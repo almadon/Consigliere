@@ -12,6 +12,9 @@
 # arcane_server_encryption_key comes from your private fleet-config repo's
 # secret arcane.server (config/secrets/arcane/server.yml).
 
+# Pinned instead of :latest (v2.15.1, 2026-10-07; the socket proxy v0.5.0, 2026-07-27). Bump on purpose.
+arcane_server_version: "v2.15.1"
+arcane_server_proxy_version: "v0.5.0"
 arcane_server_dir: /opt/arcane
 # Address the published port(s) bind to. Default: this host's Tailscale IP
 # (from the inventory), so the service is reachable over the tailnet only; falls

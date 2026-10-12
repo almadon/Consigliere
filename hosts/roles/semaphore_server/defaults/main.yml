@@ -12,9 +12,9 @@
 # semaphore_server_access_key_encryption (generate: openssl rand -base64 32).
 
 # Pinned deliberately: 2.19 removed BoltDB, so an unpinned image could change the
-# database story under you. Bump on purpose (v2.19.12 is the stable release of
-# 2026-08-30; the SQLite setup below is supported by it).
-semaphore_server_version: "v2.19.12"
+# database story under you. Bump on purpose (v2.19.16 is the stable release of
+# 2026-10-07; the SQLite setup below is supported by it).
+semaphore_server_version: "v2.19.16"
 semaphore_server_dir: /opt/semaphore
 # Address the published port(s) bind to. Default: this host's Tailscale IP
 # (from the inventory), so the service is reachable over the tailnet only; falls

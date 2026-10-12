@@ -7,7 +7,7 @@
 #     - ntfys://ntfy.example.com/alerts
 #     - tgram://<bot token>/<chat id>
 # Installs /usr/local/bin/fleet-notify "<title>" ["<body>"] (body from stdin if omitted).
-apprise_version: "2.0.0"
+apprise_version: "2.0.1"
 apprise_venv: /opt/apprise-venv
 apprise_config_dir: /etc/apprise
 apprise_notify_urls: []

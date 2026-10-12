@@ -3,7 +3,7 @@
 # docker/examples/compose.proxy.yaml (verified 2026-10-01).
 services:
   docker-socket-proxy:
-    image: tecnativa/docker-socket-proxy:latest
+    image: tecnativa/docker-socket-proxy:{{ arcane_server_proxy_version }}
     container_name: arcane-docker-proxy
     environment:
       - EVENTS=1
@@ -38,7 +38,7 @@ services:
       - no-new-privileges:true
 
   arcane:
-    image: ghcr.io/getarcaneapp/arcane:latest
+    image: ghcr.io/getarcaneapp/arcane:{{ arcane_server_version }}
     container_name: arcane
 {% if arcane_server_network %}
     networks:

@@ -10,9 +10,13 @@
 # shared with every agent (same file), so the server and the agents hold the
 # arkeep.agent password and only the server holds arkeep.server.
 
-# Pinned (the version this role was tested with: v0.6.2, 2026-09-28; :latest was the same
-# image). Keep the agents on the same version as the server; bump both on purpose.
-arkeep_server_version: "v0.6.2"
+# Pinned. v0.9.0 (2026-10-12) was tested with this role's compose (agent enrolment by CSR,
+# registration and the job stream all work). Keep the agents on the same version as the
+# server and bump both on purpose. Upgrading runs database migrations when the server starts:
+# back up the arkeep-data volume first. v0.8.0 made the "user" role read-only.
+arkeep_server_version: "v0.9.0"
+# The server asks GitHub whether a newer release exists; set false to stop that.
+arkeep_server_update_check: true
 arkeep_server_dir: /opt/arkeep-server
 # Address the published port(s) bind to. Default: this host's Tailscale IP
 # (from the inventory), so the service is reachable over the tailnet only; falls

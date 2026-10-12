@@ -10,7 +10,7 @@
 # arkeep_agent_secret: shared secret, from the secret arkeep.agent -- the same
 # file hosts/roles/arkeep_server uses.
 # Pinned like the server (arkeep_server_version); keep them equal.
-arkeep_agent_version: "v0.6.2"
+arkeep_agent_version: "v0.9.0"
 arkeep_agent_dir: /opt/arkeep-agent
 arkeep_agent_log_level: info
 

@@ -4,7 +4,7 @@
 # manager, so no ports are published on this host.
 services:
   arcane-edge-agent:
-    image: ghcr.io/getarcaneapp/agent:latest
+    image: ghcr.io/getarcaneapp/agent:{{ arcane_agent_version }}
     container_name: arcane-edge-agent
     restart: unless-stopped
     environment:
