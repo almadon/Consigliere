@@ -24,7 +24,7 @@ set -euo pipefail
 # On a terminal, always show what will be used and let you change it (a value left
 # exported in your shell would otherwise be used silently).
 if [ -t 0 ]; then
-  d="${FRAMEWORK_REPO_URL:-https://github.com/SerenIT-org/Consigliere.git}"
+  d="${FRAMEWORK_REPO_URL:-https://github.com/almadon/Consigliere.git}"
   read -r -p "Framework repo URL [$d]: " in; FRAMEWORK_REPO_URL="${in:-$d}"
   d="${FLEET_CONFIG_REPO_URL:-}"
   read -r -p "Your PRIVATE fleet repo URL (git@github.com:you/fleet.git)${d:+ [$d]}: " in; FLEET_CONFIG_REPO_URL="${in:-$d}"
@@ -88,7 +88,7 @@ chmod 600 /etc/fleet-reconcile.env
 echo "==> Cloning framework repo (to get reconcile.sh)"
 mkdir -p "$WORKDIR"
 framework_fail() {
-  echo "ERROR: could not get $FRAMEWORK_REPO_URL. The framework repo is public and needs no login, so this URL is wrong or unreachable (it lives at https://github.com/SerenIT-org/Consigliere.git). Fix it and re-run bootstrap.sh; nothing else needs cleaning up." >&2
+  echo "ERROR: could not get $FRAMEWORK_REPO_URL. The framework repo is public and needs no login, so this URL is wrong or unreachable (it lives at https://github.com/almadon/Consigliere.git). Fix it and re-run bootstrap.sh; nothing else needs cleaning up." >&2
   exit 1
 }
 if [ -d "$WORKDIR/framework/.git" ]; then

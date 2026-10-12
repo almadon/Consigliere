@@ -47,7 +47,7 @@ secrets, no site values, and no taxonomy, since tag names and "which roles run
 where" are the operator's own design.
 
 All of that lives in a separate **private fleet repo**, created from
-[consigliere-fleet-template](https://github.com/SerenIT-org/consigliere-fleet-template)
+[consigliere-fleet-template](https://github.com/almadon/consigliere-fleet-template)
 (not a fork: forks of public repos can't be private). Its two purposes:
 **customization** (node taxonomy, composition, apps, runbooks) and
 **secrets/variables**. The framework references that repo and is responsible
@@ -225,7 +225,7 @@ manager.
 - Outline vs. WikiJS — under consideration, doesn't block anything (the
   provider abstraction isolates it).
 - Where this framework repo is hosted — currently GitHub
-  (`github.com/SerenIT-org/Consigliere`).
+  (`github.com/almadon/Consigliere`).
 - Wazuh's default credentials need rotating before `stacks/wazuh/` touches
   anything but localhost — see its README's procedure.
 - Update intelligence module (apt-listchanges, Diun/Renovate, breaking-

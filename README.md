@@ -111,7 +111,7 @@ get it self-reconciling" in the meantime.
 This repo is public and generic: a library of roles, a default playbook, the
 console, bootstrap scripts. It contains **no taxonomy, no site-specific
 values, and no secrets**. Your fleet lives in a **separate private repo** you
-create from [consigliere-fleet-template](https://github.com/SerenIT-org/consigliere-fleet-template)
+create from [consigliere-fleet-template](https://github.com/almadon/consigliere-fleet-template)
 (GitHub forks of public repos can't be private, so use "Use this template" ->
 Private). That repo has two jobs:
 
@@ -198,12 +198,12 @@ equivalent gate — this one only covers the framework.)
 
 ## Open decisions (not yet settled)
 
-- Naming — "serenIT" vs "Consigliere" vs something else (conformIT was
+- Naming — "Consigliere" vs something else (conformIT was
   raised too). Internal docs still say "Consigliere"; infra-level names
   (env vars, systemd units) were deliberately made name-agnostic so this
   doesn't need a second mass-rename once it's settled.
 - Where this framework repo itself is hosted — currently GitHub
-  (`github.com/SerenIT-org/Consigliere`), presumably staying there.
+  (`github.com/almadon/Consigliere`), presumably staying there.
 - Whether swarm join tokens get regenerated/rotated, and how.
 - Provisioning substrate for Terraform (hypervisor/cloud/bare-metal mix) —
   needed before the provisioning layer can be scaffolded.

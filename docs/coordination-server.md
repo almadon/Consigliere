@@ -34,7 +34,7 @@ Docker image build, any role on a real host.
 Get `hosts/bootstrap/bootstrap.sh` onto the host (it's in the framework repo),
 then:
 
-    FRAMEWORK_REPO_URL=https://github.com/SerenIT-org/Consigliere.git \
+    FRAMEWORK_REPO_URL=https://github.com/almadon/Consigliere.git \
     FLEET_CONFIG_REPO_URL=git@github.com:<you>/<fleet-repo>.git \
     FLEET_CONFIG_REGISTER_TOKEN=<token, optional> \
     HEARTBEAT_URL=<your heartbeat url> \
