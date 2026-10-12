@@ -1,9 +1,9 @@
-FROM node:20-alpine AS deps
+FROM node:24-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm install
+RUN npm ci
 
-FROM node:20-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -11,7 +11,7 @@ RUN npm run build
 
 # `output: "standalone"` (next.config.mjs) traces the minimal set of files
 # needed to run, so the final image doesn't carry the full node_modules tree.
-FROM node:20-alpine AS run
+FROM node:24-alpine AS run
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/.next/standalone ./
