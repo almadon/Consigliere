@@ -1,0 +1,67 @@
+---
+- name: Require a source host
+  ansible.builtin.assert:
+    that: restic_mirror_source | length > 0
+    fail_msg: Set restic_mirror_source (the Tailscale hostname of the REST server to copy from).
+    quiet: true
+
+- name: Install rsync and OpenSSH client
+  ansible.builtin.apt:
+    name: [rsync, openssh-client]
+    state: present
+
+- name: Make sure /root/.ssh exists
+  ansible.builtin.file:
+    path: /root/.ssh
+    state: directory
+    mode: "0700"
+
+- name: Create the mirror's SSH key (once)
+  ansible.builtin.command:
+    cmd: ssh-keygen -q -t ed25519 -N "" -C "restic-mirror@{{ inventory_hostname }}" -f /root/.ssh/restic_mirror
+    creates: /root/.ssh/restic_mirror
+  when: not ansible_check_mode
+
+- name: Read the public key
+  ansible.builtin.slurp:
+    src: /root/.ssh/restic_mirror.pub
+  register: _restic_mirror_pub
+  failed_when: false
+
+- name: Show the public key the source host must authorize
+  ansible.builtin.debug:
+    msg: >-
+      Put this in restic_server_mirror_keys on {{ restic_mirror_source }}:
+      {{ (_restic_mirror_pub.content | b64decode | trim)
+      if _restic_mirror_pub.content is defined else '(created on the real run)' }}
+
+- name: Create the destination directory
+  ansible.builtin.file:
+    path: "{{ restic_mirror_dest_dir }}"
+    state: directory
+    mode: "0750"
+
+- name: Install the mirror script
+  ansible.builtin.template:
+    src: fleet-restic-mirror.sh.j2
+    dest: /usr/local/sbin/fleet-restic-mirror.sh
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Install the service and timer
+  ansible.builtin.template:
+    src: "fleet-restic-mirror.{{ item }}.j2"
+    dest: "/etc/systemd/system/fleet-restic-mirror.{{ item }}"
+    mode: "0644"
+  loop: [service, timer]
+  notify: Reload systemd for the restic mirror
+  register: _restic_mirror_units
+
+- name: Enable the timer
+  ansible.builtin.systemd:
+    name: fleet-restic-mirror.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not ansible_check_mode or not _restic_mirror_units.changed

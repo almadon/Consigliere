@@ -91,3 +91,20 @@
     pull: "{{ 'always' if _restic_server_compose.changed else 'missing' }}"
   # In a check run the directory and compose file above are not really written yet.
   when: not ansible_check_mode or not _restic_server_compose.changed
+
+- name: Let a mirror host pull the data read-only (rsync over SSH)
+  when: restic_server_mirror_keys | length > 0
+  block:
+    - name: Install rsync (it ships rrsync)
+      ansible.builtin.apt:
+        name: rsync
+        state: present
+
+    - name: Authorize the mirror keys for a read-only rrsync of the data dir
+      ansible.posix.authorized_key:
+        user: root
+        key: "{{ item }}"
+        key_options: 'restrict,command="/usr/bin/rrsync -ro {{ restic_server_data_dir }}"'
+        comment: restic mirror (read-only)
+        exclusive: false
+      loop: "{{ restic_server_mirror_keys }}"

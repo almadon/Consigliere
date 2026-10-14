@@ -1,0 +1,12 @@
+---
+# Mirrors another restic REST server's data directory onto this host with rsync over the
+# tailnet (restic packs are immutable, so only new files travel). Run it on the mirror
+# host (util: [restic_mirror]); the source host (util: [restic]) must list this host's
+# public key in restic_server_mirror_keys, see the README.
+# Tailscale hostname of the host to pull from (required).
+restic_mirror_source: ""
+# Where the source keeps its data, and where this host keeps the copy.
+restic_mirror_source_dir: /srv/restic
+restic_mirror_dest_dir: /srv/restic
+restic_mirror_schedule: "*-*-* 03:30:00"
+restic_mirror_randomized_delay: 15min

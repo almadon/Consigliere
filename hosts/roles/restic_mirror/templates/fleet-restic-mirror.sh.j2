@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Managed by Ansible (hosts/roles/restic_mirror). Pulls new restic files from
+# {{ restic_mirror_source }} over the tailnet. Never deletes anything here.
+set -uo pipefail
+notify() { command -v fleet-notify >/dev/null 2>&1 && fleet-notify "$1" "$2" || true; }
+
+exec 9>/run/fleet-restic-mirror.lock
+flock -n 9 || { echo "another run is in progress"; exit 0; }
+
+# --ignore-existing: pack, index and snapshot files never change once written.
+# locks/ is skipped so a stale lock never lands in the copy.
+# No --delete: a prune on the source does not remove data here.
+# The source's forced command (rrsync -ro) maps the remote path "/" to its data dir.
+log="$(mktemp)"; trap 'rm -f "$log"' EXIT
+if rsync -a --numeric-ids --partial --ignore-existing --exclude='locks/' \
+    -e "ssh -i /root/.ssh/restic_mirror -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
+    "root@{{ restic_mirror_source }}:/" "{{ restic_mirror_dest_dir }}/" >"$log" 2>&1; then
+  echo "mirror ok"
+else
+  notify "restic mirror FAILED" "{{ inventory_hostname }} <- {{ restic_mirror_source }}: $(tail -n 15 "$log")"
+  cat "$log" >&2; exit 1
+fi

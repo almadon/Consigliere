@@ -25,3 +25,6 @@ restic_server_append_only: true
 restic_server_no_auth: false
 # Join a shared Docker network (e.g. proxynet) to be fronted by Traefik; empty = none.
 restic_server_network: ""
+# Public keys of mirror hosts (see the restic_mirror role) allowed to pull this host's
+# data directory with rsync, read-only. Empty = no mirror.
+restic_server_mirror_keys: []

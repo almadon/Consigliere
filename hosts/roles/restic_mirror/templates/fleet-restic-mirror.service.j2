@@ -1,0 +1,9 @@
+# Managed by Ansible (hosts/roles/restic_mirror)
+[Unit]
+Description=Mirror restic repositories from {{ restic_mirror_source }}
+Wants=network-online.target
+After=network-online.target tailscaled.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/fleet-restic-mirror.sh

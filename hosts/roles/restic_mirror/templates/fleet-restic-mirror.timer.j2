@@ -1,0 +1,11 @@
+# Managed by Ansible (hosts/roles/restic_mirror)
+[Unit]
+Description=Scheduled restic mirror
+
+[Timer]
+OnCalendar={{ restic_mirror_schedule }}
+RandomizedDelaySec={{ restic_mirror_randomized_delay }}
+Persistent=true
+
+[Install]
+WantedBy=timers.target

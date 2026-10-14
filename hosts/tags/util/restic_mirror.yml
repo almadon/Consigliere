@@ -1,0 +1,4 @@
+---
+description: "Mirrors another restic REST server's data over rsync (set restic_mirror_source)"
+order: 45
+roles: [restic_mirror]
