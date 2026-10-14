@@ -19,6 +19,31 @@
   when: not restic_server_no_auth
   no_log: true
 
+- name: Prepare the data disk
+  when: restic_server_data_device | length > 0
+  block:
+    - name: Create the mount point
+      ansible.builtin.file:
+        path: "{{ restic_server_data_dir }}"
+        state: directory
+        mode: "0750"
+
+    # Makes a filesystem only on a blank device; it fails (never overwrites) when the
+    # device already holds a different filesystem.
+    - name: Make a filesystem on the data disk if it has none
+      community.general.filesystem:
+        dev: "{{ restic_server_data_device }}"
+        fstype: "{{ restic_server_data_fstype }}"
+        opts: "{{ restic_server_data_mkfs_opts }}"
+
+    - name: Mount the data disk
+      ansible.posix.mount:
+        path: "{{ restic_server_data_dir }}"
+        src: "{{ restic_server_data_device }}"
+        fstype: "{{ restic_server_data_fstype }}"
+        opts: defaults,nofail
+        state: mounted
+
 - name: Create the service and data directories
   ansible.builtin.file:
     path: "{{ item.path }}"

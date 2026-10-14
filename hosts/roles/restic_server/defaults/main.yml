@@ -10,6 +10,12 @@ restic_server_version: "0.14.0"
 restic_server_data_dir: /srv/restic
 restic_server_bind_address: "{{ tailscale_ipv4 | default('127.0.0.1', true) }}"
 restic_server_port: 8000
+# A dedicated data disk, mounted at restic_server_data_dir. Empty = use the root disk.
+# Use a stable path (/dev/disk/by-id/...), not /dev/sdb. A blank disk gets a filesystem;
+# one that already holds a different filesystem makes the run fail rather than be wiped.
+restic_server_data_device: ""
+restic_server_data_fstype: ext4
+restic_server_data_mkfs_opts: "-m 0"   # no reserved blocks: this disk only holds backups
 # Each user may only reach the repository under their own name (/alice/...).
 restic_server_private_repos: true
 # Clients can add data but not delete or overwrite it, so a compromised client can't
