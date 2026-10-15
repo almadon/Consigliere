@@ -5,7 +5,12 @@
 # TAILSCALE_AUTHKEY) and it lives only in that one run's environment.
 tailscale_authkey: "{{ lookup('env', 'TAILSCALE_AUTHKEY') }}"
 
-tailscale_args: "--ssh"   # enables Tailscale SSH; drop if you'd rather manage keys yourself
+# Tailscale SSH (tailscaled answering on port 22, governed by tailnet SSH ACLs). Off by
+# default: nodes use their own sshd, reached over the tailnet. The role enforces this on
+# nodes that already joined, too (it runs `tailscale set --ssh=...` when it differs).
+tailscale_ssh: false
+# Extra arguments for the first `tailscale up`.
+tailscale_args: ""
 
 # Tags to advertise when joining. Empty (the default) advertises none: tag
 # names are your own taxonomy, so the framework doesn't pick any. If your

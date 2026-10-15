@@ -53,7 +53,25 @@
       tailscale up
       --authkey={{ tailscale_authkey }}
       {{ ('--advertise-tags=' ~ tailscale_tags) if tailscale_tags else '' }}
+      --ssh={{ tailscale_ssh | bool | lower }}
       {{ tailscale_args }}
   when: _tailscale_needs_join
   no_log: true   # the command line contains the auth key
+  changed_when: true
+
+- name: Read the node's current Tailscale SSH setting
+  ansible.builtin.command: tailscale debug prefs
+  register: _tailscale_prefs
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: not _tailscale_needs_join
+
+- name: Make Tailscale SSH match tailscale_ssh
+  ansible.builtin.command:
+    cmd: "tailscale set --ssh={{ tailscale_ssh | bool | lower }}"
+  when:
+    - not _tailscale_needs_join
+    - _tailscale_prefs.rc | default(1) == 0
+    - (_tailscale_prefs.stdout | from_json).RunSSH | default(false) | bool != (tailscale_ssh | bool)
   changed_when: true
