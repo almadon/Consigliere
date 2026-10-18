@@ -1,7 +1,7 @@
 # restic_mirror
 
 Keeps a second restic REST server (the mirror) in step with the first, so Arkeep only
-uploads each backup once. The mirror pulls from the source with `rsync` over the tailnet
+uploads each backup once. The mirror pulls from the source with `rsync` over the tailnet (the source is looked up with `tailscale ip`, so MagicDNS is not needed)
 on a systemd timer.
 
 - Run it on the mirror host: `util: [restic, restic_mirror]` and `restic_mirror_source: pulsar`.

@@ -12,9 +12,13 @@ flock -n 9 || { echo "another run is in progress"; exit 0; }
 # No --delete: a prune on the source does not remove data here.
 # The source's forced command (rrsync -ro) maps the remote path "/" to its data dir.
 log="$(mktemp)"; trap 'rm -f "$log"' EXIT
+# Resolve the source through Tailscale itself: it works with MagicDNS off and follows the
+# peer if its tailnet address changes (a re-tagged node gets a new one).
+src="$(tailscale ip -4 {{ restic_mirror_source }} 2>/dev/null | head -n1)"
+src="${src:-{{ restic_mirror_source }}}"
 if rsync -a --numeric-ids --partial --ignore-existing --exclude='locks/' \
     -e "ssh -i /root/.ssh/restic_mirror -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
-    "root@{{ restic_mirror_source }}:/" "{{ restic_mirror_dest_dir }}/" >"$log" 2>&1; then
+    "root@${src}:/" "{{ restic_mirror_dest_dir }}/" >"$log" 2>&1; then
   echo "mirror ok"
 else
   notify "restic mirror FAILED" "{{ inventory_hostname }} <- {{ restic_mirror_source }}: $(tail -n 15 "$log")"
