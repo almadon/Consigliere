@@ -27,7 +27,8 @@ keep ports unpublished or bound to the Tailscale address.
 1. Install and connect Unraid's **Tailscale plugin** (use a tagged auth key). Its CLI and socket are read by the
    container to learn the host's tailnet name, which must equal the key in `hosts.yml`.
 2. Add the host to your fleet's `config/inventory/hosts.yml` (`feat: [arkeep]`, `type: unraid`) and push.
-3. Run:
+3. Run the same `bootstrap.sh` as on any other host: it recognises Unraid and hands over to this setup
+   (`CONSIGLIERE_PROFILE=unraid` forces it). Or run this one directly:
 
        curl -fsSLO https://raw.githubusercontent.com/almadon/Consigliere/main/hosts/bootstrap/unraid/bootstrap-unraid.sh
        FRAMEWORK_REPO_URL=https://github.com/almadon/Consigliere.git \

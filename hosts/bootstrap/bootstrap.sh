@@ -21,6 +21,43 @@
 # secrets from your admin machine (scripts/access.sh). No passwords are copied.
 set -euo pipefail
 
+# ---- Which kind of host is this? ------------------------------------------------------------------
+# One entry point for every kind of host. Debian and Ubuntu continue below; the others hand over to
+# their own setup, because they cannot run this one (no apt, no systemd, or a different init):
+#   unraid  -> hosts/bootstrap/unraid/bootstrap-unraid.sh   (a self-scheduling container)
+#   macos   -> macos/bootstrap/bootstrap.sh                 (launchd)
+# CONSIGLIERE_PROFILE=debian|unraid|macos overrides the detection.
+detect_profile() {
+  if [ -n "${CONSIGLIERE_PROFILE:-}" ]; then echo "$CONSIGLIERE_PROFILE"; return; fi
+  if [ -f /etc/unraid-version ]; then echo unraid
+  elif [ "$(uname -s)" = Darwin ]; then echo macos
+  elif [ -r /etc/os-release ] && grep -qiE '^ID(_LIKE)?=.*(debian|ubuntu)' /etc/os-release; then echo debian
+  else echo unsupported
+  fi
+}
+PROFILE="$(detect_profile)"
+if [ "$PROFILE" != debian ]; then
+  here="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || true)"
+  # Hand over to the profile's script: the sibling file when run from a checkout, otherwise a fresh clone.
+  handoff() {   # $1 = path of the script relative to the framework root
+    if [ -n "$here" ] && [ -f "$here/../../$1" ]; then exec bash "$here/../../$1"; fi
+    command -v git >/dev/null || { echo "ERROR: git is needed to fetch the $PROFILE setup" >&2; exit 1; }
+    tmp="$(mktemp -d)"
+    git clone --depth 1 "${FRAMEWORK_REPO_URL:-https://github.com/almadon/Consigliere.git}" "$tmp/framework" >&2 ||
+      { echo "ERROR: could not fetch the framework repo" >&2; exit 1; }
+    exec bash "$tmp/framework/$1"
+  }
+  case "$PROFILE" in
+    unraid) echo "==> Unraid detected: using the container-based setup"; handoff hosts/bootstrap/unraid/bootstrap-unraid.sh ;;
+    macos)  echo "==> macOS detected: using the launchd setup";          handoff macos/bootstrap/bootstrap.sh ;;
+    *)
+      echo "ERROR: this kind of host is not supported (profile: $PROFILE)." >&2
+      [ -r /etc/os-release ] && echo "       OS: $(. /etc/os-release; echo "${PRETTY_NAME:-unknown}")" >&2
+      echo "       Supported: Debian and Ubuntu, Unraid, macOS. To force a profile: CONSIGLIERE_PROFILE=debian|unraid|macos" >&2
+      exit 1 ;;
+  esac
+fi
+
 # On a terminal, always show what will be used and let you change it (a value left
 # exported in your shell would otherwise be used silently).
 if [ -t 0 ]; then
