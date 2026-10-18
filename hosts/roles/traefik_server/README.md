@@ -1,9 +1,11 @@
 # traefik_server
 
-Prepares a host to run the Traefik edge stack from the separate geotraefik repo:
-renders Traefik's *dynamic* configuration (a shared base, this host's own routes,
-and the certificates available on the host) and creates the shared proxy network.
-It does not deploy Traefik itself, and the host holds no DNS API key.
+Runs Traefik (Docker, pinned `traefik_server_version`) as this host's reverse proxy and
+renders its configuration: a static `traefik.yml`, and dynamic files (a shared base, this
+host's own routes, the certificates available on the host). It also creates the shared proxy
+network. The host holds no DNS API key: certificates are files from Cert Warden. Set
+`traefik_server_deploy: false` to only render the config and run Traefik some other way.
+The stack is the successor to the geotraefik compose, minus its ACME resolver.
 
 ## How a node knows which routes are its own
 
@@ -25,23 +27,13 @@ instead of overriding each other, because each layer uses a different name.
         host: vault.example.com
         backend: http://vaultwarden:80      # container on the shared network
 
-## What geotraefik must do
+## Behind another proxy
 
-Mount the rendered config and the certificates, and drop the ACME resolver
-(certificates are files now):
-
-    traefik:
-      volumes:
-        - /opt/traefik/dynamic:/dynamic:ro
-        - /opt/common/certs:/certs:ro
-      networks: [edge, proxynet]         # your shared network, external
-
-and in `traefik.yml`, a file provider on `/dynamic` with `watch: true`, and no
-`certificatesResolvers`. Remove the `BUNNY_API_KEY` environment and the static
-`routes.yml` config from the compose file.
+If a proxy such as Caddy sits in front, list its address in `traefik_server_trusted_ips` so
+Traefik trusts its `X-Forwarded-*` headers.
 
 ## Unverified
 
-That Traefik reloads when a referenced certificate file changes is handled by
+Not run against a live host. That Traefik reloads when a referenced certificate file changes is handled by
 touching `20-tls.yml` after renewal (the fetch script does this); I haven't
 confirmed it against a running Traefik.

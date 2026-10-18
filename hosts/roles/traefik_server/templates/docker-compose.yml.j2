@@ -1,0 +1,37 @@
+# Managed by Ansible (hosts/roles/traefik_server) -- edits here get overwritten on the next
+# reconciliation run. Change the role's defaults / fleet vars instead.
+name: traefik
+
+services:
+  traefik:
+    image: traefik:{{ traefik_server_version }}
+    container_name: traefik
+    restart: unless-stopped
+    ports:
+      - "{{ traefik_server_http_port }}:80"
+      - "{{ traefik_server_https_port }}:443"
+    volumes:
+      - {{ traefik_server_dir }}/dynamic:/dynamic:ro
+      - {{ traefik_server_certs_dir }}:/certs:ro
+    configs:
+      - source: static
+        target: /etc/traefik/traefik.yml
+{% if traefik_server_network %}
+    networks: [{{ traefik_server_network }}]
+{% endif %}
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+
+# The static file is passed as a compose config, so changing it recreates the container.
+configs:
+  static:
+    file: {{ traefik_server_dir }}/traefik.yml
+{% if traefik_server_network %}
+
+networks:
+  {{ traefik_server_network }}:
+    external: true
+{% endif %}

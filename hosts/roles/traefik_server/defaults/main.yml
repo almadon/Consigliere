@@ -1,7 +1,7 @@
 ---
-# Applied to hosts tagged util:traefik: hosts that run Traefik as a reverse
-# proxy. This role does NOT deploy Traefik (the stack lives in the geotraefik
-# repo); it prepares what that stack mounts on the host:
+# Applied to hosts tagged util:traefik: hosts that run Traefik as a reverse proxy.
+# The role deploys Traefik itself (compose in traefik_server_dir, set
+# traefik_server_deploy: false to leave that to another tool) and prepares what it mounts:
 #
 #   <dir>/dynamic/00-base.yml    ping + http->https redirect (framework-owned)
 #   <dir>/dynamic/10-routes.yml  THIS host's routes, collected from variables
@@ -26,6 +26,14 @@
 #     rule:        optional full Traefik rule, replacing the host-based one
 
 traefik_server_dir: /opt/traefik
+traefik_server_deploy: true
+# Pinned (v3.6.25, the 3.6 line geotraefik used). Bump on purpose.
+traefik_server_version: "v3.6.25"
+traefik_server_http_port: 80
+traefik_server_https_port: 443
+# Proxies (e.g. a Caddy in front) whose X-Forwarded-* headers Traefik should trust: IPs/CIDRs.
+traefik_server_trusted_ips: []
+traefik_server_log_level: INFO
 
 # Where certificates live on the host (certwarden_agent_dir), and the names to
 # load from there. Defaults to every certificate certwarden_agent fetches.

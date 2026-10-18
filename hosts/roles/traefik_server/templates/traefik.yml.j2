@@ -1,0 +1,29 @@
+# Managed by Ansible (hosts/roles/traefik_server) -- edits get overwritten.
+# Static configuration. Routes and certificates are files in /dynamic (see the dynamic/ dir);
+# there is no ACME resolver: certificates come from Cert Warden as files under /certs.
+entryPoints:
+  {{ traefik_server_entrypoint_web }}:
+    address: ":80"
+{% if traefik_server_trusted_ips | length > 0 %}
+    forwardedHeaders:
+      trustedIPs: {{ traefik_server_trusted_ips | to_json }}
+{% endif %}
+  {{ traefik_server_entrypoint_websecure }}:
+    address: ":443"
+{% if traefik_server_trusted_ips | length > 0 %}
+    forwardedHeaders:
+      trustedIPs: {{ traefik_server_trusted_ips | to_json }}
+{% endif %}
+
+# Plain-HTTP health endpoint (/ping on the web entry point), used by the container healthcheck.
+ping:
+  entryPoint: {{ traefik_server_entrypoint_web }}
+
+providers:
+  file:
+    directory: /dynamic
+    watch: true
+
+log:
+  level: {{ traefik_server_log_level }}
+accessLog: {}
