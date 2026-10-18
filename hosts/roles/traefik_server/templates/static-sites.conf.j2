@@ -2,7 +2,7 @@
 {% for st in traefik_server_static_sites %}
 server {
     listen 8080;
-    server_name {{ st.host }};
+    server_name {{ ([st.host] if st.host is string else st.host) | join(' ') }};
     root /sites/{{ st.name }};
     index index.html;
     server_tokens off;

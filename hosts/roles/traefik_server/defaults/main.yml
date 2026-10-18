@@ -24,6 +24,8 @@
 #                  hosts via a Tailscale address)
 #     middlewares: optional list of extra middleware names (e.g. a forward-auth you define)
 #     rule:        optional full Traefik rule, replacing the host-based one
+#     redirect:    {to: "https://example.org", permanent: true} instead of a backend: answers with a redirect
+#                  to `to` plus the original path and query (no backend needed)
 #     profile:     security-header profile: app (default), strict, relaxed, framed or none; see below
 #     compress:    false to turn compression off for this route (default true)
 #     insecure:    true when the backend is HTTPS with a certificate Traefik can't verify

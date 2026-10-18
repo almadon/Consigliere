@@ -26,7 +26,7 @@
       {{ _traefik_server_routes | selectattr('profile', 'defined')
          | rejectattr('profile', 'in', ['app', 'strict', 'relaxed', 'framed', 'none']) | list }}
     _traefik_server_without_backend: >-
-      {{ _traefik_server_routes | rejectattr('backend', 'defined') | list | length }}
+      {{ _traefik_server_routes | rejectattr('backend', 'defined') | rejectattr('redirect', 'defined') | list | length }}
     _traefik_server_without_match: >-
       {{ _traefik_server_routes | rejectattr('host', 'defined') | rejectattr('rule', 'defined') | list | length }}
 
@@ -43,7 +43,7 @@
       - traefik_server_default_profile in ['app', 'strict', 'relaxed', 'framed', 'none']
     fail_msg: >-
       Every traefik_server_routes* entry needs a unique lowercase name (a-z, 0-9, dash),
-      a backend URL, and a host (or a full rule); profile, if given, must be app, strict, relaxed, framed or none.
+      a backend URL (or `redirect: {to: https://..., permanent: true}`), and a host (or a full rule); profile, if given, must be app, strict, relaxed, framed or none.
     quiet: true
 
 - name: Create the Traefik directories

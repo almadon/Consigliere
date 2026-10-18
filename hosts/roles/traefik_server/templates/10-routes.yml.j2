@@ -17,19 +17,30 @@ http:
 {% for r in ns.all %}
 {% set hosts = r.host if (r.host is defined and r.host is not string) else ([r.host] if r.host is defined else []) %}
 {% set profile = r.profile | default(traefik_server_default_profile) %}
-{% set chain = (['compress@file'] if (r.compress | default(true)) else []) + (['sec-' ~ profile ~ '@file'] if profile != 'none' else []) + (r.middlewares | default([])) %}
+{% set normal = (['compress@file'] if (r.compress | default(true)) else []) + (['sec-' ~ profile ~ '@file'] if profile != 'none' else []) + (r.middlewares | default([])) %}
+{% set chain = ['redirect-' ~ r.name ~ '@file'] if r.redirect is defined else normal %}
     # from {{ r._src }}
     {{ r.name }}:
       rule: {{ (r.rule | default(hosts | map('regex_replace', '^(.*)$', 'Host(`\\1`)') | join(' || '))) | to_json }}
       entryPoints: [{{ traefik_server_entrypoint_websecure }}]
-      service: {{ r.name }}
+      service: {{ 'noop@internal' if r.redirect is defined else r.name }}
 {% if chain | length > 0 %}
       middlewares: {{ chain | to_json }}
 {% endif %}
       tls: {}
 {% endfor %}
+{% if ns.all | selectattr('redirect', 'defined') | list | length > 0 %}
+  middlewares:
+{% for r in ns.all | selectattr('redirect', 'defined') %}
+    redirect-{{ r.name }}:
+      redirectRegex:
+        regex: "^https?://[^/]+(.*)$"
+        replacement: {{ (r.redirect.to | trim('/') ~ '${1}') | to_json }}
+        permanent: {{ (r.redirect.permanent | default(true)) | bool | lower }}
+{% endfor %}
+{% endif %}
   services:
-{% for r in ns.all %}
+{% for r in ns.all | rejectattr('redirect', 'defined') %}
     {{ r.name }}:
       loadBalancer:
 {% if r.pass_host_header is defined and not r.pass_host_header %}
