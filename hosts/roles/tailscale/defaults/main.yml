@@ -17,3 +17,13 @@ tailscale_args: ""
 # auth key is tagged, the node gets those tags without this. Set per group in
 # config/vars/group/ only if you want the role to advertise tags itself.
 tailscale_tags: ""
+
+# ---- Host settings Tailscale itself warns about ("IP forwarding is disabled", "UDP GRO forwarding is
+# suboptimally configured") ----------------------------------------------------------------------------
+# Forwarding is needed for subnet routing and exit nodes, and Docker turns it on anyway. The host's
+# firewall still decides what may be forwarded (ufw's routed policy is deny). Set false to leave it alone.
+tailscale_ip_forwarding: true
+# Turns UDP GRO forwarding on for the interface that carries the default route (Tailscale's own advice,
+# https://tailscale.com/s/ethtool-config-udp-gro), at every boot and when the network comes up.
+# Skipped in containers and on NICs that do not support it.
+tailscale_udp_gro_tuning: true

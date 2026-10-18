@@ -1,0 +1,124 @@
+---
+# Apply kernel settings the standard way, verify them, and only then retire the hand-made versions.
+# Inputs (set by the caller): baseline_sysctl_apply_file, baseline_sysctl_apply_settings (key: value; a null
+# value skips the key), baseline_sysctl_managed_files (files that belong to this fleet and must not be edited).
+#
+# 1. write the settings into baseline_sysctl_apply_file and set them in the running kernel
+# 2. read the kernel back: a setting counts as VERIFIED only if it is in effect with the intended value
+# 3. for VERIFIED keys only: comment out the same key in /etc/sysctl.conf and the other /etc/sysctl.d/*.conf
+#    files (the original of each changed file is kept in /var/backups/consigliere). Nothing is deleted; a key that could not be
+#    verified (for example in an unprivileged container) leaves the old setting exactly as it was.
+- name: Work out the settings to manage
+  ansible.builtin.set_fact:
+    _baseline_sysctl_wanted: "{{ baseline_sysctl_apply_settings | dict2items | rejectattr('value', 'none') | list }}"
+
+- name: Read the kernel's current values (to never lower a limit that is already higher)
+  ansible.builtin.command: "sysctl -n {{ item.key }}"
+  loop: "{{ _baseline_sysctl_wanted }}"
+  loop_control:
+    label: "{{ item.key }}"
+  register: _baseline_sysctl_before
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Final values (limits listed in baseline_sysctl_raise_only are only ever raised)
+  ansible.builtin.set_fact:
+    _baseline_sysctl_final: >-
+      {%- set out = [] -%}
+      {%- for r in _baseline_sysctl_before.results -%}
+      {%- set cur = r.stdout | default('') | trim -%}
+      {%- if r.item.key in baseline_sysctl_raise_only and r.rc == 0 and cur is match('^[0-9]+$') and cur | int >= (r.item.value | int(0)) -%}
+      {%- set _ = out.append({'key': r.item.key, 'value': cur | int}) -%}
+      {%- else -%}
+      {%- set _ = out.append({'key': r.item.key, 'value': r.item.value}) -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {{ out | to_json }}
+
+- name: Apply them the standard way (the file, and the running kernel)
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value | string }}"
+    sysctl_file: "{{ baseline_sysctl_apply_file }}"
+    sysctl_set: true
+    state: present
+    reload: false
+  loop: "{{ _baseline_sysctl_final | from_json }}"
+  loop_control:
+    label: "{{ item.key }}={{ item.value }}"
+  register: _baseline_sysctl_applied
+  failed_when: false
+
+- name: Read back what the kernel has now
+  ansible.builtin.command: "sysctl -n {{ item.key }}"
+  loop: "{{ _baseline_sysctl_final | from_json }}"
+  loop_control:
+    label: "{{ item.key }}"
+  register: _baseline_sysctl_now
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Note which settings are in effect with the intended value
+  ansible.builtin.set_fact:
+    _baseline_sysctl_verified: >-
+      {%- set ok = [] -%}
+      {%- for r in _baseline_sysctl_now.results -%}
+      {%- if r.rc == 0 and (r.stdout | trim | split() | join(' ')) == (r.item.value | string | trim | split() | join(' ')) -%}
+      {%- set _ = ok.append(r.item.key) -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {{ ok | to_json }}
+    _baseline_sysctl_unverified: >-
+      {%- set bad = [] -%}
+      {%- for r in _baseline_sysctl_now.results -%}
+      {%- if not (r.rc == 0 and (r.stdout | trim | split() | join(' ')) == (r.item.value | string | trim | split() | join(' '))) -%}
+      {%- set _ = bad.append(r.item.key) -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {{ bad | to_json }}
+
+- name: Say so when a setting is not in effect (an unprivileged container cannot change many kernel values)
+  ansible.builtin.debug:
+    msg: >-
+      Not in effect on {{ inventory_hostname }}: {{ _baseline_sysctl_unverified | from_json | join(', ') }}.
+      Any older, hand-made setting for these keys was left alone. On a container, set them on the host that runs it.
+  when: (_baseline_sysctl_unverified | from_json | length) > 0 and not ansible_check_mode
+
+- name: Find other files that set the verified keys
+  ansible.builtin.shell: >-
+    grep -l -E -s '^[[:space:]]*({{ _baseline_sysctl_verified | from_json | map('regex_escape') | join('|') }})[[:space:]]*='
+    /etc/sysctl.conf /etc/sysctl.d/*.conf || true
+  register: _baseline_sysctl_legacy
+  changed_when: false
+  check_mode: false
+  when: (_baseline_sysctl_verified | from_json | length) > 0
+
+- name: Create the backup directory
+  ansible.builtin.file:
+    path: /var/backups/consigliere
+    state: directory
+    mode: "0700"
+
+- name: Keep one pristine copy of each file before it is edited (/var/backups/consigliere, never overwritten)
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/var/backups/consigliere/{{ item | regex_replace('/', '_') }}.orig"
+    remote_src: true
+    force: false
+    mode: "0600"
+  loop: "{{ (_baseline_sysctl_legacy.stdout_lines | default([])) | reject('in', baseline_sysctl_managed_files) | list }}"
+
+- name: Retire the hand-made versions (commented out, the original is in /var/backups/consigliere)
+  ansible.builtin.lineinfile:
+    path: "{{ item.0 }}"
+    regexp: '^(\s*{{ item.1 | regex_escape }}\s*=.*)$'
+    line: '# consigliere: now set in {{ baseline_sysctl_apply_file }} -- \1'
+    backrefs: true
+  loop: >-
+    {{ (_baseline_sysctl_legacy.stdout_lines | default([]))
+       | reject('in', baseline_sysctl_managed_files)
+       | product(_baseline_sysctl_verified | from_json) | list }}
+  loop_control:
+    label: "{{ item.0 }}: {{ item.1 }}"

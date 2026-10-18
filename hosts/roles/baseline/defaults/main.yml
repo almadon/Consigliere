@@ -37,3 +37,29 @@ baseline_admin_ssh_keys: []
 # false (the role then also refuses to do it while baseline_admin_ssh_keys is empty, so it can
 # never lock you out of a host it has not given a key).
 baseline_ssh_password_auth: true
+
+# Kernel settings that fix well-known warnings and failures of the services this fleet runs. Written to
+# /etc/sysctl.d/90-consigliere.conf and applied at once. Add or override keys per group or host, set a key to
+# null to skip it, or set baseline_sysctl_manage: false to leave sysctl alone.
+#   vm.overcommit_memory   Redis/Valkey ("Memory overcommit must be enabled!"): background saves fail without it
+#   net.core.somaxconn     Redis/Valkey, nginx, Traefik: the default 4096 is fine on current kernels, 1024 is the floor
+#   vm.max_map_count       OpenSearch/Elasticsearch/Wazuh indexer refuse to start below 262144
+#   fs.inotify.*           many containers watching files: "too many open files" / "inotify limit reached"
+baseline_sysctl_manage: true
+baseline_sysctl:
+  vm.overcommit_memory: 1
+  net.core.somaxconn: 4096
+  vm.max_map_count: 262144
+  fs.inotify.max_user_watches: 524288
+  fs.inotify.max_user_instances: 1024
+# Files this fleet owns (never edited when retiring hand-made settings).
+baseline_sysctl_managed_files:
+  - /etc/sysctl.d/90-consigliere.conf
+  - /etc/sysctl.d/99-tailscale.conf
+# Keys that are limits: only ever raised to the value above, never lowered (a host whose kernel or admin already
+# set them higher keeps the higher value).
+baseline_sysctl_raise_only:
+  - net.core.somaxconn
+  - vm.max_map_count
+  - fs.inotify.max_user_watches
+  - fs.inotify.max_user_instances

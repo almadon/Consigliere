@@ -1,0 +1,158 @@
+---
+# Settings Tailscale warns about when they are missing. Included from main.yml once Tailscale is installed.
+# Everything here is best-effort and safe next to fixes someone applied by hand: the standard method is applied
+# first, tested, and only when it is verified in effect are the hand-made ones retired (commented out, the original kept
+# in /var/backups/consigliere, or a stray unit disabled). Nothing is deleted, and a method that cannot be verified
+# leaves the existing setup exactly as it was.
+- name: IP forwarding (subnet routers and exit nodes need it)
+  ansible.builtin.include_role:
+    name: baseline
+    tasks_from: sysctl
+  vars:
+    baseline_sysctl_apply_file: /etc/sysctl.d/99-tailscale.conf
+    baseline_sysctl_apply_settings:
+      net.ipv4.ip_forward: 1
+      net.ipv6.conf.all.forwarding: 1
+  when: tailscale_ip_forwarding | bool
+
+- name: UDP GRO forwarding on the default-route interface
+  when:
+    - tailscale_udp_gro_tuning | bool
+    - ansible_virtualization_type | default('') not in ['lxc', 'docker', 'podman', 'openvz']
+  block:
+    - name: Install ethtool
+      ansible.builtin.apt:
+        name: ethtool
+        state: present
+
+    - name: Which interface carries the default route
+      ansible.builtin.shell: set -o pipefail && ip -o route get 1.1.1.1 | sed -n 's/.* dev \([^ ]*\).*/\1/p' | head -n1
+      args:
+        executable: /bin/bash
+      register: _tailscale_gro_dev
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Can this NIC do it? (a feature shown as "[fixed]" or missing cannot be changed)
+      ansible.builtin.command: "ethtool -k {{ _tailscale_gro_dev.stdout | trim }}"
+      register: _tailscale_gro_before
+      changed_when: false
+      failed_when: false
+      check_mode: false
+      when: _tailscale_gro_dev.stdout | trim | length > 0
+
+    - name: Decide
+      ansible.builtin.set_fact:
+        _tailscale_gro_supported: >-
+          {{ (_tailscale_gro_before.rc | default(1)) == 0 and
+             (_tailscale_gro_before.stdout | default('')) is search('rx-udp-gro-forwarding: (on|off)(?! \[fixed\])') }}
+
+    - name: Say so when the NIC cannot do it
+      ansible.builtin.debug:
+        msg: >-
+          UDP GRO forwarding is not available on {{ _tailscale_gro_dev.stdout | default('') | trim | default('the default interface', true) }}
+          of {{ inventory_hostname }} (a virtual or fixed-feature NIC, or ethtool is not installed yet). Nothing was changed.
+      when: not (_tailscale_gro_supported | bool)
+
+    - name: Apply it the standard way (a script and a boot-time unit)
+      when: _tailscale_gro_supported | bool
+      block:
+        - name: Install the tuning script
+          ansible.builtin.template:
+            src: tailscale-udp-gro.sh.j2
+            dest: /usr/local/sbin/tailscale-udp-gro
+            mode: "0755"
+          register: _tailscale_gro_script
+
+        - name: Install the boot-time unit
+          ansible.builtin.template:
+            src: tailscale-udp-gro.service.j2
+            dest: /etc/systemd/system/tailscale-udp-gro.service
+            mode: "0644"
+          register: _tailscale_gro_unit
+
+        - name: Enable it for every boot
+          ansible.builtin.systemd:
+            name: tailscale-udp-gro.service
+            enabled: true
+            daemon_reload: "{{ _tailscale_gro_unit.changed }}"
+
+        - name: Apply it now, if the NIC is not already set
+          ansible.builtin.command: /usr/local/sbin/tailscale-udp-gro
+          changed_when: true
+          when:
+            - not ansible_check_mode
+            - >-
+              (_tailscale_gro_before.stdout | default('')) is not search('rx-udp-gro-forwarding: on') or
+              (_tailscale_gro_before.stdout | default('')) is not search('rx-gro-list: off')
+
+        - name: Test it - read the NIC's settings back
+          ansible.builtin.command: "ethtool -k {{ _tailscale_gro_dev.stdout | trim }}"
+          register: _tailscale_gro_after
+          changed_when: false
+          failed_when: false
+          check_mode: false
+
+        - name: In effect?
+          ansible.builtin.set_fact:
+            _tailscale_gro_verified: >-
+              {{ (_tailscale_gro_after.stdout | default('')) is search('rx-udp-gro-forwarding: on') and
+                 (_tailscale_gro_after.stdout | default('')) is search('rx-gro-list: off') }}
+
+        - name: Say so when it did not take
+          ansible.builtin.debug:
+            msg: >-
+              The UDP GRO setting is not in effect on {{ inventory_hostname }} after running the standard method.
+              Any older hand-made fix was left in place.
+          when: not (_tailscale_gro_verified | bool) and not ansible_check_mode
+
+        - name: Find hand-made versions of the same fix
+          ansible.builtin.shell: >-
+            grep -rIl -s -- 'rx-udp-gro-forwarding' /etc/rc.local /etc/network/interfaces /etc/network/interfaces.d
+            /etc/networkd-dispatcher /etc/NetworkManager/dispatcher.d /etc/cron.d /etc/crontab /etc/udev/rules.d
+            /etc/systemd/system /var/spool/cron/crontabs || true
+          register: _tailscale_gro_legacy
+          changed_when: false
+          check_mode: false
+          when: _tailscale_gro_verified | bool
+
+        - name: Disable hand-made units (the unit file is left in place)
+          ansible.builtin.systemd:
+            name: "{{ item | basename }}"
+            enabled: false
+          loop: >-
+            {{ _tailscale_gro_legacy.stdout_lines | default([])
+               | select('match', '^/etc/systemd/system/[^/]+\.service$')
+               | reject('equalto', '/etc/systemd/system/tailscale-udp-gro.service') | list }}
+          when: _tailscale_gro_verified | bool
+
+        - name: Create the backup directory
+          ansible.builtin.file:
+            path: /var/backups/consigliere
+            state: directory
+            mode: "0700"
+          when: _tailscale_gro_verified | bool
+
+        - name: Keep one pristine copy of each file before it is edited (/var/backups/consigliere, never overwritten)
+          ansible.builtin.copy:
+            src: "{{ item }}"
+            dest: "/var/backups/consigliere/{{ item | regex_replace('/', '_') }}.orig"
+            remote_src: true
+            force: false
+            mode: "0600"
+          loop: >-
+            {{ _tailscale_gro_legacy.stdout_lines | default([])
+               | reject('match', '^/etc/systemd/system/') | list }}
+          when: _tailscale_gro_verified | bool
+
+        - name: Comment out hand-made commands in scripts, cron and network files
+          ansible.builtin.lineinfile:
+            path: "{{ item }}"
+            regexp: '^(?!\s*#)(.*rx-udp-gro-forwarding.*)$'
+            line: '# consigliere: replaced by tailscale-udp-gro.service -- \1'
+            backrefs: true
+          loop: >-
+            {{ _tailscale_gro_legacy.stdout_lines | default([])
+               | reject('match', '^/etc/systemd/system/') | list }}
+          when: _tailscale_gro_verified | bool

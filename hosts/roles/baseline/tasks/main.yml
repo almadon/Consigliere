@@ -81,3 +81,10 @@
     state: absent
   when: baseline_ssh_password_auth
   notify: Reload sshd
+
+- name: Kernel settings the fleet's services expect (see baseline_sysctl)
+  ansible.builtin.include_tasks: sysctl.yml
+  vars:
+    baseline_sysctl_apply_file: /etc/sysctl.d/90-consigliere.conf
+    baseline_sysctl_apply_settings: "{{ baseline_sysctl }}"
+  when: baseline_sysctl_manage | bool

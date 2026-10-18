@@ -38,6 +38,9 @@
     enabled: true
     state: started
 
+- name: Host settings Tailscale warns about (forwarding, UDP GRO)
+  ansible.builtin.include_tasks: tuning.yml
+
 - name: Check tailnet state
   ansible.builtin.command: tailscale status --json
   register: _tailscale_status

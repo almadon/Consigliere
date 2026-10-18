@@ -1,0 +1,12 @@
+# Managed by Ansible (hosts/roles/tailscale)
+[Unit]
+Description=Tailscale UDP GRO forwarding tuning
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/tailscale-udp-gro
+
+[Install]
+WantedBy=multi-user.target
