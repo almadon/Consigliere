@@ -12,10 +12,10 @@
 # arcane_server_api_url (group-wide) is the manager's URL, set in
 # config/vars/group/feat_arcane.yml.
 
-# Pinned instead of :latest (v2.15.1, 2026-10-07). The agent has to speak to the manager it
+# Pinned instead of :latest (v2.16.1, 2026-10-15). The agent has to speak to the manager it
 # connects to: keep this equal to the manager's version (arcane_server_version if Ansible
 # runs the manager), and bump both together.
-arcane_agent_version: "v2.15.1"
+arcane_agent_version: "v2.16.1"
 arcane_agent_dir: "{{ common_dir | default('/opt/common') }}/arcane"
 # "poll" is what the wizard emitted for edge agents; the previous default
 # ("websocket") was a guess from the non-edge example.
