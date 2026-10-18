@@ -89,12 +89,13 @@
         mode: "0644"
       when: traefik_server_static_sites | length > 0
 
-    # No mode here on purpose: certwarden_agent owns this directory's permissions, and two roles
-    # setting different modes would change it back and forth on every run.
+    # Same mode as certwarden_agent (which owns this directory): two roles setting different modes
+    # would change it back and forth on every run.
     - name: Make sure the certificates directory exists
       ansible.builtin.file:
         path: "{{ traefik_server_certs_dir }}"
         state: directory
+        mode: "0755"
 
     - name: Write the compose file
       ansible.builtin.template:
