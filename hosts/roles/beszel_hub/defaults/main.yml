@@ -1,0 +1,16 @@
+---
+# The Beszel hub (https://www.beszel.dev): the monitoring dashboard the agents (prop/beszel)
+# report to. Run it on one host, tagged util: [beszel]. First start: open the URL and create
+# the admin account (the first user to register becomes admin), then take the public key from
+# "Add system" and a universal token from Settings > Tokens and store them in the secret
+# beszel.agent (scripts/secrets.sh create beszel.agent).
+# Pinned; keep the agents (beszel_agent_version) on the same version.
+beszel_hub_version: "0.21.0"
+beszel_hub_dir: /opt/beszel-hub
+# The address people and agents use to reach the hub (also what the agents' HUB_URL is).
+beszel_hub_url: ""
+beszel_hub_port: 8090
+# Shared Docker network with Traefik (e.g. proxynet). When set, the port is not published and
+# Traefik reaches the hub as http://beszel-hub:8090. Empty = publish on beszel_hub_bind_address.
+beszel_hub_network: ""
+beszel_hub_bind_address: "{{ tailscale_ipv4 | default('127.0.0.1', true) }}"

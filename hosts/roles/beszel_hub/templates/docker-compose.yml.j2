@@ -1,0 +1,23 @@
+# Managed by Ansible (hosts/roles/beszel_hub) -- edits here get overwritten on the next
+# reconciliation run. Change the role's defaults / fleet vars instead.
+services:
+  beszel-hub:
+    image: henrygd/beszel:{{ beszel_hub_version }}
+    container_name: beszel-hub
+    restart: unless-stopped
+{% if not beszel_hub_network %}
+    ports:
+      - "{{ beszel_hub_bind_address ~ ':' if beszel_hub_bind_address else '' }}{{ beszel_hub_port }}:8090"
+{% endif %}
+    environment:
+      APP_URL: "{{ beszel_hub_url }}"
+    volumes:
+      - {{ beszel_hub_dir }}/data:/beszel_data
+{% if beszel_hub_network %}
+    networks:
+      - {{ beszel_hub_network }}
+
+networks:
+  {{ beszel_hub_network }}:
+    external: true
+{% endif %}

@@ -1,0 +1,4 @@
+---
+description: "Beszel monitoring hub (the dashboard the beszel agents report to)"
+order: 48
+roles: [beszel_hub]
