@@ -13,6 +13,7 @@
     url: "https://download.docker.com/linux/{{ ansible_distribution | lower }}/gpg"
     dest: /etc/apt/keyrings/docker.asc
     mode: "0644"
+  register: _docker_key
 
 - name: Add Docker apt repo
   ansible.builtin.copy:
@@ -27,6 +28,7 @@
     owner: root
     group: root
     mode: "0644"
+  register: _docker_repo
   notify: Refresh the package index after the Docker repo changed
 
 - name: Pick up the new repo before installing from it
@@ -40,6 +42,17 @@
       - containerd.io
       - docker-compose-plugin
     state: present
+  # In a check run on a new host the repo files above are only simulated, so apt can't see the packages.
+  when: not ansible_check_mode or not (_docker_key.changed or _docker_repo.changed)
+
+- name: Is Docker installed?
+  ansible.builtin.stat:
+    path: /usr/bin/docker
+  register: _docker_bin
+
+- name: Nothing more to check until Docker is really installed
+  ansible.builtin.meta: end_role
+  when: ansible_check_mode and not _docker_bin.stat.exists
 
 # Services publish ports on the host's Tailscale IP (see the server_* roles).
 # Docker can't bind an address that doesn't exist yet, so after a reboot it must
