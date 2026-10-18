@@ -33,8 +33,10 @@
 
 # The firewall comes last, once everything the tags put on this host is known: the tag
 # manifests' `firewall:` lists say which ports to open to the world.
+# Skipped where the host has no ufw to drive (firewall_manage: false), for example Unraid.
 - name: Apply the host firewall
   ansible.builtin.include_role:
     name: firewall
   vars:
     firewall_tag_rules: "{{ _fleet_plan_data.firewall }}"
+  when: firewall_manage | default(true) | bool

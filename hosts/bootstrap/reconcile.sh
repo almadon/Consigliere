@@ -154,10 +154,13 @@ fi
 # Tag manifests (what each util:/feat: tag runs): your config/tags/ first, then the
 # framework's hosts/tags/.
 EXTRA_VARS+=(-e "{\"fleet_tags_dirs\": [\"$CONF/tags\", \"$FRAMEWORK_DIR/hosts/tags\"]}")
-if [ -f "$CONF/site.yml" ]; then
-  cp "$CONF/site.yml" "$RUN_DIR/site.yml"
+# RECONCILE_PLAYBOOK picks the entry playbook (default site.yml; Unraid uses site-unraid.yml). The
+# fleet's own file of that name, if it has one, wins over the framework's.
+PLAYBOOK_FILE="${RECONCILE_PLAYBOOK:-site.yml}"
+if [ -f "$CONF/$PLAYBOOK_FILE" ]; then
+  cp "$CONF/$PLAYBOOK_FILE" "$RUN_DIR/site.yml"
 else
-  cp "$FRAMEWORK_DIR/hosts/site.yml" "$RUN_DIR/site.yml"
+  cp "$FRAMEWORK_DIR/hosts/$PLAYBOOK_FILE" "$RUN_DIR/site.yml"
 fi
 
 # Framework roles first; the fleet's own roles (if any) are also available.

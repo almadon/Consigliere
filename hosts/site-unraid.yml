@@ -1,0 +1,23 @@
+---
+# Entry point for hosts that are not Debian-family and cannot run the normal site.yml: Unraid (Slackware,
+# no apt, no systemd, a root filesystem in RAM). reconcile.sh runs this inside a container on the host
+# (hosts/bootstrap/unraid/), so only roles that work through the Docker socket belong here: the tag
+# manifests decide which (feat: [arkeep] runs the Arkeep agent, prop: [beszel] the Beszel agent, ...).
+# The baseline, tailscale, sops, docker and firewall roles are deliberately not run: Unraid manages its own
+# packages, Docker and network, and the container already carries sops.
+- name: Container-based roles for an Unraid host
+  hosts: all
+  become: false
+  gather_facts: true
+  pre_tasks:
+    - name: Group by operating system
+      ansible.builtin.group_by:
+        key: "os_{{ ansible_system | lower }}"
+      changed_when: false
+      tags: [always]
+  tasks:
+    - name: Run what this host's tags select
+      ansible.builtin.include_role:
+        name: fleet_plan
+      vars:
+        firewall_manage: false
