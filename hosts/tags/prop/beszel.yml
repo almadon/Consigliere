@@ -1,0 +1,5 @@
+---
+description: "Beszel monitoring agent (reports to the Beszel hub)"
+order: 60
+roles: [beszel_agent]
+secrets: [beszel.agent]

@@ -15,16 +15,24 @@
     arcane_server_api_url is not defined or not arcane_server_api_url or
     arcane_server_api_url is search('CHANGEME')
 
-- name: Fail fast if the Arcane agent token isn't configured
-  ansible.builtin.fail:
+# util: docker hosts get this role by default, so a host whose token has not been minted
+# yet is skipped with a warning instead of failing the whole run.
+- name: Skip until this host has an Arcane agent token
+  ansible.builtin.debug:
     msg: >-
-      arcane_agent_token is not set -- mint one from the Arcane manager's
-      own UI after it's running, then set it in this host's config/vars/host/ file in
-      your fleet-config repo (see defaults/main.yml -- this isn't a shared
-      secret like Arkeep's, so it can't be provisioned ahead of time).
+      Arcane agent skipped on {{ inventory_hostname }}: arcane_agent_token is not set. Mint one in
+      the Arcane manager (Environments > add an edge agent) and put it in this host's
+      config/vars/host/{{ inventory_hostname }}.yml (see defaults/main.yml). Set arcane_agent_skip: true
+      there to silence this.
   when: >-
-    arcane_agent_token is not defined or not arcane_agent_token or
-    arcane_agent_token is search('CHANGEME')
+    not (arcane_agent_skip | default(false)) and
+    (arcane_agent_token is not defined or not arcane_agent_token or arcane_agent_token is search('CHANGEME'))
+
+- name: Stop here without a token
+  ansible.builtin.meta: end_role
+  when: >-
+    (arcane_agent_skip | default(false)) or
+    arcane_agent_token is not defined or not arcane_agent_token or arcane_agent_token is search('CHANGEME')
 
 - name: Create Arcane agent directory
   ansible.builtin.file:

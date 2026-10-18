@@ -1,0 +1,52 @@
+---
+- name: Load the hub key and token (secret beszel.agent)
+  ansible.builtin.include_role:
+    name: load_secrets
+  vars:
+    load_secrets_scopes: [beszel.agent]
+
+- name: Require the hub address, key and token
+  ansible.builtin.assert:
+    that:
+      - beszel_hub_url is defined
+      - beszel_hub_url | length > 0
+      - beszel_agent_key is defined
+      - beszel_agent_key | length > 0
+      - "'CHANGEME' not in beszel_agent_key"
+      - beszel_agent_token is defined
+      - "'CHANGEME' not in beszel_agent_token"
+    fail_msg: >-
+      Set beszel_hub_url (config/vars/group/all.yml) and fill the secret
+      (scripts/secrets.sh edit beszel.agent) with the hub's public key and a universal token.
+    quiet: true
+  no_log: true
+
+- name: Create the agent directory
+  ansible.builtin.file:
+    path: "{{ beszel_agent_dir }}"
+    state: directory
+    mode: "0750"
+
+- name: Write the compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ beszel_agent_dir }}/docker-compose.yml"
+    mode: "0600"   # holds the token
+  no_log: true
+  register: _beszel_agent_compose
+
+- name: Check that no container this role needs is already taken by something else
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: guard_containers
+  vars:
+    docker_guard_containers: [beszel-agent]
+    docker_guard_dir: "{{ beszel_agent_dir }}"
+
+- name: Start the Beszel agent
+  community.docker.docker_compose_v2:
+    project_src: "{{ beszel_agent_dir }}"
+    state: present
+    pull: "{{ 'always' if _beszel_agent_compose.changed else 'missing' }}"
+  # In a check run the directory and compose file above are not really written yet.
+  when: not ansible_check_mode or not _beszel_agent_compose.changed

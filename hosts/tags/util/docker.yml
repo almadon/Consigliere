@@ -1,4 +1,5 @@
 ---
-description: "Class only: hosts running Docker workloads (no extra roles; Docker itself is in the baseline)"
+description: "Hosts running Docker workloads: they also get the Arcane edge agent (Docker itself is in the baseline)"
 order: 50
+requires: [feat/arcane]
 roles: []

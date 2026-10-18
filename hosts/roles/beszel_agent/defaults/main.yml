@@ -1,0 +1,13 @@
+---
+# The Beszel agent (https://www.beszel.dev): reports this host's CPU, memory, disk, network
+# and Docker stats to the Beszel hub. Applied by the prop/beszel tag (every node).
+# It connects OUTBOUND to the hub (HUB_URL), so no inbound port is needed from the hub.
+# Secret beszel.agent (config/secrets/beszel/agent.yml), shared by all agents:
+#   beszel_agent_key:   the hub's public key (shown in the hub's "Add system" dialog)
+#   beszel_agent_token: a universal token (hub > Settings > Tokens); lets agents register themselves
+# beszel_hub_url (the hub's address) belongs in config/vars/group/all.yml.
+beszel_agent_version: "0.21.0"
+beszel_agent_dir: "{{ common_dir | default('/opt/common') }}/beszel"
+# Port the agent listens on (used when the hub connects to it instead). Host networking
+# opens it on the host, so it is covered by the host firewall.
+beszel_agent_port: 45876

@@ -1,0 +1,16 @@
+# Managed by Ansible (hosts/roles/beszel_agent) -- edits here get overwritten on the next
+# reconciliation run.
+services:
+  beszel-agent:
+    image: henrygd/beszel-agent:{{ beszel_agent_version }}
+    container_name: beszel-agent
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - {{ beszel_agent_dir }}/data:/var/lib/beszel-agent
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      LISTEN: "{{ beszel_agent_port }}"
+      KEY: "{{ beszel_agent_key }}"
+      HUB_URL: "{{ beszel_hub_url }}"
+      TOKEN: "{{ beszel_agent_token }}"
