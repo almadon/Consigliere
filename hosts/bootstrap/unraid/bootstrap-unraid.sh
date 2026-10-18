@@ -104,6 +104,7 @@ DOCKER_ARGS=(
   -v "$DIR:$DIR"
   -v "$TS_CLI:/usr/local/bin/tailscale:ro"
   -v /var/run/tailscale:/var/run/tailscale
+  -v /etc/localtime:/etc/localtime:ro
   --env-file "$DIR/reconcile.env"
   -e CRED_DIR="$DIR/cred" -e FRAMEWORK_DIR="$DIR/work/framework"
 )
