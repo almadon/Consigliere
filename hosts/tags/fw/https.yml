@@ -1,0 +1,4 @@
+---
+description: "Accept HTTPS (443/tcp) from the internet"
+firewall:
+  - {port: 443, proto: tcp}

@@ -24,6 +24,7 @@
   ansible.builtin.set_fact:
     _firewall_open_ssh: >-
       {{ firewall_public_ssh or
+         ((firewall_tag_rules + firewall_extra_rules) | map(attribute='port') | map('string') | list).count('22') > 0 or
          (not (_firewall_on_tailnet | bool) and (firewall_ssh_from | length == 0)) }}
 
 - name: Warn when SSH is kept open because there is no other way in
@@ -96,3 +97,7 @@
   community.general.ufw:
     state: enabled
   when: _firewall_apply | bool
+
+- name: Guard the ports Docker publishes
+  ansible.builtin.include_tasks: docker_guard.yml
+  when: firewall_docker_guard | bool and _firewall_apply | bool

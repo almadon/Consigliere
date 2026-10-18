@@ -2,6 +2,5 @@
 description: "Traefik reverse proxy host (per-host routes, certificates from Cert Warden)"
 order: 90
 roles: [traefik_server]
-firewall:
-  - {port: 80, proto: tcp}
-  - {port: 443, proto: tcp}
+# A proxy host serves the world: the public ports come from the fw tags.
+requires: [fw/http, fw/https]

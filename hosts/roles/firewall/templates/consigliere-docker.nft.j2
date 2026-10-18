@@ -1,0 +1,27 @@
+# Managed by Ansible (hosts/roles/firewall) -- edits get overwritten.
+# Guards the ports Docker publishes. Docker's own netfilter rules run ahead of ufw, so ufw's
+# deny-by-default never sees traffic to a published port. This table runs ahead of Docker's:
+# a NEW connection that Docker is about to forward to a container (conntrack status "dnat")
+# is dropped unless it came from a trusted interface or source, or targets a port that the
+# tag manifests / firewall_extra_rules open on purpose. Everything else is left alone.
+table inet consigliere_docker
+delete table inet consigliere_docker
+table inet consigliere_docker {
+  chain forward {
+    type filter hook forward priority -10; policy accept;
+    iifname { {{ firewall_docker_trusted_ifaces | map('to_json') | join(', ') }} } return
+    ct status dnat ct state new jump published
+  }
+  chain published {
+{% for r in firewall_tag_rules + firewall_extra_rules %}
+{% set src = (r.from | default('')) %}
+{% set srcmatch = '' if not src else (('ip6 saddr ' if ':' in src else 'ip saddr ') ~ src ~ ' ') %}
+    {{ srcmatch }}meta l4proto {{ r.proto | default('tcp') }} ct original proto-dst {{ r.port }} return
+{% endfor %}
+{% for cidr in firewall_docker_trusted_sources %}
+    {{ 'ip6' if ':' in cidr else 'ip' }} saddr {{ cidr }} return
+{% endfor %}
+    limit rate 5/minute log prefix "consigliere-docker-drop " counter drop
+    counter drop
+  }
+}

@@ -1,0 +1,132 @@
+---
+# Guard the ports Docker publishes (see firewall_docker_guard in defaults). Included from main.yml.
+- name: Look for Docker
+  ansible.builtin.stat:
+    path: /usr/bin/docker
+  register: _firewall_docker
+
+- name: Install nftables
+  ansible.builtin.apt:
+    name: nftables
+    state: present
+  when: _firewall_docker.stat.exists and not ansible_check_mode
+
+- name: Does the kernel let this host use nftables?
+  ansible.builtin.shell: |
+    set -e
+    nft add table inet consigliere_probe
+    nft delete table inet consigliere_probe
+  args:
+    executable: /bin/bash
+  register: _firewall_nft_probe
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: _firewall_docker.stat.exists and not ansible_check_mode
+
+- name: Decide whether the docker guard can run
+  ansible.builtin.set_fact:
+    _firewall_guard_ok: >-
+      {{ _firewall_docker.stat.exists and not ansible_check_mode and
+         (_firewall_nft_probe.rc | default(1)) == 0 }}
+
+- name: Warn when nftables is not available here
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: nftables is not usable on {{ inventory_hostname }} (an unprivileged LXC container?), so
+      the docker guard is NOT active. Ports Docker publishes are not covered by ufw: keep them bound
+      to 127.0.0.1 or the Tailscale IP, and put a firewall rule on the host or network in front of this
+      machine. The report below still lists exposed ports.
+  when: _firewall_docker.stat.exists and not ansible_check_mode and not (_firewall_guard_ok | bool)
+
+- name: Install the docker guard
+  when: _firewall_guard_ok | bool
+  block:
+    - name: Create the config directory
+      ansible.builtin.file:
+        path: /etc/consigliere
+        state: directory
+        mode: "0755"
+
+    - name: Write the guard ruleset
+      ansible.builtin.template:
+        src: consigliere-docker.nft.j2
+        dest: /etc/consigliere/docker-guard.nft
+        mode: "0644"
+        validate: /usr/sbin/nft -c -f %s
+      notify: Reload the docker guard
+
+    - name: Install the guard unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/consigliere-docker-guard.service
+        mode: "0644"
+        content: |
+          # Managed by Ansible (hosts/roles/firewall)
+          [Unit]
+          Description=Drop public traffic to ports Docker publishes unless allowed
+          Before=docker.service
+          After=network-pre.target
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/usr/sbin/nft -f /etc/consigliere/docker-guard.nft
+          ExecStop=-/usr/sbin/nft delete table inet consigliere_docker
+
+          [Install]
+          WantedBy=multi-user.target docker.service
+      notify: Reload the docker guard
+
+    - name: Start Docker after the guard
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/docker.service.d/20-after-docker-guard.conf
+        mode: "0644"
+        content: |
+          [Unit]
+          After=consigliere-docker-guard.service
+          Wants=consigliere-docker-guard.service
+      notify: Reload the docker guard
+
+    - name: Enable and start the guard
+      ansible.builtin.systemd:
+        name: consigliere-docker-guard.service
+        enabled: true
+        state: started
+        daemon_reload: true
+
+- name: Report containers that publish a port on every interface
+  when: firewall_docker_report and _firewall_docker.stat.exists and not ansible_check_mode
+  block:
+    - name: List published ports
+      ansible.builtin.command: docker ps --format '{{ '{{' }}.Names{{ '}}' }}|{{ '{{' }}.Ports{{ '}}' }}'
+      register: _firewall_docker_ps
+      changed_when: false
+      failed_when: false
+
+    - name: Work out which ones nothing opens on purpose
+      ansible.builtin.set_fact:
+        _firewall_exposed: >-
+          {% set allowed = (firewall_tag_rules + firewall_extra_rules) | map(attribute='port') | map('string') | list -%}
+          {% set out = [] -%}
+          {% for line in _firewall_docker_ps.stdout_lines | default([]) -%}
+          {% set name = line.split('|')[0] -%}
+          {% for m in (line.split('|', 1)[1] | default('')) | regex_findall('(?:0\.0\.0\.0|\[::\]):(\d+)->\d+/(?:tcp|udp)') -%}
+          {% if m not in allowed and (name ~ ':' ~ m) not in out %}{% set _ = out.append(name ~ ':' ~ m) %}{% endif -%}
+          {% endfor -%}
+          {% endfor -%}
+          {{ out | to_json }}
+
+    - name: Say so when something is exposed
+      ansible.builtin.debug:
+        msg: >-
+          WARNING: on {{ inventory_hostname }} these containers publish ports on all interfaces that no tag
+          opens on purpose: {{ _firewall_exposed | from_json | join(', ') }}. Bind them to the Tailscale IP or
+          127.0.0.1 in their compose file, or open the port with an fw: tag.{{ ' The docker guard blocks them from the internet.' if _firewall_guard_ok | bool else ' The docker guard is NOT active here, so they ARE reachable.' }}
+      when: (_firewall_exposed | from_json | length) > 0
+
+    - name: Tell Apprise
+      ansible.builtin.shell: >-
+        command -v fleet-notify >/dev/null 2>&1 && fleet-notify "exposed ports on {{ inventory_hostname }}"
+        "{{ _firewall_exposed | from_json | join(', ') }}" || true
+      changed_when: false
+      when: (_firewall_exposed | from_json | length) > 0

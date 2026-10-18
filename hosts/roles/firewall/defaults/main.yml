@@ -8,8 +8,8 @@
 # Tailscale. Hosts on a LAN list their networks in firewall_ssh_from. Safety net: a host
 # that is not (yet) on the tailnet and has no firewall_ssh_from keeps SSH open on 22,
 # with a warning, so enabling the firewall can never lock you out of a fresh machine.
-# NOTE: ports published by Docker bypass ufw (Docker writes its own iptables rules); the
-# services here bind to the Tailscale IP for that reason.
+# Ports published by Docker bypass ufw (Docker writes its own netfilter rules, which run
+# before ufw's). The docker guard below closes that: see firewall_docker_guard.
 firewall_tailnet_interface: tailscale0
 firewall_tailnet_allow_all: true
 # Networks allowed to SSH in (e.g. a LAN): ["192.168.1.0/24"].
@@ -19,3 +19,17 @@ firewall_public_ssh: false
 # Rules from the tag manifests (set by fleet_plan) and your own: [{port: 8443, proto: tcp, from: ""}]
 firewall_tag_rules: []
 firewall_extra_rules: []
+
+# ---- Docker guard -------------------------------------------------------------------
+# An nftables table (inet consigliere_docker) that drops new connections to Docker-published
+# ports unless they arrive on a trusted interface, come from a trusted source, or hit a port the
+# tag manifests / extra rules open (e.g. util: [traefik] opens 80 and 443). It never touches
+# traffic between containers or from the host. Skipped, with a warning, where the kernel
+# does not allow nftables (some unprivileged LXC containers).
+firewall_docker_guard: true
+firewall_docker_trusted_ifaces: ["lo", "{{ firewall_tailnet_interface }}", "docker*", "br-*", "veth*"]
+# Networks allowed to reach published ports, e.g. a LAN: ["192.168.1.0/24"].
+firewall_docker_trusted_sources: []
+# After each run, list containers publishing a port on all interfaces that nothing opens on
+# purpose (and tell Apprise if fleet-notify exists).
+firewall_docker_report: true

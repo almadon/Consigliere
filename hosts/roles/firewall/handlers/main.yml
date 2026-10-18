@@ -1,0 +1,6 @@
+---
+- name: Reload the docker guard
+  ansible.builtin.systemd:
+    name: consigliere-docker-guard.service
+    state: restarted
+    daemon_reload: true

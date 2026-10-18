@@ -24,7 +24,7 @@ A dimension may also have <dimension>/_default.yml, applied once when the host h
 any value in that dimension (e.g. cert/_default.yml requires feat/certwarden).
 Values of such a dimension need no manifest of their own.
 
-Variables read: fleet_tag_dimensions (default [util, feat, cert, prop]), fleet_tags_dirs
+Variables read: fleet_tag_dimensions (default [util, feat, cert, prop, fw]), fleet_tags_dirs
 (default: the framework's hosts/tags), fleet_tags_strict (fail on a tag with no
 manifest; default false: such tags are just classes).
 """
@@ -135,7 +135,7 @@ def resolve(values, dims, dirs, strict=False):
 class LookupModule(LookupBase):
     def run(self, terms, variables=None, **kwargs):
         v = variables or {}
-        dims = _as_list(kwargs.get("dimensions", v.get("fleet_tag_dimensions", ["util", "feat", "cert", "prop"])))
+        dims = _as_list(kwargs.get("dimensions", v.get("fleet_tag_dimensions", ["util", "feat", "cert", "prop", "fw"])))
         default_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "tags"))
         dirs = _as_list(kwargs.get("dirs", v.get("fleet_tags_dirs"))) or [default_dir]
         strict = bool(kwargs.get("strict", v.get("fleet_tags_strict", False)))

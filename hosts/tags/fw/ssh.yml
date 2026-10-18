@@ -1,0 +1,4 @@
+---
+description: "Accept SSH (22/tcp) from the whole internet. Normally NOT wanted: SSH is reached over the tailnet"
+firewall:
+  - {port: 22, proto: tcp, comment: "ssh (fw: ssh)"}

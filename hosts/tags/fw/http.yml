@@ -1,0 +1,4 @@
+---
+description: "Accept plain HTTP (80/tcp) from the internet (a proxy host: Traefik redirects it to HTTPS)"
+firewall:
+  - {port: 80, proto: tcp}
