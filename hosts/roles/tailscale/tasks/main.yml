@@ -6,18 +6,31 @@
         url: "https://pkgs.tailscale.com/stable/{{ ansible_distribution | lower }}/{{ ansible_distribution_release }}.noarmor.gpg"
         dest: /usr/share/keyrings/tailscale-archive-keyring.gpg
         mode: "0644"
+      register: _tailscale_key
 
     - name: Add Tailscale apt repo
       ansible.builtin.get_url:
         url: "https://pkgs.tailscale.com/stable/{{ ansible_distribution | lower }}/{{ ansible_distribution_release }}.tailscale-keyring.list"
         dest: /etc/apt/sources.list.d/tailscale.list
         mode: "0644"
+      register: _tailscale_repo
 
     - name: Install tailscale
       ansible.builtin.apt:
         name: tailscale
         state: present
         update_cache: true
+      # In a check run on a new host the repo files above are only simulated, so apt can't see the package.
+      when: not ansible_check_mode or not (_tailscale_key.changed or _tailscale_repo.changed)
+
+- name: Is tailscale installed?
+  ansible.builtin.stat:
+    path: /usr/bin/tailscale
+  register: _tailscale_bin
+
+- name: Nothing more to check until tailscale is really installed
+  ansible.builtin.meta: end_role
+  when: ansible_check_mode and not _tailscale_bin.stat.exists
 
 - name: Enable + start tailscaled
   ansible.builtin.systemd:
