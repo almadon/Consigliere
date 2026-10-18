@@ -28,3 +28,12 @@ baseline_unattended_upgrades_remove_unused: true  # autoremove packages left unu
 # Extra origins to upgrade automatically, e.g. ["origin=Tailscale"]. Don't add Docker's:
 # an upgrade restarts the daemon and with it the containers.
 baseline_unattended_upgrades_extra_origins: []
+
+# SSH access. Public keys that may log in as root on every node (the fleet's admin keys): a
+# list of "ssh-ed25519 AAAA... comment" lines. Set it once in config/vars/group/all.yml and a
+# new node accepts your key on its first apply. Keys already on the host are left alone.
+baseline_admin_ssh_keys: []
+# Allow password logins over SSH. Leave true until the key above works on every node, then set
+# false (the role then also refuses to do it while baseline_admin_ssh_keys is empty, so it can
+# never lock you out of a host it has not given a key).
+baseline_ssh_password_auth: true

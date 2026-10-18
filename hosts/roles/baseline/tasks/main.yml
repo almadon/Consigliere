@@ -49,3 +49,35 @@
   loop:
     - apt-daily.timer
     - apt-daily-upgrade.timer
+
+- name: Authorize the fleet's admin SSH keys for root
+  ansible.posix.authorized_key:
+    user: root
+    key: "{{ item }}"
+    comment: fleet admin key
+    exclusive: false
+  loop: "{{ baseline_admin_ssh_keys }}"
+  loop_control:
+    label: "{{ item.split()[-1] if item.split() | length > 2 else item[:30] }}"
+
+- name: Turn off SSH password logins (only once an admin key is installed)
+  when: not baseline_ssh_password_auth and baseline_admin_ssh_keys | length > 0
+  block:
+    - name: Write the sshd drop-in
+      ansible.builtin.copy:
+        dest: /etc/ssh/sshd_config.d/10-consigliere.conf
+        content: |
+          # Managed by Ansible (hosts/roles/baseline). SSH keys only.
+          PasswordAuthentication no
+          KbdInteractiveAuthentication no
+          PermitRootLogin prohibit-password
+        mode: "0644"
+        validate: /usr/sbin/sshd -t -f %s
+      notify: Reload sshd
+
+- name: Remove the password-login lock-down again when it is not wanted
+  ansible.builtin.file:
+    path: /etc/ssh/sshd_config.d/10-consigliere.conf
+    state: absent
+  when: baseline_ssh_password_auth
+  notify: Reload sshd
