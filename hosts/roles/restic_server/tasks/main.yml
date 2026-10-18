@@ -107,4 +107,4 @@
         key_options: 'restrict,command="/usr/bin/rrsync -ro {{ restic_server_data_dir }}"'
         comment: restic mirror (read-only)
         exclusive: false
-      loop: "{{ restic_server_mirror_keys }}"
+      loop: "{{ [restic_server_mirror_keys] | flatten }}"
