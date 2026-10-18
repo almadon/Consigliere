@@ -1,0 +1,17 @@
+# Managed by Ansible (hosts/roles/traefik_server) -- edits get overwritten.
+{% for st in traefik_server_static_sites %}
+server {
+    listen 8080;
+    server_name {{ st.host }};
+    root /sites/{{ st.name }};
+    index index.html;
+    server_tokens off;
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+{% endfor %}
+server {
+    listen 8080 default_server;
+    return 404;
+}

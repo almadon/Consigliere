@@ -20,7 +20,11 @@
 
 - name: Summarise the routes for validation
   ansible.builtin.set_fact:
-    _traefik_server_names: "{{ _traefik_server_routes | map(attribute='name', default='') | list }}"
+    _traefik_server_names: >-
+      {{ (_traefik_server_routes + (traefik_server_static_sites | default([]))) | map(attribute='name', default='') | list }}
+    _traefik_server_bad_profiles: >-
+      {{ _traefik_server_routes | selectattr('profile', 'defined')
+         | rejectattr('profile', 'in', ['app', 'strict', 'relaxed', 'framed', 'none']) | list }}
     _traefik_server_without_backend: >-
       {{ _traefik_server_routes | rejectattr('backend', 'defined') | list | length }}
     _traefik_server_without_match: >-
@@ -35,9 +39,11 @@
       - _traefik_server_names | unique | list | length == _traefik_server_names | length
       - _traefik_server_without_backend | int == 0
       - _traefik_server_without_match | int == 0
+      - _traefik_server_bad_profiles | length == 0
+      - traefik_server_default_profile in ['app', 'strict', 'relaxed', 'framed', 'none']
     fail_msg: >-
       Every traefik_server_routes* entry needs a unique lowercase name (a-z, 0-9, dash),
-      a backend URL, and a host (or a full rule). Check the routes defined for this host.
+      a backend URL, and a host (or a full rule); profile, if given, must be app, strict, relaxed, framed or none.
     quiet: true
 
 - name: Create the Traefik directories
@@ -56,15 +62,16 @@
     mode: "0644"
   loop:
     - { src: 00-base.yml.j2, dest: 00-base.yml }
+    - { src: 05-security.yml.j2, dest: 05-security.yml }
     - { src: 10-routes.yml.j2, dest: 10-routes.yml }
     - { src: 20-tls.yml.j2, dest: 20-tls.yml }
   loop_control:
     label: "{{ item.dest }}"
 
-- name: Create the shared proxy network
+- name: Create the shared proxy networks
   community.docker.docker_network:
-    name: "{{ traefik_server_network }}"
-  when: traefik_server_network | length > 0
+    name: "{{ item }}"
+  loop: "{{ traefik_server_networks }}"
 
 - name: Deploy Traefik
   when: traefik_server_deploy
@@ -74,6 +81,13 @@
         src: traefik.yml.j2
         dest: "{{ traefik_server_dir }}/traefik.yml"
         mode: "0644"
+
+    - name: Write the static sites' nginx configuration
+      ansible.builtin.template:
+        src: static-sites.conf.j2
+        dest: "{{ traefik_server_dir }}/static-sites.conf"
+        mode: "0644"
+      when: traefik_server_static_sites | length > 0
 
     - name: Make sure the certificates directory exists
       ansible.builtin.file:
@@ -93,7 +107,7 @@
         name: docker
         tasks_from: guard_containers
       vars:
-        docker_guard_containers: [traefik]
+        docker_guard_containers: "{{ ['traefik'] + (['traefik-static'] if traefik_server_static_sites | length > 0 else []) }}"
         docker_guard_dir: "{{ traefik_server_dir }}"
 
     - name: Start Traefik

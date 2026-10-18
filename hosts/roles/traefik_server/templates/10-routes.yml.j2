@@ -1,28 +1,43 @@
 # Managed by Ansible (hosts/roles/traefik_server) -- edits get overwritten.
-# This host's routes, collected from traefik_server_routes* variables.
-{% if _traefik_server_routes | length == 0 %}
+# This host's routes, collected from traefik_server_routes* variables (and static_sites).
+{% set ns = namespace(all=[]) %}
+{% for src in _traefik_server_sources %}
+{% for r in lookup('vars', src) %}
+{% set ns.all = ns.all + [dict(r, _src=src)] %}
+{% endfor %}
+{% endfor %}
+{% for st in traefik_server_static_sites %}
+{% set ns.all = ns.all + [{'name': st.name, 'host': st.host, 'backend': 'http://traefik-static:8080', '_src': 'traefik_server_static_sites'}] %}
+{% endfor %}
+{% if ns.all | length == 0 %}
 {}
 {% else %}
 http:
   routers:
-{% for src in _traefik_server_sources %}
-    # from {{ src }}
-{% for r in lookup('vars', src) %}
+{% for r in ns.all %}
 {% set hosts = r.host if (r.host is defined and r.host is not string) else ([r.host] if r.host is defined else []) %}
+{% set profile = r.profile | default(traefik_server_default_profile) %}
+{% set chain = (['compress@file'] if (r.compress | default(true)) else []) + (['sec-' ~ profile ~ '@file'] if profile != 'none' else []) + (r.middlewares | default([])) %}
+    # from {{ r._src }}
     {{ r.name }}:
       rule: {{ (r.rule | default(hosts | map('regex_replace', '^(.*)$', 'Host(`\\1`)') | join(' || '))) | to_json }}
       entryPoints: [{{ traefik_server_entrypoint_websecure }}]
       service: {{ r.name }}
-{% if r.middlewares is defined and r.middlewares | length > 0 %}
-      middlewares: {{ r.middlewares | to_json }}
+{% if chain | length > 0 %}
+      middlewares: {{ chain | to_json }}
 {% endif %}
       tls: {}
 {% endfor %}
-{% endfor %}
   services:
-{% for r in _traefik_server_routes %}
+{% for r in ns.all %}
     {{ r.name }}:
       loadBalancer:
+{% if r.pass_host_header is defined and not r.pass_host_header %}
+        passHostHeader: false
+{% endif %}
+{% if r.insecure | default(false) %}
+        serversTransport: insecure@file
+{% endif %}
         servers:
           - url: {{ r.backend | to_json }}
 {% endfor %}

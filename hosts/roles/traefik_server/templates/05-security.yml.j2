@@ -1,0 +1,53 @@
+# Managed by Ansible (hosts/roles/traefik_server) -- edits get overwritten.
+# Security profiles (headers), compression, TLS policy and backend transports. Routes pick
+# a profile with `profile:`; see the role's defaults for what each one does.
+{% macro headers(csp, framed=false) %}
+    headers:
+      stsSeconds: {{ traefik_server_hsts_seconds }}
+      stsIncludeSubdomains: true
+      stsPreload: {{ traefik_server_hsts_preload | bool | lower }}
+      forceSTSHeader: true
+      contentTypeNosniff: true
+{% if not framed %}
+      customFrameOptionsValue: SAMEORIGIN
+{% endif %}
+      referrerPolicy: {{ traefik_server_referrer_policy | to_json }}
+      permissionsPolicy: {{ (traefik_server_permissions_policy | trim) | to_json }}
+{% if csp %}
+      contentSecurityPolicy: {{ (csp | trim) | to_json }}
+{% endif %}
+      customResponseHeaders:
+        Server: ""
+        X-Powered-By: ""
+        X-Permitted-Cross-Domain-Policies: "none"
+{% endmacro %}
+http:
+  middlewares:
+    compress:
+      compress: {}
+    sec-app:
+{{ headers(traefik_server_csp_app) | indent(2, true) }}
+    sec-strict:
+{{ headers(traefik_server_csp_strict) | indent(2, true) }}
+    sec-relaxed:
+{{ headers('') | indent(2, true) }}
+    sec-framed:
+{{ headers('', true) | indent(2, true) }}
+{% for name, body in traefik_server_extra_middlewares.items() %}
+    {{ name }}: {{ body | to_json }}
+{% endfor %}
+  serversTransports:
+    insecure:
+      insecureSkipVerify: true
+tls:
+  options:
+    default:
+      minVersion: {{ traefik_server_tls_min_version }}
+      sniStrict: {{ traefik_server_tls_sni_strict | bool | lower }}
+      cipherSuites:
+        - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+        - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256

@@ -10,6 +10,10 @@ entryPoints:
 {% endif %}
   {{ traefik_server_entrypoint_websecure }}:
     address: ":443"
+    transport:
+      respondingTimeouts:
+        readTimeout: {{ traefik_server_read_timeout }}
+        idleTimeout: {{ traefik_server_idle_timeout }}
 {% if traefik_server_trusted_ips | length > 0 %}
     forwardedHeaders:
       trustedIPs: {{ traefik_server_trusted_ips | to_json }}
