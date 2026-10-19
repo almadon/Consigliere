@@ -62,6 +62,11 @@ Roles:
   backup target (`util: [restic]`); see [its README](hosts/roles/restic_server/README.md)
 - `apprise` — notifications through [Apprise](https://github.com/caronc/apprise) (~100
   services); installs `fleet-notify` for other roles (`feat: [apprise]`, secret `apprise.notify`)
+  **Run reporting:** on a host that has `fleet-notify`, `reconcile.sh` reports each run (`hosts/bootstrap/reconcile-report.sh`):
+  a failure names the failing task (the same failure is repeated at most every 6 hours, `RECONCILE_NOTIFY_REPEAT_SECS`), the
+  first success afterwards says "recovered", and an applied run that changed something lists the changed tasks
+  (`RECONCILE_NOTIFY_CHANGES=0` turns that off). URLs can carry tags (alert / info), for example Pushover at two priorities;
+  `fleet-notify` uses `FLEET_NOTIFY_TAG` (default alert). Every run's output is also kept in `<workdir>/last-run.log`.
 - `apt_updates`, `compose_updates` — scheduled `apt update && upgrade` and `docker compose
   pull && up -d`, each followed by an Apprise notification (`feat: [apt_updates]`,
   `feat: [compose_updates]`; both pull in `apprise`). `compose_updates` moves `:latest`

@@ -6,6 +6,12 @@
 #   apprise_notify_urls:
 #     - ntfys://ntfy.example.com/alerts
 #     - tgram://<bot token>/<chat id>
+# Tags route by urgency: write an entry as a mapping to attach one (fleet-notify uses FLEET_NOTIFY_TAG, default "alert"):
+#   apprise_notify_urls:
+#     - "pover://<user key>@<app token>?priority=high":
+#         - tag: alert
+#     - "pover://<user key>@<app token>?priority=low":
+#         - tag: info
 # Installs /usr/local/bin/fleet-notify "<title>" ["<body>"] (body from stdin if omitted).
 apprise_version: "2.0.1"
 apprise_venv: /opt/apprise-venv

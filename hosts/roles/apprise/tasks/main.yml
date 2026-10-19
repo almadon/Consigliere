@@ -9,7 +9,7 @@
   ansible.builtin.assert:
     that:
       - apprise_notify_urls | length > 0
-      - apprise_notify_urls | select('search', 'CHANGEME') | list | length == 0
+      - apprise_notify_urls | map('string') | select('search', 'CHANGEME') | list | length == 0
     fail_msg: >-
       apprise_notify_urls is empty or still a placeholder. Edit the secret:
       scripts/secrets.sh edit apprise.notify

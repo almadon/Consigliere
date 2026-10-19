@@ -48,7 +48,10 @@ heartbeat() {
   [ -n "$1" ] || return 0
   curl -fsS -m 10 --retry 2 -o /dev/null "$1" || true
 }
-trap 'rc=$?; if [ "$rc" -eq 0 ]; then heartbeat "$HEARTBEAT_URL"; else heartbeat "$HEARTBEAT_FAIL_URL"; fi' EXIT
+# Reporting through fleet-notify (the apprise role), when installed: see reconcile-report.sh.
+# shellcheck source=hosts/bootstrap/reconcile-report.sh
+source "$(dirname "${BASH_SOURCE[0]}")/reconcile-report.sh"
+trap 'rc=$?; if [ "$rc" -eq 0 ]; then heartbeat "$HEARTBEAT_URL"; else heartbeat "$HEARTBEAT_FAIL_URL"; fi; sleep 1; report_run "$rc" || true' EXIT
 
 WORKDIR="${RECONCILE_WORKDIR:-/opt/fleet-reconcile}"
 FRAMEWORK_DIR="$WORKDIR/framework"
@@ -65,6 +68,10 @@ DEPLOY_KEY="$CRED_DIR/deploy_key"
 AGE_KEY_FILE="$CRED_DIR/age.key"
 
 mkdir -p "$WORKDIR"
+# Everything this run prints is also kept in $RUN_LOG, so a failure can be reported with its cause.
+RUN_LOG="$WORKDIR/last-run.log"
+: >"$RUN_LOG"
+exec > >(tee -a "$RUN_LOG") 2>&1
 
 # An empty branch means "whatever the remote's default branch is", so a repo
 # whose default is master or main works without configuration.

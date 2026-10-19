@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 # Managed by Ansible (hosts/roles/apprise).
 # fleet-notify "<title>" ["<body>"]     (body is read from stdin if omitted)
+# When the notification URLs carry tags (for example Pushover at two priorities: alert = urgent, info = quiet), the tag
+# comes from FLEET_NOTIFY_TAG (default: alert). URLs without tags are always used.
 set -u
 title="${1:-notification}"
 body="${2:-}"
 [ -n "$body" ] || { [ -t 0 ] || body="$(cat)"; }
 [ -n "$body" ] || body="(no details)"
-exec {{ apprise_venv }}/bin/apprise -c {{ apprise_config_dir }}/apprise.yml \
+tag_args=()
+if grep -q 'tag:' {{ apprise_config_dir }}/apprise.yml 2>/dev/null; then
+  tag_args=(-g "${FLEET_NOTIFY_TAG:-alert}")
+fi
+exec {{ apprise_venv }}/bin/apprise -c {{ apprise_config_dir }}/apprise.yml ${tag_args[@]+"${tag_args[@]}"} \
   -t "[{{ apprise_title_prefix }}] $title" -b "$body"
