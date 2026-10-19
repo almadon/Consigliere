@@ -1,0 +1,5 @@
+---
+description: "Grafana: dashboards and log explorer, signed in through the identity provider, Loki provisioned"
+order: 60
+roles: [grafana_server]
+secrets: [grafana.server]

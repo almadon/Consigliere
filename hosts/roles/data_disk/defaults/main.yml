@@ -1,0 +1,9 @@
+---
+# A dedicated data disk, mounted at data_disk_mount, shared by the roles that keep bulk data on it (garage, loki_server, ...).
+# Those roles include this one first, so the disk is mounted before they write anything. Empty device = nothing to do (their data
+# then sits on the root disk). Use a stable path (/dev/disk/by-id/...), not /dev/sdc. A blank disk gets a filesystem; a disk that
+# already holds one is never touched (the run fails instead). Set it per host, in config/vars/host/<host>.yml.
+data_disk_device: ""
+data_disk_mount: /srv/bulk
+data_disk_fstype: ext4
+data_disk_mkfs_opts: "-m 1"

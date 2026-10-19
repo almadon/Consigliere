@@ -6,9 +6,9 @@ attachments, Tududi, ...). One node (replication 1), the S3 API on the host's Ta
 
 - **Secret** `garage.server` (`garage_rpc_secret`, 64 hex characters): `scripts/garage.sh init` in the fleet repo creates it
   and tags the host `util: [garage]`.
-- **Disk:** with `garage_data_device` (a `/dev/disk/by-id/...` path) the data blocks live on a disk of their own, mounted at
-  `garage_data_dir`. A blank disk gets a filesystem; a disk that already holds one is never touched (the run fails instead).
-  Metadata (`garage_meta_dir`, a small database) stays on the root disk.
+- **Disk:** on a host with a dedicated data disk (`data_disk_device` in the host's vars, see the `data_disk` role) set
+  `garage_data_dir: /srv/bulk/garage` so the data blocks live there. A blank disk gets a filesystem; one that already holds a
+  filesystem is never touched (the run fails instead). Metadata (`garage_meta_dir`, a small database) stays on the root disk.
 - **First run** puts the node into the cluster layout with `garage_capacity` (set it a little under the disk size) and zone
   `garage_zone`. Changing the capacity later is done by hand: `docker exec garage /garage layout assign -c <size> <node id>`
   then `layout apply --version <n+1>`.

@@ -1,0 +1,26 @@
+# Managed by Ansible (hosts/roles/loki_server) -- edits here get overwritten on the next reconciliation run.
+services:
+  loki:
+    image: grafana/loki:{{ loki_server_version }}
+    container_name: loki
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    mem_limit: {{ loki_server_memory_limit }}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    ports:
+      - "{{ loki_server_bind_address }}:{{ loki_server_port }}:3100"
+    volumes:
+      - {{ loki_server_dir }}/loki.yaml:/etc/loki/loki.yaml:ro
+      - {{ loki_server_dir }}/state:/loki
+      - {{ loki_server_data_dir }}:/data
+{% if loki_server_network | length > 0 %}
+    networks:
+      - {{ loki_server_network }}
+
+networks:
+  {{ loki_server_network }}:
+    external: true
+{% endif %}

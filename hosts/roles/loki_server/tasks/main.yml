@@ -1,0 +1,72 @@
+---
+- name: Check the settings
+  ansible.builtin.assert:
+    that:
+      - loki_server_retention_days | int >= 1
+      - loki_server_memory_limit is match('^[0-9]+[kKmMgG]$')
+    fail_msg: loki_server_retention_days is a whole number of days and loki_server_memory_limit looks like 1536m.
+    quiet: true
+
+- name: Mount the shared data disk first (when this host has one)
+  ansible.builtin.include_role:
+    name: data_disk
+
+# Loki's image runs as uid 10001 (loki_server_uid), so the directories it writes to must belong to it.
+- name: Create the service, state and data directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "0750"
+  loop:
+    - {path: "{{ loki_server_dir }}", owner: "{{ loki_server_admin_owner }}", group: "{{ loki_server_admin_group }}"}
+    - {path: "{{ loki_server_dir }}/state", owner: "{{ loki_server_uid }}", group: "{{ loki_server_gid }}"}
+    - {path: "{{ loki_server_data_dir }}", owner: "{{ loki_server_uid }}", group: "{{ loki_server_gid }}"}
+
+- name: Write Loki's configuration
+  ansible.builtin.template:
+    src: loki.yaml.j2
+    dest: "{{ loki_server_dir }}/loki.yaml"
+    mode: "0644"
+  notify: Recreate loki
+
+- name: Write the compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ loki_server_dir }}/docker-compose.yml"
+    mode: "0640"
+  register: _loki_server_compose
+
+- name: Create the shared network
+  community.docker.docker_network:
+    name: "{{ loki_server_network }}"
+  when: loki_server_network | length > 0
+
+- name: Check that no container this role needs is already taken by something else
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: guard_containers
+  vars:
+    docker_guard_containers: [loki]
+    docker_guard_dir: "{{ loki_server_dir }}"
+
+- name: Start Loki
+  community.docker.docker_compose_v2:
+    project_src: "{{ loki_server_dir }}"
+    state: present
+    pull: "{{ 'always' if _loki_server_compose.changed else 'missing' }}"
+  # In a check run the directory and compose file above are not really written yet.
+  when: not ansible_check_mode or not _loki_server_compose.changed
+
+# The image has no shell tools for a container healthcheck, so ask from the host. Loki says "ready" about 15 seconds after start.
+- name: Wait until Loki is ready
+  ansible.builtin.uri:
+    url: "http://{{ loki_server_bind_address }}:{{ loki_server_port }}/ready"
+    return_content: true
+  register: _loki_server_ready
+  until: _loki_server_ready.status == 200
+  retries: 20
+  delay: 5
+  changed_when: false
+  when: not ansible_check_mode

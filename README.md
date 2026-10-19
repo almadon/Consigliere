@@ -51,6 +51,10 @@ Roles:
 - `traefik_server` — renders Traefik's dynamic config per host (a shared base,
   that host's own routes gathered from `traefik_server_routes*` variables, and the
   fetched certificates); see [its README](hosts/roles/traefik_server/README.md)
+- `loki_server` / `grafana_server` — the log store and dashboards (`util: [loki]`, `util: [grafana]`): Loki (90 days by default,
+  chunks on a dedicated data disk when the host has one, bound to the tailnet, OTLP ingestion) and Grafana (OIDC sign-in, Loki
+  provisioned, dashboards from the fleet repo); see [loki](hosts/roles/loki_server/README.md) and [grafana](hosts/roles/grafana_server/README.md)
+- `data_disk` — formats (only if blank) and mounts one dedicated data disk shared by `garage` and `loki_server`
 - `garage` — a [Garage](https://garagehq.deuxfleurs.fr) S3-compatible object store on the tailnet (`util: [garage]`,
   secret `garage.server`, optional dedicated data disk, declared buckets and keys); see [its README](hosts/roles/garage/README.md)
 - `muximux` — the fleet console: a [Muximux](https://github.com/mescon/Muximux) dashboard whose tiles come

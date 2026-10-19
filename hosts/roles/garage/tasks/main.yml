@@ -20,29 +20,9 @@
     quiet: true
   no_log: true
 
-- name: Prepare the data disk
-  when: garage_data_device | length > 0
-  block:
-    - name: Create the mount point
-      ansible.builtin.file:
-        path: "{{ garage_data_dir }}"
-        state: directory
-        mode: "0750"
-
-    # Makes a filesystem only on a blank device; it fails (never overwrites) when the device already holds a different one.
-    - name: Make a filesystem on the data disk if it has none
-      community.general.filesystem:
-        dev: "{{ garage_data_device }}"
-        fstype: "{{ garage_data_fstype }}"
-        opts: "{{ garage_data_mkfs_opts }}"
-
-    - name: Mount the data disk
-      ansible.posix.mount:
-        path: "{{ garage_data_dir }}"
-        src: "{{ garage_data_device }}"
-        fstype: "{{ garage_data_fstype }}"
-        opts: defaults,nofail
-        state: mounted
+- name: Mount the shared data disk first (when this host has one)
+  ansible.builtin.include_role:
+    name: data_disk
 
 - name: Create the service, metadata and data directories
   ansible.builtin.file:

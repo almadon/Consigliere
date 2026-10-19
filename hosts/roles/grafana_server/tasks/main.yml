@@ -1,0 +1,116 @@
+---
+- name: Check the settings
+  ansible.builtin.assert:
+    that:
+      - grafana_server_url | length > 0
+      - grafana_server_url is match('^https://')
+      - grafana_server_oidc_issuer_url | length > 0
+      - grafana_server_memory_limit is match('^[0-9]+[kKmMgG]$')
+      - grafana_server_dashboards | map(attribute='name') | list | length == grafana_server_dashboards | map(attribute='name') | list | unique | length
+    fail_msg: >-
+      Set grafana_server_url (the public https URL) and grafana_server_oidc_issuer_url. Dashboard names must be unique.
+    quiet: true
+
+- name: Load the sign-in client and admin password (secret grafana.server)
+  ansible.builtin.include_role:
+    name: load_secrets
+  vars:
+    load_secrets_scopes: [grafana.server]
+
+- name: Require real values
+  ansible.builtin.assert:
+    that:
+      - grafana_server_oidc_client_id is defined
+      - grafana_server_oidc_client_secret is defined
+      - grafana_server_admin_password is defined
+      - grafana_server_admin_password | length >= 12
+      - "'CHANGEME' not in grafana_server_oidc_client_id"
+      - "'CHANGEME' not in grafana_server_oidc_client_secret"
+      - "'CHANGEME' not in grafana_server_admin_password"
+    fail_msg: >-
+      The identity-provider client or the admin password is not set up. Create a confidential client for {{ grafana_server_url }}
+      (callback {{ grafana_server_url | trim('/') }}/login/generic_oauth), then run scripts/observability.sh init in the fleet repo.
+    quiet: true
+  no_log: true
+
+- name: Work out the role mapping for signed-in users
+  ansible.builtin.set_fact:
+    _grafana_server_role_path: >-
+      {% set parts = [] %}{% for g in grafana_server_oidc_admin_groups %}{% set _ = parts.append("contains(groups[*], '" ~ g ~ "') && 'Admin'") %}{% endfor %}
+      {%- for g in grafana_server_oidc_editor_groups %}{% set _ = parts.append("contains(groups[*], '" ~ g ~ "') && 'Editor'") %}{% endfor %}
+      {{ (parts + ["'Viewer'"]) | join(' || ') }}
+
+- name: Create the service, provisioning and dashboard directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "0755"
+  loop:
+    - {path: "{{ grafana_server_dir }}", owner: "{{ grafana_server_admin_owner }}", group: "{{ grafana_server_admin_group }}"}
+    - {path: "{{ grafana_server_dir }}/provisioning", owner: "{{ grafana_server_admin_owner }}", group: "{{ grafana_server_admin_group }}"}
+    - {path: "{{ grafana_server_dir }}/provisioning/datasources", owner: "{{ grafana_server_admin_owner }}", group: "{{ grafana_server_admin_group }}"}
+    - {path: "{{ grafana_server_dir }}/provisioning/dashboards", owner: "{{ grafana_server_admin_owner }}", group: "{{ grafana_server_admin_group }}"}
+    - {path: "{{ grafana_server_dir }}/dashboards", owner: "{{ grafana_server_admin_owner }}", group: "{{ grafana_server_admin_group }}"}
+    - {path: "{{ grafana_server_dir }}/data", owner: "{{ grafana_server_uid }}", group: "{{ grafana_server_gid }}"}
+
+- name: Write the data source and dashboard provisioning
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ grafana_server_dir }}/provisioning/{{ item.dest }}"
+    mode: "0644"
+  loop:
+    - {src: datasources.yml.j2, dest: datasources/fleet.yml}
+    - {src: dashboards.yml.j2, dest: dashboards/fleet.yml}
+  loop_control:
+    label: "{{ item.dest }}"
+  notify: Recreate grafana
+
+- name: Write the inline dashboards
+  ansible.builtin.copy:
+    content: "{{ item.json | to_nice_json }}"
+    dest: "{{ grafana_server_dir }}/dashboards/{{ item.name }}.json"
+    mode: "0644"
+  loop: "{{ grafana_server_dashboards }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Write the compose file (it holds the sign-in secret and the admin password)
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ grafana_server_dir }}/docker-compose.yml"
+    mode: "0600"
+  no_log: true
+  register: _grafana_server_compose
+
+- name: Create the shared network
+  community.docker.docker_network:
+    name: "{{ grafana_server_network }}"
+  when: grafana_server_network | length > 0
+
+- name: Check that no container this role needs is already taken by something else
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: guard_containers
+  vars:
+    docker_guard_containers: [grafana]
+    docker_guard_dir: "{{ grafana_server_dir }}"
+
+- name: Start Grafana
+  community.docker.docker_compose_v2:
+    project_src: "{{ grafana_server_dir }}"
+    state: present
+    pull: "{{ 'always' if _grafana_server_compose.changed else 'missing' }}"
+  # In a check run the directory and compose file above are not really written yet.
+  when: not ansible_check_mode or not _grafana_server_compose.changed
+
+- name: Wait until Grafana is up
+  ansible.builtin.uri:
+    url: "http://{{ grafana_server_bind_address }}:{{ grafana_server_port }}/api/health"
+  register: _grafana_server_up
+  until: _grafana_server_up.status == 200
+  retries: 20
+  delay: 5
+  changed_when: false
+  when: not ansible_check_mode

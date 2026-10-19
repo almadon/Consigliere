@@ -1,0 +1,51 @@
+# Managed by Ansible (hosts/roles/grafana_server) -- edits here get overwritten on the next reconciliation run.
+services:
+  grafana:
+    image: grafana/grafana:{{ grafana_server_version }}
+    container_name: grafana
+    restart: unless-stopped
+    mem_limit: {{ grafana_server_memory_limit }}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    ports:
+      - "{{ grafana_server_bind_address }}:{{ grafana_server_port }}:3000"
+    environment:
+      GF_SERVER_ROOT_URL: {{ (grafana_server_url | trim('/') ~ '/') | to_json }}
+      GF_SERVER_ENFORCE_DOMAIN: "false"
+      GF_LIVE_ALLOWED_ORIGINS: {{ (grafana_server_url | trim('/')) | to_json }}
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: {{ grafana_server_admin_password | to_json }}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_DISABLE_LOGIN_FORM: "{{ 'false' if grafana_server_local_login | bool else 'true' }}"
+      GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
+      GF_AUTH_GENERIC_OAUTH_NAME: {{ grafana_server_oidc_name | to_json }}
+      GF_AUTH_GENERIC_OAUTH_CLIENT_ID: {{ grafana_server_oidc_client_id | to_json }}
+      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: {{ grafana_server_oidc_client_secret | to_json }}
+      GF_AUTH_GENERIC_OAUTH_SCOPES: {{ grafana_server_oidc_scopes | to_json }}
+      GF_AUTH_GENERIC_OAUTH_AUTH_URL: {{ grafana_server_oidc_auth_url | to_json }}
+      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: {{ grafana_server_oidc_token_url | to_json }}
+      GF_AUTH_GENERIC_OAUTH_API_URL: {{ grafana_server_oidc_api_url | to_json }}
+      GF_AUTH_GENERIC_OAUTH_USE_PKCE: "true"
+      GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP: "true"
+      GF_AUTH_GENERIC_OAUTH_LOGIN_ATTRIBUTE_PATH: preferred_username
+      GF_AUTH_GENERIC_OAUTH_NAME_ATTRIBUTE_PATH: name
+      GF_AUTH_GENERIC_OAUTH_EMAIL_ATTRIBUTE_PATH: email
+      GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH: {{ _grafana_server_role_path | trim | to_json }}
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+    volumes:
+      - {{ grafana_server_dir }}/data:/var/lib/grafana
+      - {{ grafana_server_dir }}/provisioning:/etc/grafana/provisioning:ro
+      - {{ grafana_server_dir }}/dashboards:/var/lib/grafana-dashboards:ro
+{% if grafana_server_network | length > 0 %}
+    networks:
+      - {{ grafana_server_network }}
+
+networks:
+  {{ grafana_server_network }}:
+    external: true
+{% endif %}

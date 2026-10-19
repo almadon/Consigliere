@@ -1,0 +1,7 @@
+---
+- name: Recreate grafana
+  community.docker.docker_compose_v2:
+    project_src: "{{ grafana_server_dir }}"
+    state: present
+    recreate: always
+  when: not ansible_check_mode

@@ -1,0 +1,23 @@
+---
+# Loki (https://grafana.com/oss/loki/): the fleet's log store, single binary, filesystem storage. Hosts send logs to it with
+# OpenTelemetry (http://<this host>:3100/otlp) or any Loki client; Grafana reads it. No sign-in of its own: it is bound to this
+# host's Tailscale address only, never given a public route.
+loki_server_version: "3.7.8"
+loki_server_dir: /opt/loki
+# Where things live. The log chunks and the uploaded index are the bulk and go in loki_server_data_dir: on a host with a dedicated
+# data disk (data_disk_device, see the data_disk role) point it under the mount, for example /srv/bulk/loki, so the root
+# disk cannot fill up. The write-ahead log, the live index and caches stay in loki_server_dir/state (small).
+loki_server_data_dir: /srv/loki
+# Logs older than this are deleted by the compactor.
+loki_server_retention_days: 90
+loki_server_bind_address: "{{ tailscale_ipv4 | default('127.0.0.1', true) }}"
+loki_server_port: 3100
+# Shared Docker network with Grafana (and anything else on this host that reads Loki as http://loki:3100). Empty = none.
+loki_server_network: observability
+# Hard memory limit of the container.
+loki_server_memory_limit: 1536m
+# The user Loki's image runs as, and who owns the service directory itself.
+loki_server_uid: "10001"
+loki_server_gid: "10001"
+loki_server_admin_owner: root
+loki_server_admin_group: root

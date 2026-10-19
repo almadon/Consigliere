@@ -1,0 +1,24 @@
+---
+- name: Prepare the data disk
+  when: data_disk_device | length > 0
+  block:
+    - name: Create the mount point
+      ansible.builtin.file:
+        path: "{{ data_disk_mount }}"
+        state: directory
+        mode: "0755"
+
+    # Makes a filesystem only on a blank device; it fails (never overwrites) when the device already holds a different one.
+    - name: Make a filesystem on the data disk if it has none
+      community.general.filesystem:
+        dev: "{{ data_disk_device }}"
+        fstype: "{{ data_disk_fstype }}"
+        opts: "{{ data_disk_mkfs_opts }}"
+
+    - name: Mount the data disk
+      ansible.posix.mount:
+        path: "{{ data_disk_mount }}"
+        src: "{{ data_disk_device }}"
+        fstype: "{{ data_disk_fstype }}"
+        opts: defaults,nofail
+        state: mounted

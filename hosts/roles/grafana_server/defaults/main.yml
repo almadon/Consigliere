@@ -1,0 +1,39 @@
+---
+# Grafana (OSS, https://grafana.com/oss/grafana/): the fleet's dashboards, log explorer and (later) alerting. Signs in through the
+# identity provider (OIDC; Pocket ID is what the paths below fit). Loki is provisioned as the default data source.
+# Client id/secret and the break-glass admin password come from the secret grafana.server (config/secrets/grafana/server.yml):
+#   grafana_server_oidc_client_id, grafana_server_oidc_client_secret, grafana_server_admin_password
+grafana_server_version: "13.2.4"
+grafana_server_dir: /opt/grafana
+# The public https URL (required: the identity provider sends the browser back to it).
+grafana_server_url: ""
+grafana_server_bind_address: "{{ tailscale_ipv4 | default('127.0.0.1', true) }}"
+grafana_server_port: 3105
+# Shared Docker network with Loki (see loki_server). Empty = none.
+grafana_server_network: observability
+grafana_server_memory_limit: 1g
+grafana_server_uid: "472"
+grafana_server_gid: "0"
+grafana_server_admin_owner: root
+grafana_server_admin_group: root
+
+# Sign-in (OIDC). The issuer's well-known address lists these; the defaults fit Pocket ID.
+grafana_server_oidc_issuer_url: ""
+grafana_server_oidc_name: "Pocket ID"
+grafana_server_oidc_scopes: "openid profile email groups"
+grafana_server_oidc_auth_url: "{{ grafana_server_oidc_issuer_url | trim('/') }}/authorize"
+grafana_server_oidc_token_url: "{{ grafana_server_oidc_issuer_url | trim('/') }}/api/oidc/token"
+grafana_server_oidc_api_url: "{{ grafana_server_oidc_issuer_url | trim('/') }}/api/oidc/userinfo"
+# Members of these groups (claim "groups") get these roles; everyone else the identity provider lets in is a Viewer.
+grafana_server_oidc_admin_groups: [Grafana-Admins]
+grafana_server_oidc_editor_groups: [Grafana-Editors]
+# The local admin login stays as a break-glass way in (the password is set only when Grafana first creates its database).
+grafana_server_local_login: true
+
+# Data sources. Loki is always provisioned; add more as Grafana provisioning entries:
+#   - {name: Prometheus, type: prometheus, url: "http://victoria:8428", access: proxy}
+grafana_server_loki_url: "http://loki:3100"
+grafana_server_datasources_extra: []
+# Dashboards as inline JSON, written to {{ grafana_server_dir }}/dashboards: [{name: fleet-overview, json: {...}}]
+# (dashboards saved in the UI live in Grafana's database and are not touched).
+grafana_server_dashboards: []

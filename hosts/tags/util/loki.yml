@@ -1,0 +1,4 @@
+---
+description: "Loki: the fleet's log store (single binary, 90 days by default), on the tailnet only; Grafana and OpenTelemetry agents use it"
+order: 55
+roles: [loki_server]

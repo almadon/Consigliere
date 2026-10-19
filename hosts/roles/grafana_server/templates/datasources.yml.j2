@@ -1,0 +1,12 @@
+# Managed by Ansible (hosts/roles/grafana_server).
+apiVersion: 1
+datasources:
+  - name: Loki
+    type: loki
+    access: proxy
+    url: {{ grafana_server_loki_url | to_json }}
+    isDefault: true
+    editable: false
+{% for ds in grafana_server_datasources_extra %}
+  - {{ ds | to_json }}
+{% endfor %}

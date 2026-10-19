@@ -6,14 +6,9 @@
 garage_version: "2.4.1"
 garage_dir: /opt/garage
 # Metadata (a small database, fast storage matters) and the data blocks are separate. By default the data sits on the root
-# disk; with garage_data_device it gets a disk of its own mounted at garage_data_dir.
+# disk; on a host with a dedicated data disk (data_disk_device, see the data_disk role) set it under the mount: /srv/bulk/garage.
 garage_meta_dir: "{{ garage_dir }}/meta"
 garage_data_dir: /srv/garage
-# A dedicated data disk, mounted at garage_data_dir. Empty = use the root disk. Use a stable path
-# (/dev/disk/by-id/...), not /dev/sdc. A blank disk gets a filesystem; one that already holds a filesystem is never touched.
-garage_data_device: ""
-garage_data_fstype: ext4
-garage_data_mkfs_opts: "-m 1"
 # S3 API address. The tailnet address by default (Docker-published ports bypass ufw; the docker guard also drops outside
 # sources). Containers on this host can instead join garage_network and use http://garage:3900.
 garage_bind_address: "{{ tailscale_ipv4 | default('127.0.0.1', true) }}"
