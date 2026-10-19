@@ -5,10 +5,12 @@
       - otel_agent_loki_url is match('^https?://')
       - otel_agent_journal | bool or _otel_agent_docker_wanted
       - otel_agent_memory_limit_mib | int >= 64
+      - otel_agent_journal_priority in ['emerg', 'alert', 'crit', 'err', 'warning', 'notice', 'info', 'debug']
       - ansible_architecture in ['x86_64', 'aarch64']
     fail_msg: >-
       Set otel_agent_loki_url (Loki's OTLP address, for example http://lk.ctrl.a64.one:3100/otlp) in config/vars/group/feat_otel.yml.
-      The collector package exists for x86_64 and aarch64 only; at least one of journal and Docker logs must be on.
+      otel_agent_journal_priority is one of emerg, alert, crit, err, warning, notice, info, debug. The collector package exists for
+      x86_64 and aarch64 only; at least one of journal and Docker logs must be on; the memory limit is at least 64 MiB.
     quiet: true
   vars:
     _otel_agent_docker_wanted: "{{ otel_agent_docker_logs | string | lower in ['auto', 'true', 'yes'] }}"
@@ -83,6 +85,8 @@
     mode: "0750"
   when: not ansible_check_mode or _otel_agent_installed.stdout == otel_agent_version
 
+# The collector checks the new file itself (receivers, processors and every OTTL statement) before it replaces the live one, so a
+# mistake stops this run with the reason and leaves the working configuration in place.
 - name: Write the collector's configuration
   ansible.builtin.template:
     src: config.yaml.j2
@@ -90,8 +94,10 @@
     owner: root
     group: root
     mode: "0644"
+    validate: /usr/bin/otelcol-contrib validate --config=%s
   when: not ansible_check_mode or _otel_agent_installed.stdout == otel_agent_version
   notify: Restart otelcol-contrib
+  register: _otel_agent_config
 
 - name: Hardening and limits for the service
   ansible.builtin.file:
@@ -107,6 +113,7 @@
     group: root
     mode: "0644"
   notify: Restart otelcol-contrib
+  register: _otel_agent_dropin
 
 - name: Flush handlers so the new configuration is live before the final checks
   ansible.builtin.meta: flush_handlers
@@ -117,3 +124,25 @@
     enabled: true
     state: started
   when: not ansible_check_mode
+
+# A configuration the collector accepts can still fail when it starts (for example a receiver that cannot open its source). After
+# any change, make sure the service stays up and say why when it does not.
+- name: Give a changed collector a few seconds, then check it stayed up
+  when:
+    - not ansible_check_mode
+    - _otel_agent_config.changed or _otel_agent_dropin.changed or _otel_agent_deb.changed | default(false)
+  block:
+    - name: Wait for the collector to settle
+      ansible.builtin.wait_for:
+        timeout: 8
+
+    - name: Read the service state
+      ansible.builtin.systemd:
+        name: otelcol-contrib
+      register: _otel_agent_state
+
+    - name: Fail with the reason if it is not running steadily
+      ansible.builtin.command: journalctl -u otelcol-contrib --no-pager -n 12 -o cat
+      register: _otel_agent_why
+      changed_when: false
+      failed_when: _otel_agent_state.status.ActiveState != 'active' or (_otel_agent_state.status.NRestarts | int) > 0

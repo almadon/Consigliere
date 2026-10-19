@@ -18,6 +18,11 @@ Every line carries `host_name` (`otel_agent_host_name`, the fleet's short name).
   (`ProtectSystem=strict`, `NoNewPrivileges`, state only in `/var/lib/otelcol-contrib`).
 - **Limits:** a soft memory limit (`otel_agent_memory_limit_mib`, 128) in the collector, `GOMEMLIMIT`, and `MemoryMax` (256M). Measured at
   rest on Debian 13: about 80 MB resident (51 MB of it heap), with a larger spike while it starts. The installed binary is large (~370 MB on disk).
+- **Failsafes:** the rendered configuration is checked by the collector itself (`otelcol-contrib validate`, which parses every OTTL
+  statement) before it replaces the live file, so a mistake stops that host's run with the reason and the working configuration stays.
+  After any change the role waits a few seconds and fails, with the service's last journal lines, if the collector is not running
+  steadily. Transient unit names (`session-123.scope`, container scopes, `run-*`) are folded into a few stable `unit` values so
+  Loki's stream count stays bounded.
 - **No data lost across restarts:** read offsets and the send queue are kept on disk (`file_storage`); if Loki is unreachable the agent
   queues and retries.
 - No secret is needed: Loki takes logs only from the tailnet. Metrics (host metrics, Docker stats) are not sent yet, because there is no

@@ -62,6 +62,13 @@ processors:
           - set(attributes["unit"], body["_SYSTEMD_UNIT"]) where body["_SYSTEMD_UNIT"] != nil
           - set(attributes["unit"], body["SYSLOG_IDENTIFIER"]) where attributes["unit"] == nil and body["SYSLOG_IDENTIFIER"] != nil
           - set(attributes["unit"], "kernel") where attributes["unit"] == nil and body["_TRANSPORT"] == "kernel"
+          # Keep the label values few and stable: transient units (SSH sessions, container scopes, systemd-run jobs) would otherwise
+          # create a new stream every time.
+          - replace_pattern(attributes["unit"], "\\.service$", "") where attributes["unit"] != nil
+          - replace_pattern(attributes["unit"], "^session-[A-Za-z0-9]+\\.scope$", "session") where attributes["unit"] != nil
+          - replace_pattern(attributes["unit"], "^(docker|libpod|cri-containerd)-[0-9a-f]+\\.scope$", "$$1") where attributes["unit"] != nil
+          - replace_pattern(attributes["unit"], "^run-.*$", "run") where attributes["unit"] != nil
+          - replace_pattern(attributes["unit"], "@[0-9]+", "@N") where attributes["unit"] != nil
           - set(body, body["MESSAGE"]) where body["MESSAGE"] != nil
 {% endif %}
   batch: {}
