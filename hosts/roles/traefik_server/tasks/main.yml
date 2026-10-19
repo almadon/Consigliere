@@ -46,6 +46,35 @@
       a backend URL (or `redirect: {to: https://..., permanent: true}`), and a host (or a full rule); profile, if given, must be app, strict, relaxed, framed or none.
     quiet: true
 
+# Two routes that answer the same request make Traefik pick one silently. Refuse before anything is written.
+- name: Find routes that match the same request
+  ansible.builtin.set_fact:
+    _traefik_server_duplicate_matches: >-
+      {%- set keys = [] -%}
+      {%- for r in _traefik_server_routes -%}
+        {%- if r.rule is defined -%}
+          {%- set _ = keys.append(r.rule | trim) -%}
+        {%- else -%}
+          {%- for h in ([r.host] if r.host is string else r.host) -%}
+            {%- set _ = keys.append('Host(`' ~ (h | lower) ~ '`)') -%}
+          {%- endfor -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {%- set dups = [] -%}
+      {%- for k in keys | unique -%}
+        {%- if keys | select('equalto', k) | list | length > 1 -%}{%- set _ = dups.append(k) -%}{%- endif -%}
+      {%- endfor -%}
+      {{ dups | to_json }}
+
+- name: Refuse conflicting routes
+  ansible.builtin.assert:
+    that: _traefik_server_duplicate_matches | from_json | length == 0
+    fail_msg: >-
+      These routes are defined more than once on this host, so Traefik would pick one at random: {{
+      _traefik_server_duplicate_matches | from_json | join(' ; ') }}. Remove the duplicate (see "Show which variable
+      each route comes from" above for where each route is defined). Nothing was changed on this host.
+    quiet: true
+
 - name: Create the Traefik directories
   ansible.builtin.file:
     path: "{{ item }}"

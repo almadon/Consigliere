@@ -30,6 +30,12 @@ instead of overriding each other, because each layer uses a different name.
         host: vault.example.com
         backend: http://vaultwarden:80      # container on the shared network
 
+## Conflicting routes are refused
+
+Before writing any file the role asserts that route names are unique and that no two routes match the same request
+(the same host, or the same rule). The failure names the duplicate and nothing is changed on the host, so the running
+Traefik keeps its last good configuration. The fleet repo's `scripts/preflight.sh` makes the same check before a push.
+
 ## Behind another proxy
 
 If a proxy such as Caddy sits in front, list its address in `traefik_server_trusted_ips` so
