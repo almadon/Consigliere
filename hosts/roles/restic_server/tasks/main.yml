@@ -116,4 +116,3 @@
     state: absent
   loop: "{{ [restic_server_mirror_keys_revoked] | flatten }}"
   when: restic_server_mirror_keys_revoked | length > 0
-

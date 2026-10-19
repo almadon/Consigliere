@@ -31,4 +31,3 @@ restic_server_mirror_keys: []
 # Mirror keys that must NO LONGER pull from this host (for example after the mirror and the primary swap places).
 # The same "ssh-ed25519 AAAA..." line as in restic_server_mirror_keys; it is removed from root's authorized keys.
 restic_server_mirror_keys_revoked: []
-
