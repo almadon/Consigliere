@@ -1,0 +1,43 @@
+# Managed by Ansible (hosts/roles/muximux) -- edits here get overwritten on the next reconciliation run.
+services:
+  muximux:
+    image: ghcr.io/mescon/muximux:{{ muximux_version }}
+    container_name: muximux
+    init: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    # The entrypoint starts as root, fixes ownership, then drops to uid 1000 (su-exec); it needs exactly these three.
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+{% if muximux_network | length == 0 %}
+    ports:
+      - "{{ muximux_bind_address }}:{{ muximux_port }}:8080"
+{% endif %}
+    environment:
+{% if muximux_auth == 'oidc' %}
+      MUXIMUX_AUTH_METHOD: oidc
+      MUXIMUX_OIDC_ENABLED: "true"
+      MUXIMUX_OIDC_ISSUER_URL: {{ muximux_oidc_issuer_url | to_json }}
+      MUXIMUX_OIDC_CLIENT_ID: {{ muximux_oidc_client_id | to_json }}
+      MUXIMUX_OIDC_CLIENT_SECRET: {{ muximux_oidc_client_secret | to_json }}
+      MUXIMUX_OIDC_REDIRECT_URL: {{ (muximux_url | trim('/') ~ '/api/auth/oidc/callback') | to_json }}
+      MUXIMUX_OIDC_SCOPES: "openid,profile,email,groups"
+      MUXIMUX_OIDC_GROUPS_CLAIM: groups
+      MUXIMUX_OIDC_ADMIN_GROUPS: {{ (muximux_oidc_admin_groups | join(',')) | to_json }}
+{% endif %}
+    volumes:
+      - {{ muximux_dir }}/data:/app/data
+      - {{ muximux_dir }}/config.yaml:/app/data/config.yaml:ro
+{% if muximux_network | length > 0 %}
+    networks:
+      - {{ muximux_network }}
+
+networks:
+  {{ muximux_network }}:
+    external: true
+{% endif %}

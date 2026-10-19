@@ -1,0 +1,43 @@
+---
+# The fleet console: a Muximux dashboard (https://github.com/mescon/Muximux), generated from the fleet repo.
+# Tiles, groups and theme come from the variables below; the config file is mounted read-only, so the fleet repo is
+# the single source of truth (a change made in Muximux's own settings page would only be lost at the next run).
+#
+# Sign-in is OIDC against your identity provider (documented for Pocket ID). The client id and secret come from the
+# secret muximux.server (config/secrets/muximux/server.yml):
+#   muximux_oidc_client_id, muximux_oidc_client_secret
+# In the identity provider: a confidential client whose callback URL is  <muximux_url>/api/auth/oidc/callback,
+# allowed to read the "groups" claim, and a group (muximux_oidc_admin_groups) for the people who may use the console.
+muximux_version: "3.6.2"
+muximux_dir: /opt/muximux
+muximux_port: 8080
+# The public https URL of the console (required: the identity provider sends the browser back to it).
+muximux_url: ""
+muximux_title: "Fleet console"
+# Join a shared Docker network (for example proxynet) so Traefik reaches it as http://muximux:8080 and nothing is
+# published on the host. Empty = publish on muximux_bind_address instead.
+muximux_network: ""
+muximux_bind_address: "{{ tailscale_ipv4 | default('127.0.0.1', true) }}"
+# oidc (default) or none. "none" is refused unless muximux_allow_no_auth is true: a console without a sign-in
+# lists every admin tool you run.
+muximux_auth: oidc
+muximux_allow_no_auth: false
+muximux_oidc_issuer_url: ""
+muximux_oidc_admin_groups: [Muximux-Admins]
+muximux_session_max_age: 24h
+muximux_theme_family: default
+muximux_theme_variant: system
+muximux_nav_position: left
+muximux_health_interval: 30s
+muximux_health_timeout: 5s
+# Groups of tiles:  - {name: Fleet, icon: server, color: "#3498db"}   (icon: a Lucide icon name)
+muximux_groups: []
+# Tiles:
+#   - name: Arkeep
+#     url: https://ark.a64.one
+#     group: Fleet
+#     icon: database-backup         # Lucide icon name, or  {type: dashboard, name: vaultwarden}
+#     open: new_tab                 # new_tab (default; right for apps with their own sign-in), iframe, new_window
+#     health_url: http://...        # optional: what the health check calls instead of url
+#     min_role: admin               # optional: user | power-user | admin
+muximux_apps: []

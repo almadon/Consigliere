@@ -1,0 +1,5 @@
+---
+description: "The fleet console: a Muximux dashboard generated from the fleet repo, signed in through the identity provider"
+order: 80
+roles: [muximux]
+secrets: [muximux.server]

@@ -1,0 +1,79 @@
+---
+- name: Check the console's settings
+  ansible.builtin.assert:
+    that:
+      - muximux_url | length > 0
+      - muximux_auth in ['oidc', 'none']
+      - muximux_auth != 'none' or muximux_allow_no_auth | bool
+      - muximux_auth != 'oidc' or muximux_oidc_issuer_url | length > 0
+      - muximux_apps | map(attribute='name') | list | length == muximux_apps | map(attribute='name') | list | unique | length
+    fail_msg: >-
+      Set muximux_url (the public https URL) and, for sign-in, muximux_oidc_issuer_url. Tile names must be unique.
+      muximux_auth: none is refused unless muximux_allow_no_auth is true.
+    quiet: true
+
+- name: Load the sign-in client (secret muximux.server)
+  ansible.builtin.include_role:
+    name: load_secrets
+  vars:
+    load_secrets_scopes: [muximux.server]
+  when: muximux_auth == 'oidc'
+
+- name: Require a real client id and secret
+  ansible.builtin.assert:
+    that:
+      - muximux_oidc_client_id is defined
+      - muximux_oidc_client_secret is defined
+      - "'CHANGEME' not in muximux_oidc_client_id"
+      - "'CHANGEME' not in muximux_oidc_client_secret"
+    fail_msg: >-
+      The identity-provider client is not set up. Create a confidential client for {{ muximux_url }} (callback
+      {{ muximux_url | trim('/') }}/api/auth/oidc/callback), then run scripts/console.sh init in the fleet repo.
+    quiet: true
+  no_log: true
+  when: muximux_auth == 'oidc'
+
+- name: Create the directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ muximux_dir }}"
+    - "{{ muximux_dir }}/data"
+
+- name: Write the console's configuration (no secrets in it)
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: "{{ muximux_dir }}/config.yaml"
+    mode: "0644"
+  notify: Recreate muximux
+
+- name: Write the compose file (it holds the sign-in client secret)
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ muximux_dir }}/docker-compose.yml"
+    mode: "0600"
+  no_log: true
+  register: _muximux_compose
+
+- name: Create the shared proxy network
+  community.docker.docker_network:
+    name: "{{ muximux_network }}"
+  when: muximux_network | length > 0
+
+- name: Check that no container this role needs is already taken by something else
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: guard_containers
+  vars:
+    docker_guard_containers: [muximux]
+    docker_guard_dir: "{{ muximux_dir }}"
+
+- name: Start the console
+  community.docker.docker_compose_v2:
+    project_src: "{{ muximux_dir }}"
+    state: present
+    pull: "{{ 'always' if _muximux_compose.changed else 'missing' }}"
+  # In a check run the directory and compose file above are not really written yet.
+  when: not ansible_check_mode or not _muximux_compose.changed

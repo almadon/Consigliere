@@ -1,0 +1,57 @@
+# Managed by Ansible (hosts/roles/muximux). Mounted read-only: change the tiles in the fleet repo, not in Muximux.
+# Sign-in settings come from environment variables (MUXIMUX_OIDC_*), so no secret is in this file.
+server:
+  listen: ":8080"
+  title: {{ muximux_title | to_json }}
+  log_level: info
+  log_format: text
+health:
+  enabled: true
+  interval: {{ muximux_health_interval }}
+  timeout: {{ muximux_health_timeout }}
+auth:
+  method: {{ muximux_auth }}
+{% if muximux_auth == 'oidc' %}
+  secure_cookies: true
+  session_max_age: {{ muximux_session_max_age }}
+{% endif %}
+theme:
+  family: {{ muximux_theme_family }}
+  variant: {{ muximux_theme_variant }}
+navigation:
+  position: {{ muximux_nav_position }}
+{% if muximux_groups | length > 0 %}
+groups:
+{% for g in muximux_groups %}
+  - name: {{ g.name | to_json }}
+    icon: {type: lucide, name: {{ (g.icon | default('folder')) | to_json }}}
+    color: {{ (g.color | default('#3498db')) | to_json }}
+    order: {{ loop.index }}
+    expanded: true
+{% endfor %}
+{% else %}
+groups: []
+{% endif %}
+{% if muximux_apps | length > 0 %}
+apps:
+{% for a in muximux_apps %}
+{% set icon = a.icon | default('app-window') %}
+  - name: {{ a.name | to_json }}
+    url: {{ a.url | to_json }}
+{% if a.health_url is defined %}
+    health_url: {{ a.health_url | to_json }}
+{% endif %}
+    icon: {{ (icon if icon is mapping else {'type': 'lucide', 'name': icon}) | to_json }}
+    group: {{ (a.group | default('')) | to_json }}
+    order: {{ loop.index }}
+    enabled: true
+    open_mode: {{ a.open | default('new_tab') }}
+    proxy: false
+    health_check: {{ (a.health | default(true)) | bool | lower }}
+{% if a.min_role is defined %}
+    min_role: {{ a.min_role }}
+{% endif %}
+{% endfor %}
+{% else %}
+apps: []
+{% endif %}
