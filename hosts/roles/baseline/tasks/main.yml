@@ -11,6 +11,10 @@
     name: "{{ baseline_timezone }}"
   when: baseline_timezone | length > 0
 
+- name: Keep the operating system's hostname short (no domain part)
+  ansible.builtin.import_tasks: hostname.yml
+  when: baseline_short_hostname | bool
+
 # --- unattended upgrades ----------------------------------------------------
 - name: Turn on the periodic apt update + unattended upgrade
   ansible.builtin.copy:

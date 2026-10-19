@@ -63,3 +63,7 @@ baseline_sysctl_raise_only:
   - vm.max_map_count
   - fs.inotify.max_user_watches
   - fs.inotify.max_user_instances
+
+# Trim an FQDN hostname ("nova.core.example.com") to its first label ("nova"), fix /etc/hosts to match, and stop
+# cloud-init from restoring it. A host that already has a short name is untouched.
+baseline_short_hostname: true

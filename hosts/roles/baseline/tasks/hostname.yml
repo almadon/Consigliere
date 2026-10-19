@@ -1,0 +1,47 @@
+---
+# Hosts are named by their short Tailscale hostname everywhere in the fleet (inventory, Beszel, Arkeep, logs), so the
+# operating system's own hostname should be the short name too: "Nova", not "Nova.core.rmrg.casa". Provisioners
+# (cloud-init, VPS panels) often set an FQDN. This trims it to its first label, keeps the 127.0.1.1 line of
+# /etc/hosts in step, and tells cloud-init not to put the FQDN back. Nothing happens on a host that is already short.
+- name: Read the static hostname
+  ansible.builtin.command: hostnamectl --static
+  register: _baseline_hostname
+  changed_when: false
+  check_mode: false
+
+- name: Work out the short name
+  ansible.builtin.set_fact:
+    _baseline_short_hostname: "{{ (_baseline_hostname.stdout | trim).split('.')[0] }}"
+
+- name: Use the short name as the hostname
+  ansible.builtin.hostname:
+    name: "{{ _baseline_short_hostname }}"
+    use: systemd
+  when:
+    - "'.' in (_baseline_hostname.stdout | trim)"
+    - _baseline_short_hostname | length > 0
+
+# `replace` changes a matching line only (a missing line is left missing); this one matches a 127.0.1.1 entry that
+# carries a dotted name, so a host that is already tidy is untouched.
+- name: Keep the 127.0.1.1 entry of /etc/hosts in step
+  ansible.builtin.replace:
+    path: /etc/hosts
+    regexp: '^(127\.0\.1\.1)\s+\S*\.\S*.*$'
+    replace: '\1 {{ _baseline_short_hostname }}'
+  when: _baseline_short_hostname | length > 0
+
+- name: Check whether cloud-init is present
+  ansible.builtin.stat:
+    path: /etc/cloud/cloud.cfg.d
+  register: _baseline_cloud_cfg
+
+- name: Stop cloud-init from putting an FQDN back
+  ansible.builtin.copy:
+    dest: /etc/cloud/cloud.cfg.d/99-consigliere-hostname.cfg
+    content: |
+      # Managed by Ansible (hosts/roles/baseline): the fleet keeps short hostnames.
+      preserve_hostname: true
+    owner: root
+    group: root
+    mode: "0644"
+  when: _baseline_cloud_cfg.stat.isdir | default(false)

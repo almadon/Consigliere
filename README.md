@@ -27,7 +27,7 @@ visibility (run history, dashboard) and on-demand/webhook-triggered runs —
 it is not the primary execution path, `ansible-pull` is.
 
 Roles:
-- `baseline` — users, SSH hardening, unattended-upgrades
+- `baseline` — users, SSH hardening, unattended-upgrades, short OS hostnames (an FQDN is trimmed to its first label; `baseline_short_hostname: false` turns it off)
 - `tailscale` — install + join (see inventory below)
 - `firewall` — ufw, run last by `fleet_plan`: deny inbound except everything on the tailnet
   interface, plus ports the tags ask for (`util: [traefik]` opens 80/443; a manifest's
