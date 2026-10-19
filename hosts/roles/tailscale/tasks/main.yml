@@ -10,13 +10,25 @@
 
 - name: Add Tailscale apt repo + install
   block:
+    # Fetched once, when missing: get_url on an old existing file reports "changed" in every check pass (it cannot download
+    # then, so it assumes the server copy is newer). To rotate the key or the list, delete the file.
+    - name: Are the Tailscale key and repo list already there?
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /usr/share/keyrings/tailscale-archive-keyring.gpg
+        - /etc/apt/sources.list.d/tailscale.list
+      register: _tailscale_files
+
     - name: Add Tailscale GPG key
       ansible.builtin.get_url:
         url: "https://pkgs.tailscale.com/stable/{{ ansible_distribution | lower }}/{{ ansible_distribution_release }}.noarmor.gpg"
         dest: /usr/share/keyrings/tailscale-archive-keyring.gpg
         mode: "0644"
       register: _tailscale_key
-      when: _baseline_apt_foreign | length == 0
+      when:
+        - _baseline_apt_foreign | length == 0
+        - not _tailscale_files.results[0].stat.exists
 
     - name: Add Tailscale apt repo
       ansible.builtin.get_url:
@@ -24,7 +36,9 @@
         dest: /etc/apt/sources.list.d/tailscale.list
         mode: "0644"
       register: _tailscale_repo
-      when: _baseline_apt_foreign | length == 0
+      when:
+        - _baseline_apt_foreign | length == 0
+        - not _tailscale_files.results[1].stat.exists
 
     - name: Install tailscale
       ansible.builtin.apt:
