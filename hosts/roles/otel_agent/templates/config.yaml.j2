@@ -99,3 +99,6 @@ service:
   telemetry:
     logs:
       level: warn
+    # The collector's own metrics endpoint (127.0.0.1:8888) is off: nothing scrapes it, and another service may already own that port.
+    metrics:
+      level: none
