@@ -1,4 +1,13 @@
 ---
+- name: Is the Tailscale apt source already set up another way?
+  ansible.builtin.include_role:
+    name: baseline
+    tasks_from: apt_foreign_source
+  vars:
+    baseline_apt_source_host: pkgs.tailscale.com
+    baseline_apt_our_files: [/etc/apt/sources.list.d/tailscale.list]
+    baseline_apt_our_keyrings: [/usr/share/keyrings/tailscale-archive-keyring.gpg]
+
 - name: Add Tailscale apt repo + install
   block:
     - name: Add Tailscale GPG key
@@ -7,6 +16,7 @@
         dest: /usr/share/keyrings/tailscale-archive-keyring.gpg
         mode: "0644"
       register: _tailscale_key
+      when: _baseline_apt_foreign | length == 0
 
     - name: Add Tailscale apt repo
       ansible.builtin.get_url:
@@ -14,6 +24,7 @@
         dest: /etc/apt/sources.list.d/tailscale.list
         mode: "0644"
       register: _tailscale_repo
+      when: _baseline_apt_foreign | length == 0
 
     - name: Install tailscale
       ansible.builtin.apt:
@@ -21,7 +32,7 @@
         state: present
         update_cache: true
       # In a check run on a new host the repo files above are only simulated, so apt can't see the package.
-      when: not ansible_check_mode or not (_tailscale_key.changed or _tailscale_repo.changed)
+      when: not ansible_check_mode or not (_tailscale_key.changed | default(false) or _tailscale_repo.changed | default(false))
 
 - name: Is tailscale installed?
   ansible.builtin.stat:

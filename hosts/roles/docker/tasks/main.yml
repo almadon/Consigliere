@@ -2,6 +2,15 @@
 # deb822 .sources file + an armored key, written with plain file modules: no gpg or
 # apt-key needed on the host (Debian 13 has neither by default), and it is the layout
 # Docker's own instructions use, so a host that already follows them stays unchanged.
+- name: Is the Docker apt source already set up another way?
+  ansible.builtin.include_role:
+    name: baseline
+    tasks_from: apt_foreign_source
+  vars:
+    baseline_apt_source_host: download.docker.com
+    baseline_apt_our_files: [/etc/apt/sources.list.d/docker.sources]
+    baseline_apt_our_keyrings: [/etc/apt/keyrings/docker.asc]
+
 - name: Create the apt keyrings directory
   ansible.builtin.file:
     path: /etc/apt/keyrings
@@ -14,6 +23,7 @@
     dest: /etc/apt/keyrings/docker.asc
     mode: "0644"
   register: _docker_key
+  when: _baseline_apt_foreign | length == 0
 
 - name: Add Docker apt repo
   ansible.builtin.copy:
@@ -30,6 +40,7 @@
     mode: "0644"
   register: _docker_repo
   notify: Refresh the package index after the Docker repo changed
+  when: _baseline_apt_foreign | length == 0
 
 - name: Pick up the new repo before installing from it
   ansible.builtin.meta: flush_handlers
@@ -43,7 +54,7 @@
       - docker-compose-plugin
     state: present
   # In a check run on a new host the repo files above are only simulated, so apt can't see the packages.
-  when: not ansible_check_mode or not (_docker_key.changed or _docker_repo.changed)
+  when: not ansible_check_mode or not (_docker_key.changed | default(false) or _docker_repo.changed | default(false))
 
 - name: Is Docker installed?
   ansible.builtin.stat:

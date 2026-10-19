@@ -20,6 +20,15 @@
     wazuh_server_addr is not defined or not wazuh_server_addr or
     wazuh_server_addr is search('CHANGEME')
 
+- name: Is the Wazuh apt source already set up another way?
+  ansible.builtin.include_role:
+    name: baseline
+    tasks_from: apt_foreign_source
+  vars:
+    baseline_apt_source_host: packages.wazuh.com
+    baseline_apt_our_files: [/etc/apt/sources.list.d/wazuh.sources]
+    baseline_apt_our_keyrings: [/etc/apt/keyrings/wazuh.asc]
+
 - name: Create the apt keyrings directory
   ansible.builtin.file:
     path: /etc/apt/keyrings
@@ -33,6 +42,7 @@
     dest: /etc/apt/keyrings/wazuh.asc
     mode: "0644"
   register: _wazuh_agent_key
+  when: _baseline_apt_foreign | length == 0
 
 - name: Add the Wazuh apt repo
   ansible.builtin.copy:
@@ -48,6 +58,7 @@
     mode: "0644"
   register: _wazuh_agent_repo
   notify: Refresh the package index after the Wazuh repo changed
+  when: _baseline_apt_foreign | length == 0
 
 - name: Pick up the new repo before installing from it
   ansible.builtin.meta: flush_handlers
@@ -58,7 +69,7 @@
     state: present
     update_cache: true
   # In a check run on a new host the repo files above are only simulated, so apt can't see the package.
-  when: not ansible_check_mode or not (_wazuh_agent_key.changed or _wazuh_agent_repo.changed)
+  when: not ansible_check_mode or not (_wazuh_agent_key.changed | default(false) or _wazuh_agent_repo.changed | default(false))
   environment:
     WAZUH_MANAGER: "{{ wazuh_server_addr }}"
     # NOTE: WAZUH_MANAGER only templates /var/ossec/etc/ossec.conf on *first*
@@ -73,4 +84,4 @@
     enabled: true
     state: started
     daemon_reload: true
-  when: not ansible_check_mode or not (_wazuh_agent_key.changed or _wazuh_agent_repo.changed)
+  when: not ansible_check_mode or not (_wazuh_agent_key.changed | default(false) or _wazuh_agent_repo.changed | default(false))

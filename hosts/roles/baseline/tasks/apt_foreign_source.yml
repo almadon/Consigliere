@@ -1,0 +1,53 @@
+---
+# A third-party apt repository may already have been set up by hand (or by the vendor's install script) with its own
+# key file. Adding a second source for the same repository with a different Signed-By makes apt refuse to read the
+# source list at all, which breaks apt on the whole host. So a role asks this first, and when a source exists it
+# uses that one and does NOT add its own.
+#
+# Inputs:  baseline_apt_source_host   a string that appears in the repository's URL (for example pkgs.tailscale.com)
+#          baseline_apt_our_files     the source files this fleet would write for it
+#          baseline_apt_our_keyrings  the key files this fleet would write for it
+# Output:  _baseline_apt_foreign      other files that already define a source for that repository ([] = none)
+# If there is one, the fleet's own source (left by an earlier run) is removed, and its key too when nothing else uses it.
+- name: Look for other apt sources for this repository
+  ansible.builtin.shell: >-
+    grep -l -s -F -- '{{ baseline_apt_source_host }}' /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources || true
+  register: _baseline_apt_grep
+  changed_when: false
+  check_mode: false
+
+- name: Note the ones this fleet did not write
+  ansible.builtin.set_fact:
+    _baseline_apt_foreign: "{{ _baseline_apt_grep.stdout_lines | reject('in', baseline_apt_our_files) | list }}"
+
+- name: Use the existing source and drop the fleet's own
+  when: _baseline_apt_foreign | length > 0
+  block:
+    - name: Say so
+      ansible.builtin.debug:
+        msg: >-
+          {{ baseline_apt_source_host }} is already configured in {{ _baseline_apt_foreign | join(', ') }}.
+          Using that; the fleet's own source for it is not added (two sources with different keys break apt).
+
+    - name: Remove the fleet's own source file (an earlier run may have left it)
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop: "{{ baseline_apt_our_files }}"
+
+    - name: Is one of the fleet's key files used by the existing source?
+      ansible.builtin.shell: >-
+        grep -l -s -F -- '{{ item }}' {{ _baseline_apt_foreign | map('quote') | join(' ') }} || true
+      loop: "{{ baseline_apt_our_keyrings }}"
+      register: _baseline_apt_key_use
+      changed_when: false
+      check_mode: false
+
+    - name: Remove the fleet's key file when nothing uses it
+      ansible.builtin.file:
+        path: "{{ item.item }}"
+        state: absent
+      loop: "{{ _baseline_apt_key_use.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+      when: item.stdout | trim | length == 0
