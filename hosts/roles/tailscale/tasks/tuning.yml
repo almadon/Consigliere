@@ -77,6 +77,8 @@
             name: tailscale-udp-gro.service
             enabled: true
             daemon_reload: "{{ _tailscale_gro_unit.changed }}"
+          # In a check run the unit file above is not really written yet, so there is nothing to enable.
+          when: not ansible_check_mode or not (_tailscale_gro_script.changed or _tailscale_gro_unit.changed)
 
         - name: Apply it now, if the NIC is not already set
           ansible.builtin.command: /usr/local/sbin/tailscale-udp-gro
