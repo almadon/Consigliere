@@ -13,7 +13,10 @@ By ordinary Ansible variable scope. Define any variable named
 `traefik_server_routes` or `traefik_server_routes_<anything>`, and put it where
 it should apply:
 
-- `config/vars/host/web-host.yml`: only on that host.
+- `config/vars/routes/web-host.yml`: only on that host. This is the recommended place for a host's routes: the
+  reconciler hands Ansible `vars/host/<host>.yml` (settings) and `vars/routes/<host>.yml` (routes) as two files of the
+  same host, so they stay separate in git. A directory `vars/routes/<host>/*.yml` also works (one file per site).
+- `config/vars/host/web-host.yml`: also works, for settings and routes together (the older layout).
 - `config/vars/group/util_arkeep.yml`: wherever that service runs, so the route
   follows the service.
 - `config/vars/group/all.yml`: on every proxy.

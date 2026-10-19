@@ -51,6 +51,11 @@ Roles:
 - `traefik_server` — renders Traefik's dynamic config per host (a shared base,
   that host's own routes gathered from `traefik_server_routes*` variables, and the
   fetched certificates); see [its README](hosts/roles/traefik_server/README.md)
+- `muximux` — the fleet console: a [Muximux](https://github.com/mescon/Muximux) dashboard whose tiles come
+  from fleet variables (`util: [muximux]`, sign-in through OIDC such as Pocket ID, secret `muximux.server`);
+  see [its README](hosts/roles/muximux/README.md)
+- `beszel_hub` / `beszel_agent` — [Beszel](https://www.beszel.dev) host monitoring: one hub (`util: [beszel]`),
+  an agent on every host that carries `prop: [beszel]` (secret `beszel.agent`)
 - `restic_server` — a [restic REST server](https://github.com/restic/rest-server)
   backup target (`util: [restic]`); see [its README](hosts/roles/restic_server/README.md)
 - `apprise` — notifications through [Apprise](https://github.com/caronc/apprise) (~100
@@ -85,7 +90,13 @@ instead of apt, and a launchd agent instead of a systemd timer since macOS
 has no systemd. Security posture role is skipped for now — XProtect is
 already native; revisit if that ever feels insufficient.
 
-### 4. Fleet console — `console/` (Next.js)
+### 4. Fleet console
+
+The default console is the **`muximux` role** (see the role list above): a Muximux dashboard generated from
+the fleet repo (`util: [muximux]`; set up with the fleet repo's `scripts/console.sh init`). The bespoke
+Next.js app described below is optional and no longer the recommended base.
+
+#### The bespoke Next.js console — `console/`
 
 A bespoke webUI, deployed as its own stack (`stacks/console/`) and gated
 behind OIDC login via [Pocket ID](https://github.com/pocket-id/pocket-id).
@@ -118,8 +129,10 @@ Private). That repo has two jobs:
 1. **Customization**: your host table and grouping (`config/inventory/hosts.yml`,
    `groups.yml`), optionally which roles run where (`config/site.yml`), your own roles/apps,
    and your runbooks.
-2. **Secrets and variables**: `config/vars/group/`, `config/vars/host/`, and the
-   sops-encrypted files under `config/secrets/`.
+2. **Secrets and variables**: `config/vars/group/`, `config/vars/host/` (a host's settings),
+   `config/vars/routes/` (a host's Traefik routes, kept apart from its settings; optional), and the
+   sops-encrypted files under `config/secrets/`. The reconciler gives each host a `host_vars/<host>/`
+   directory holding its `host` and `routes` files, which Ansible merges.
 
 ### Inventory and group names
 

@@ -10,3 +10,4 @@ The fleet console: a [Muximux](https://github.com/mescon/Muximux) dashboard whos
 - Tiles open in a new tab by default: admin tools have their own sign-in, which cannot complete inside a frame.
 - Health dots come from Muximux's own checks (`health_url` when the public address is not what should be checked).
 - `muximux_auth: none` is refused unless `muximux_allow_no_auth: true`.
+- The container drops all capabilities except `CHOWN`, `SETUID` and `SETGID`, which its entrypoint needs to start as root and then run as uid 1000. Verified: anonymous requests to `/api/apps` get 401.

@@ -12,6 +12,7 @@
 #        tags/<dim>/<value>.yml optional  what each util:/feat: tag runs (roles,
 #                                         task files); overrides hosts/tags/
 #        vars/group/, vars/host/ REQUIRED  variables; secrets are sops-encrypted
+#        vars/routes/<host>.yml optional   that host's Traefik routes, kept apart from vars/host/
 #        site.yml               optional  which roles run where (default: the
 #                                         framework's hosts/site.yml)
 #        roles/                 optional  your own site-specific roles/apps
@@ -116,14 +117,25 @@ mkdir -p "$RUN_DIR"
 ln -s "$CONF/vars/group" "$RUN_DIR/group_vars"
 # Host names are case-insensitive: the inventory name is lowercase, so the host table's
 # keys and the host_vars file names are lowercased into the run directory.
-if [ -d "$CONF/vars/host" ]; then
-  mkdir "$RUN_DIR/host_vars"
-  for f in "$CONF/vars/host"/*; do
+# Each host gets a host_vars/<name>/ directory (Ansible merges every file in it), holding its
+# vars/host/<name>.yml (host settings) and its vars/routes/<name>.yml (Traefik routes, kept apart so
+# the two can be edited and reviewed separately). vars/routes/<name>/*.yml (a directory of files) works too.
+link_hostvars() {  # link_hostvars <dir> <prefix>
+  [ -d "$1" ] || return 0
+  for f in "$1"/*; do
     [ -e "$f" ] || continue
-    b="$(basename "$f")"
-    ln -s "$f" "$RUN_DIR/host_vars/$(printf '%s' "$b" | tr '[:upper:]' '[:lower:]')"
+    b="$(basename "$f")"; n="$(printf '%s' "${b%.yml}" | tr '[:upper:]' '[:lower:]')"
+    mkdir -p "$RUN_DIR/host_vars/$n"
+    if [ -d "$f" ]; then
+      for g in "$f"/*.yml; do [ -e "$g" ] && ln -s "$g" "$RUN_DIR/host_vars/$n/$2-$(basename "$g")"; done
+    else
+      ln -s "$f" "$RUN_DIR/host_vars/$n/$2.yml"
+    fi
   done
-fi
+}
+mkdir "$RUN_DIR/host_vars"
+link_hostvars "$CONF/vars/host" host
+link_hostvars "$CONF/vars/routes" routes
 python3 - "$CONF/inventory/hosts.yml" "$RUN_DIR/hosts.yml" <<'PY'
 import sys, yaml
 src, dst = sys.argv[1:3]

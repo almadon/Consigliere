@@ -1,5 +1,9 @@
 # Consigliere console
 
+> **Optional.** The fleet's default console is now the `muximux` role (a Muximux dashboard built from fleet
+> variables; see `hosts/roles/muximux/README.md`). This Next.js app is kept for people who want per-machine
+> widgets backed by Outline.
+
 The bespoke fleet webUI — a tile grid, one tile per machine, with
 per-machine widgets (KVM link, SSH launch, dashboard links, live
 reachability). Login is OIDC via Pocket ID. Deployed as its own stack
