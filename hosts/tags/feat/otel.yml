@@ -1,0 +1,4 @@
+---
+description: "OpenTelemetry Collector: ships the systemd journal and Docker container logs to Loki (needs util: loki somewhere)"
+order: 70
+roles: [otel_agent]

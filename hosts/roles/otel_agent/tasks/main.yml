@@ -1,0 +1,119 @@
+---
+- name: Check the settings
+  ansible.builtin.assert:
+    that:
+      - otel_agent_loki_url is match('^https?://')
+      - otel_agent_journal | bool or _otel_agent_docker_wanted
+      - otel_agent_memory_limit_mib | int >= 64
+      - ansible_architecture in ['x86_64', 'aarch64']
+    fail_msg: >-
+      Set otel_agent_loki_url (Loki's OTLP address, for example http://lk.ctrl.a64.one:3100/otlp) in config/vars/group/feat_otel.yml.
+      The collector package exists for x86_64 and aarch64 only; at least one of journal and Docker logs must be on.
+    quiet: true
+  vars:
+    _otel_agent_docker_wanted: "{{ otel_agent_docker_logs | string | lower in ['auto', 'true', 'yes'] }}"
+
+- name: Is Docker installed here?
+  ansible.builtin.stat:
+    path: /usr/bin/docker
+  register: _otel_agent_docker_bin
+
+- name: Decide whether to collect Docker logs
+  ansible.builtin.set_fact:
+    _otel_agent_docker: >-
+      {{ (otel_agent_docker_logs | string | lower == 'auto' and _otel_agent_docker_bin.stat.exists)
+         or otel_agent_docker_logs | string | lower in ['true', 'yes'] }}
+
+- name: Look up the running and stopped containers
+  ansible.builtin.command: docker ps -a --no-trunc --format "{% raw %}{{.ID}} {{.Names}}{% endraw %}"
+  register: _otel_agent_ps
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when: _otel_agent_docker | bool
+
+- name: Build the container id to name table
+  ansible.builtin.set_fact:
+    _otel_agent_container_names: >-
+      {{ dict((_otel_agent_ps.stdout | default('')).splitlines() | map('split', ' ') | selectattr('1', 'defined')
+              | map('map', 'trim') | list) }}
+
+- name: Which collector version is installed?
+  ansible.builtin.command: dpkg-query -W -f='${Version}' otelcol-contrib
+  register: _otel_agent_installed
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Download the collector package (checksum from the release)
+  ansible.builtin.get_url:
+    url: "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v{{ otel_agent_version }}/otelcol-contrib_{{ otel_agent_version }}_linux_{{ _otel_agent_arch }}.deb"
+    dest: "/var/cache/otelcol-contrib_{{ otel_agent_version }}_{{ _otel_agent_arch }}.deb"
+    checksum: "sha256:https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v{{ otel_agent_version }}/otelcol-contrib_{{ otel_agent_version }}_linux_{{ _otel_agent_arch }}.deb.sha256"
+    mode: "0644"
+  vars:
+    _otel_agent_arch: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}"
+  when: _otel_agent_installed.stdout != otel_agent_version
+  register: _otel_agent_deb
+
+# The package starts the service with its stock config; ours replaces it right after (the restart handler runs below).
+- name: Install the collector package
+  ansible.builtin.apt:
+    deb: "/var/cache/otelcol-contrib_{{ otel_agent_version }}_{{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}.deb"
+    state: present
+  when:
+    - _otel_agent_installed.stdout != otel_agent_version
+    - not ansible_check_mode
+  notify: Restart otelcol-contrib
+
+- name: Let the collector read the systemd journal
+  ansible.builtin.user:
+    name: otelcol-contrib
+    groups: systemd-journal
+    append: true
+  when: otel_agent_journal | bool and (not ansible_check_mode or _otel_agent_installed.stdout == otel_agent_version)
+  notify: Restart otelcol-contrib
+
+- name: Create the collector's state directory (read offsets and the send queue survive restarts)
+  ansible.builtin.file:
+    path: /var/lib/otelcol-contrib/storage
+    state: directory
+    owner: otelcol-contrib
+    group: otelcol-contrib
+    mode: "0750"
+  when: not ansible_check_mode or _otel_agent_installed.stdout == otel_agent_version
+
+- name: Write the collector's configuration
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /etc/otelcol-contrib/config.yaml
+    owner: root
+    group: root
+    mode: "0644"
+  when: not ansible_check_mode or _otel_agent_installed.stdout == otel_agent_version
+  notify: Restart otelcol-contrib
+
+- name: Hardening and limits for the service
+  ansible.builtin.file:
+    path: /etc/systemd/system/otelcol-contrib.service.d
+    state: directory
+    mode: "0755"
+
+- name: Write the service drop-in
+  ansible.builtin.template:
+    src: override.conf.j2
+    dest: /etc/systemd/system/otelcol-contrib.service.d/consigliere.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart otelcol-contrib
+
+- name: Flush handlers so the new configuration is live before the final checks
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start the collector
+  ansible.builtin.systemd:
+    name: otelcol-contrib
+    enabled: true
+    state: started
+  when: not ansible_check_mode

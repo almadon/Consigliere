@@ -1,0 +1,17 @@
+# Managed by Ansible (hosts/roles/otel_agent).
+[Service]
+# Soft memory target for the Go runtime, a hard ceiling for systemd.
+Environment=GOMEMLIMIT={{ otel_agent_memory_limit_mib }}MiB
+MemoryMax={{ otel_agent_memory_max }}
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/otelcol-contrib
+{% if _otel_agent_docker %}
+# Read (never write) Docker's root-owned container logs without running as root.
+AmbientCapabilities=CAP_DAC_READ_SEARCH
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH
+{% else %}
+CapabilityBoundingSet=
+{% endif %}

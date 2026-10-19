@@ -1,0 +1,94 @@
+# Managed by Ansible (hosts/roles/otel_agent) -- edits here get overwritten on the next reconciliation run.
+extensions:
+  file_storage:
+    directory: /var/lib/otelcol-contrib/storage
+
+receivers:
+{% if otel_agent_journal | bool %}
+  journald:
+    priority: {{ otel_agent_journal_priority }}
+    storage: file_storage
+{% endif %}
+{% if _otel_agent_docker %}
+  file_log/docker:
+    include: [/var/lib/docker/containers/*/*-json.log]
+    include_file_path: true
+    start_at: end
+    storage: file_storage
+    operators:
+      - type: json_parser
+        timestamp:
+          parse_from: attributes.time
+          layout: '%Y-%m-%dT%H:%M:%S.%LZ'
+      - type: regex_parser
+        regex: '^/var/lib/docker/containers/(?P<container_id>[0-9a-f]{64})/'
+        parse_from: attributes["log.file.path"]
+        on_error: send_quiet
+      # Container names are looked up in a table written at each reconcile (docker ps); a container newer than the table is
+      # labelled c-<short id> until the next run.
+      - type: add
+        field: resource["container.name"]
+        value: 'EXPR({{ _otel_agent_container_names | to_json }}[attributes.container_id] ?? ("c-" + attributes.container_id[:12]))'
+      - type: move
+        from: attributes.log
+        to: body
+      - type: move
+        from: attributes.stream
+        to: attributes["log.iostream"]
+      - type: remove
+        field: attributes.time
+      - type: remove
+        field: attributes.container_id
+{% endif %}
+
+processors:
+  memory_limiter:
+    check_interval: 5s
+    limit_mib: {{ otel_agent_memory_limit_mib }}
+    spike_limit_mib: {{ (otel_agent_memory_limit_mib | int / 4) | int }}
+  resource:
+    attributes:
+      - {key: host.name, value: {{ otel_agent_host_name | to_json }}, action: upsert}
+{% for k, v in otel_agent_attributes.items() %}
+      - {key: {{ k | to_json }}, value: {{ v | to_json }}, action: upsert}
+{% endfor %}
+{% if otel_agent_journal | bool %}
+  # A journal entry arrives with its fields as the body; keep the message as the body and the unit as the attribute "unit".
+  transform/journald:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - set(attributes["unit"], body["_SYSTEMD_UNIT"]) where body["_SYSTEMD_UNIT"] != nil
+          - set(attributes["unit"], body["SYSLOG_IDENTIFIER"]) where attributes["unit"] == nil and body["SYSLOG_IDENTIFIER"] != nil
+          - set(attributes["unit"], "kernel") where attributes["unit"] == nil and body["_TRANSPORT"] == "kernel"
+          - set(body, body["MESSAGE"]) where body["MESSAGE"] != nil
+{% endif %}
+  batch: {}
+
+exporters:
+  otlp_http/loki:
+    endpoint: {{ otel_agent_loki_url | to_json }}
+    sending_queue:
+      storage: file_storage
+    retry_on_failure:
+      max_elapsed_time: 0s
+
+service:
+  extensions: [file_storage]
+  pipelines:
+{% if otel_agent_journal | bool %}
+    logs/journal:
+      receivers: [journald]
+      processors: [memory_limiter, transform/journald, resource, batch]
+      exporters: [otlp_http/loki]
+{% endif %}
+{% if _otel_agent_docker %}
+    logs/docker:
+      receivers: [file_log/docker]
+      processors: [memory_limiter, resource, batch]
+      exporters: [otlp_http/loki]
+{% endif %}
+  telemetry:
+    logs:
+      level: warn

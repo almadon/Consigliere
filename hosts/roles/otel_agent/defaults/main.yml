@@ -1,0 +1,19 @@
+---
+# OpenTelemetry Collector (contrib build, installed from the project's .deb and run by systemd as an unprivileged user) that ships this
+# host's logs to Loki's native OTLP endpoint: the systemd journal, and the logs of every Docker container (json-file driver).
+# No secret needed: Loki takes logs only from the tailnet.
+otel_agent_version: "0.163.1"
+# Loki's OTLP endpoint (a DNS record for the Loki host's tailnet address). Set it in config/vars/group/feat_otel.yml.
+otel_agent_loki_url: ""
+# The host's name in Loki (label host_name). The fleet's short name by default.
+otel_agent_host_name: "{{ inventory_hostname }}"
+# Journal entries at this priority or more severe: emerg, alert, crit, err, warning, notice, info, debug.
+otel_agent_journal: true
+otel_agent_journal_priority: info
+# Docker container logs. "auto" = when Docker is installed on the host.
+otel_agent_docker_logs: auto
+# Hard limits: the collector's own soft limit (MiB, drops data under pressure instead of growing) and systemd's ceiling.
+otel_agent_memory_limit_mib: 128
+otel_agent_memory_max: 256M
+# Extra resource attributes on everything this host sends, for example {environment: lab}.
+otel_agent_attributes: {}

@@ -39,9 +39,17 @@ ingester:
 
 limits_config:
   retention_period: {{ loki_server_retention_days * 24 }}h
-  # OpenTelemetry resource attributes arrive as structured metadata.
+  # OpenTelemetry attributes arrive as structured metadata; these few are also made index labels (stream selectors).
   allow_structured_metadata: true
   volume_enabled: true
+  otlp_config:
+    resource_attributes:
+      attributes_config:
+        - action: index_label
+          attributes: {{ loki_server_index_resource_attributes | to_json }}
+    log_attributes:
+      - action: index_label
+        attributes: {{ loki_server_index_log_attributes | to_json }}
 
 compactor:
   working_directory: /loki/compactor
