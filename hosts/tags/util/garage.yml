@@ -1,0 +1,5 @@
+---
+description: "Garage: a small S3-compatible object store on the tailnet (one node), for services that want S3"
+order: 50
+roles: [garage]
+secrets: [garage.server]

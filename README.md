@@ -51,6 +51,8 @@ Roles:
 - `traefik_server` — renders Traefik's dynamic config per host (a shared base,
   that host's own routes gathered from `traefik_server_routes*` variables, and the
   fetched certificates); see [its README](hosts/roles/traefik_server/README.md)
+- `garage` — a [Garage](https://garagehq.deuxfleurs.fr) S3-compatible object store on the tailnet (`util: [garage]`,
+  secret `garage.server`, optional dedicated data disk, declared buckets and keys); see [its README](hosts/roles/garage/README.md)
 - `muximux` — the fleet console: a [Muximux](https://github.com/mescon/Muximux) dashboard whose tiles come
   from fleet variables (`util: [muximux]`, sign-in through OIDC such as Pocket ID, secret `muximux.server`);
   see [its README](hosts/roles/muximux/README.md)

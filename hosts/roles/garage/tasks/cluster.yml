@@ -1,0 +1,92 @@
+---
+# Everything here is idempotent: it only creates what is missing, using Garage's own CLI inside the container.
+- name: Wait until Garage answers
+  ansible.builtin.command: docker exec garage /garage status
+  register: _garage_status
+  until: _garage_status.rc == 0
+  retries: 20
+  delay: 3
+  changed_when: false
+
+- name: Put the node in the cluster layout (first run only)
+  when: "'NO ROLE ASSIGNED' in _garage_status.stdout"
+  block:
+    - name: Read this node's id
+      ansible.builtin.command: docker exec garage /garage node id -q
+      register: _garage_node
+      changed_when: false
+
+    - name: Read the current layout version
+      ansible.builtin.shell: |
+        set -o pipefail
+        docker exec garage /garage layout show 2>/dev/null | sed -n 's/^Current cluster layout version: //p'
+      args:
+        executable: /bin/bash
+      register: _garage_layout_version
+      changed_when: false
+
+    - name: Stage the node's role
+      ansible.builtin.command: >-
+        docker exec garage /garage layout assign -z {{ garage_zone | quote }} -c {{ garage_capacity | quote }}
+        {{ _garage_node.stdout | trim | quote }}
+      changed_when: true
+
+    - name: Apply the layout
+      ansible.builtin.command: docker exec garage /garage layout apply --version {{ (_garage_layout_version.stdout | trim | int) + 1 }}
+      changed_when: true
+
+- name: Find the buckets that do not exist yet
+  ansible.builtin.command: docker exec garage /garage bucket info {{ item.name | quote }}
+  loop: "{{ garage_buckets }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: _garage_bucket_info
+  changed_when: false
+  failed_when: false
+
+- name: Create missing buckets
+  ansible.builtin.command: docker exec garage /garage bucket create {{ item.item.name | quote }}
+  loop: "{{ _garage_bucket_info.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: item.rc != 0
+  changed_when: true
+
+- name: Find the keys that do not exist yet
+  ansible.builtin.command: docker exec garage /garage key info {{ item | quote }}
+  loop: "{{ garage_buckets | map(attribute='keys', default=[]) | flatten | map(attribute='name') | unique | list }}"
+  register: _garage_key_info
+  changed_when: false
+  failed_when: false
+
+- name: Create missing keys (a secret is read with key info --show-secret, see the README)
+  ansible.builtin.command: docker exec garage /garage key create {{ item.item | quote }}
+  loop: "{{ _garage_key_info.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.rc != 0
+  changed_when: true
+  no_log: true
+
+# `allow` can be repeated safely; it states the permission the key should have.
+- name: Grant each key its access to its bucket
+  ansible.builtin.command: >-
+    docker exec garage /garage bucket allow
+    {{ '--read' if item.1.read | default(true) else '' }}
+    {{ '--write' if item.1.write | default(true) else '' }}
+    {{ '--owner' if item.1.owner | default(false) else '' }}
+    {{ item.0.name | quote }} --key {{ item.1.name | quote }}
+  loop: "{{ garage_buckets | subelements('keys', skip_missing=True) }}"
+  loop_control:
+    label: "{{ item.0.name }} <- {{ item.1.name }}"
+  changed_when: false
+
+- name: Apply bucket quotas
+  ansible.builtin.command: >-
+    docker exec garage /garage bucket set-quotas {{ item.name | quote }}
+    {% if item.max_size is defined %}--max-size {{ item.max_size | quote }}{% endif %}
+    {% if item.max_objects is defined %}--max-objects {{ item.max_objects | quote }}{% endif %}
+  loop: "{{ garage_buckets | selectattr('max_size', 'defined') | list + garage_buckets | selectattr('max_objects', 'defined') | rejectattr('max_size', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  changed_when: false

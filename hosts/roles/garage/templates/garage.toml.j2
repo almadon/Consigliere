@@ -1,0 +1,13 @@
+# Managed by Ansible (hosts/roles/garage) -- edits here get overwritten on the next reconciliation run.
+metadata_dir = "/var/lib/garage/meta"
+data_dir = "/var/lib/garage/data"
+db_engine = "lmdb"
+replication_factor = 1
+metadata_auto_snapshot_interval = "{{ garage_metadata_snapshot_interval }}"
+
+rpc_bind_addr = "[::]:3901"
+rpc_secret = "{{ garage_rpc_secret }}"
+
+[s3_api]
+s3_region = "{{ garage_s3_region }}"
+api_bind_addr = "[::]:3900"

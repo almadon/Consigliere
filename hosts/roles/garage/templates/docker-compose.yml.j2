@@ -1,0 +1,29 @@
+# Managed by Ansible (hosts/roles/garage) -- edits here get overwritten on the next reconciliation run.
+services:
+  garage:
+    image: dxflrs/garage:v{{ garage_version }}
+    container_name: garage
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    ports:
+      - "{{ garage_bind_address }}:{{ garage_s3_port }}:3900"
+    volumes:
+      - {{ garage_dir }}/garage.toml:/etc/garage.toml:ro
+      - {{ garage_meta_dir }}:/var/lib/garage/meta
+      - {{ garage_data_dir }}:/var/lib/garage/data
+    healthcheck:
+      test: ["CMD", "/garage", "status"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+{% if garage_network | length > 0 %}
+    networks:
+      - {{ garage_network }}
+
+networks:
+  {{ garage_network }}:
+    external: true
+{% endif %}

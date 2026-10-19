@@ -1,0 +1,95 @@
+---
+- name: Load the cluster secret (secret garage.server)
+  ansible.builtin.include_role:
+    name: load_secrets
+  vars:
+    load_secrets_scopes: [garage.server]
+
+- name: Check the settings
+  ansible.builtin.assert:
+    that:
+      - garage_rpc_secret is defined
+      - garage_rpc_secret is match('^[0-9a-f]{64}$')
+      - garage_capacity is match('^[0-9]+[KMGT]?$')
+      - garage_buckets | map(attribute='name') | list | length == garage_buckets | map(attribute='name') | list | unique | length
+      - garage_buckets | map(attribute='name') | select('match', '^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$') | list | length == garage_buckets | length
+    fail_msg: >-
+      garage_rpc_secret must be 64 hex characters (run scripts/garage.sh init in the fleet repo, or openssl rand -hex 32 and
+      scripts/secrets.sh edit garage.server). garage_capacity looks like 500G. Bucket names are unique and S3-valid
+      (lowercase letters, digits, dots, dashes; 3 to 63 characters).
+    quiet: true
+  no_log: true
+
+- name: Prepare the data disk
+  when: garage_data_device | length > 0
+  block:
+    - name: Create the mount point
+      ansible.builtin.file:
+        path: "{{ garage_data_dir }}"
+        state: directory
+        mode: "0750"
+
+    # Makes a filesystem only on a blank device; it fails (never overwrites) when the device already holds a different one.
+    - name: Make a filesystem on the data disk if it has none
+      community.general.filesystem:
+        dev: "{{ garage_data_device }}"
+        fstype: "{{ garage_data_fstype }}"
+        opts: "{{ garage_data_mkfs_opts }}"
+
+    - name: Mount the data disk
+      ansible.posix.mount:
+        path: "{{ garage_data_dir }}"
+        src: "{{ garage_data_device }}"
+        fstype: "{{ garage_data_fstype }}"
+        opts: defaults,nofail
+        state: mounted
+
+- name: Create the service, metadata and data directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0750"
+  loop:
+    - "{{ garage_dir }}"
+    - "{{ garage_meta_dir }}"
+    - "{{ garage_data_dir }}"
+
+- name: Write Garage's configuration (it holds the cluster secret)
+  ansible.builtin.template:
+    src: garage.toml.j2
+    dest: "{{ garage_dir }}/garage.toml"
+    mode: "0600"
+  no_log: true
+  notify: Recreate garage
+
+- name: Write the compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ garage_dir }}/docker-compose.yml"
+    mode: "0640"
+  register: _garage_compose
+
+- name: Create the shared proxy network
+  community.docker.docker_network:
+    name: "{{ garage_network }}"
+  when: garage_network | length > 0
+
+- name: Check that no container this role needs is already taken by something else
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: guard_containers
+  vars:
+    docker_guard_containers: [garage]
+    docker_guard_dir: "{{ garage_dir }}"
+
+- name: Start Garage
+  community.docker.docker_compose_v2:
+    project_src: "{{ garage_dir }}"
+    state: present
+    pull: "{{ 'always' if _garage_compose.changed else 'missing' }}"
+  # In a check run the directory and compose file above are not really written yet.
+  when: not ansible_check_mode or not _garage_compose.changed
+
+- name: Set up the cluster layout, buckets and keys
+  ansible.builtin.include_tasks: cluster.yml
+  when: not ansible_check_mode
