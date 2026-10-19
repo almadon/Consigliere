@@ -109,6 +109,8 @@
     force: false
     mode: "0600"
   loop: "{{ (_baseline_sysctl_legacy.stdout_lines | default([])) | reject('in', baseline_sysctl_managed_files) | list }}"
+  # A check run does not create the directory above, so there is nothing to copy into yet.
+  when: not ansible_check_mode
 
 - name: Retire the hand-made versions (commented out, the original is in /var/backups/consigliere)
   ansible.builtin.lineinfile:

@@ -144,7 +144,8 @@
           loop: >-
             {{ _tailscale_gro_legacy.stdout_lines | default([])
                | reject('match', '^/etc/systemd/system/') | list }}
-          when: _tailscale_gro_verified | bool
+          # A check run does not create the directory above, so there is nothing to copy into yet.
+          when: _tailscale_gro_verified | bool and not ansible_check_mode
 
         - name: Comment out hand-made commands in scripts, cron and network files
           ansible.builtin.lineinfile:
