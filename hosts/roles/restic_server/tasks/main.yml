@@ -108,3 +108,12 @@
         comment: restic mirror (read-only)
         exclusive: false
       loop: "{{ [restic_server_mirror_keys] | flatten }}"
+
+- name: Withdraw mirror keys that are no longer allowed
+  ansible.posix.authorized_key:
+    user: root
+    key: "{{ item }}"
+    state: absent
+  loop: "{{ [restic_server_mirror_keys_revoked] | flatten }}"
+  when: restic_server_mirror_keys_revoked | length > 0
+
