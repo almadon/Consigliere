@@ -29,3 +29,15 @@ garage_metadata_snapshot_interval: 6h
 #     keys:
 #       - {name: outline, read: true, write: true, owner: false}
 garage_buckets: []
+
+# Garage's admin API (reachable only inside the compose network, never published) and a web UI in front of it
+# (https://github.com/khairul169/garage-webui, MIT): cluster status, buckets, keys, a browser for objects. The UI has its own sign-in only
+# (basic, bcrypt), so keep it off the open internet. Both need values from the secret garage.server:
+#   garage_admin_token       any long random string
+#   garage_webui_auth        "user:bcrypt-hash"  (htpasswd -nbBC 10 admin 'password')
+# scripts/garage.sh webui in the fleet repo adds them to an existing secret.
+garage_admin_enabled: true
+garage_webui_enabled: true
+garage_webui_version: "1.1.0"
+garage_webui_port: 3909
+garage_webui_bind_address: "{{ tailscale_ipv4 | default('127.0.0.1', true) }}"

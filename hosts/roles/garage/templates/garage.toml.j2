@@ -11,3 +11,9 @@ rpc_secret = "{{ garage_rpc_secret }}"
 [s3_api]
 s3_region = "{{ garage_s3_region }}"
 api_bind_addr = "[::]:3900"
+{% if garage_admin_enabled | bool %}
+
+[admin]
+api_bind_addr = "[::]:3903"
+admin_token = "{{ garage_admin_token }}"
+{% endif %}

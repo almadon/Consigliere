@@ -11,9 +11,14 @@
       - garage_rpc_secret is defined
       - garage_rpc_secret is match('^[0-9a-f]{64}$')
       - garage_capacity is match('^[0-9]+[KMGT]?$')
+      - not (garage_webui_enabled | bool) or (garage_admin_enabled | bool)
+      - not (garage_admin_enabled | bool) or (garage_admin_token is defined and garage_admin_token | length >= 24)
+      - not (garage_webui_enabled | bool) or (garage_webui_auth is defined and garage_webui_auth is match('^[^:]+:[$]2[aby][$]'))
       - garage_buckets | map(attribute='name') | list | length == garage_buckets | map(attribute='name') | list | unique | length
       - garage_buckets | map(attribute='name') | select('match', '^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$') | list | length == garage_buckets | length
     fail_msg: >-
+      The web UI needs the admin API (garage_admin_enabled) and, in the secret garage.server, garage_admin_token (24+ characters) and
+      garage_webui_auth ("user:bcrypt hash"): run scripts/garage.sh webui in the fleet repo.
       garage_rpc_secret must be 64 hex characters (run scripts/garage.sh init in the fleet repo, or openssl rand -hex 32 and
       scripts/secrets.sh edit garage.server). garage_capacity looks like 500G. Bucket names are unique and S3-valid
       (lowercase letters, digits, dots, dashes; 3 to 63 characters).
@@ -42,11 +47,12 @@
   no_log: true
   notify: Recreate garage
 
-- name: Write the compose file
+- name: Write the compose file (it holds the admin token and the web UI's password hash)
   ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: "{{ garage_dir }}/docker-compose.yml"
-    mode: "0640"
+    mode: "0600"
+  no_log: true
   register: _garage_compose
 
 - name: Create the shared proxy network
@@ -59,7 +65,7 @@
     name: docker
     tasks_from: guard_containers
   vars:
-    docker_guard_containers: [garage]
+    docker_guard_containers: "{{ ['garage'] + (['garage-webui'] if garage_webui_enabled | bool else []) }}"
     docker_guard_dir: "{{ garage_dir }}"
 
 - name: Start Garage
