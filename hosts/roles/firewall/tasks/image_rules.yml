@@ -1,0 +1,85 @@
+---
+# See firewall_remove_image_rules. Runs after ufw is enabled, so SSH is already allowed by ufw (or by its safety net) when the image's own allow
+# rule for port 22 goes away.
+- name: Look for rules saved for netfilter-persistent
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: [/etc/iptables/rules.v4, /etc/iptables/rules.v6]
+  register: _firewall_saved_rules
+
+- name: Read the saved rules
+  ansible.builtin.slurp:
+    src: "{{ item.item }}"
+  loop: "{{ _firewall_saved_rules.results | selectattr('stat.exists') | list }}"
+  loop_control:
+    label: "{{ item.item }}"
+  register: _firewall_saved_rules_content
+
+# The copy in /var/backups is made the first time the rules are retired, so its presence means this host is already done.
+- name: Did an earlier run already retire them?
+  ansible.builtin.stat:
+    path: /var/backups/consigliere/rules.v4.from-image
+  register: _firewall_image_done
+
+- name: Is one of them the image's "reject everything else" set?
+  ansible.builtin.set_fact:
+    _firewall_image_rules: >-
+      {{ not _firewall_image_done.stat.exists and
+         (_firewall_saved_rules_content.results
+          | map(attribute='content') | map('b64decode')
+          | select('search', '-A (INPUT|FORWARD) .*-j REJECT') | list | length > 0) }}
+
+- name: Retire the image's firewall rules
+  when: _firewall_image_rules | bool
+  block:
+    - name: Keep a copy of the saved rules
+      ansible.builtin.copy:
+        src: "{{ item.item }}"
+        dest: "/var/backups/consigliere/{{ item.item | basename }}.from-image"
+        remote_src: true
+        force: false
+        mode: "0600"
+      loop: "{{ _firewall_saved_rules.results | selectattr('stat.exists') | list }}"
+      loop_control:
+        label: "{{ item.item }}"
+      when: not ansible_check_mode
+
+    # Deletes exactly the INPUT/FORWARD/OUTPUT rules written in the saved files, one by one; ufw's and Docker's chains are not in those files and stay.
+    - name: Remove those rules from the running firewall
+      ansible.builtin.shell: |
+        set -euo pipefail
+        removed=0
+        for tool in iptables ip6tables; do
+          file=/etc/iptables/rules.v4
+          [ "$tool" = ip6tables ] && file=/etc/iptables/rules.v6
+          [ -r "$file" ] || continue
+          while IFS= read -r line; do
+            case "$line" in
+              "-A INPUT "*|"-A FORWARD "*|"-A OUTPUT "*) ;;
+              *) continue ;;
+            esac
+            read -r -a spec <<<"${line#-A }"
+            while "$tool" -C "${spec[@]}" 2>/dev/null; do "$tool" -D "${spec[@]}"; removed=$((removed + 1)); done
+          done < "$file"
+        done
+        echo "removed=$removed"
+      args:
+        executable: /bin/bash
+      register: _firewall_image_removed
+      changed_when: "'removed=0' not in _firewall_image_removed.stdout"
+      when: not ansible_check_mode
+
+    - name: Stop netfilter-persistent from restoring them at boot
+      ansible.builtin.systemd:
+        name: netfilter-persistent
+        enabled: false
+        masked: true
+      failed_when: false   # the unit may not exist; its state (running or not) is deliberately left alone: "stop" would flush every rule
+      when: not ansible_check_mode
+
+    - name: Say what happened
+      ansible.builtin.debug:
+        msg: >-
+          This image shipped saved firewall rules (netfilter-persistent) that reject everything but SSH and sat in front of ufw. They are
+          {{ 'removed from the running firewall and disabled for the next boot' if not ansible_check_mode else 'going to be removed (check mode)' }};
+          the originals are in /var/backups/consigliere. Set firewall_remove_image_rules: false to keep them.

@@ -101,3 +101,7 @@
 - name: Guard the ports Docker publishes
   ansible.builtin.include_tasks: docker_guard.yml
   when: firewall_docker_guard | bool and _firewall_apply | bool
+
+- name: Retire firewall rules the cloud image preinstalled (they would shadow ufw)
+  ansible.builtin.include_tasks: image_rules.yml
+  when: firewall_remove_image_rules | bool and _firewall_apply | bool

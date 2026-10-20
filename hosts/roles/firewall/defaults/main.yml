@@ -33,3 +33,10 @@ firewall_docker_trusted_sources: []
 # After each run, list containers publishing a port on all interfaces that nothing opens on
 # purpose (and tell Apprise if fleet-notify exists).
 firewall_docker_report: true
+
+# Some cloud images (Oracle Cloud's Ubuntu, for one) arrive with firewall rules saved for netfilter-persistent: allow SSH, then REJECT everything else in
+# INPUT and FORWARD. Those rules sit BEFORE ufw's chains, so ufw's allows for host services (the tailnet interface, a syslog listener) never get a say,
+# and they keep SSH open to the world. When this is true (default) and /etc/iptables/rules.v4 holds such a REJECT, the role removes exactly those saved
+# rules from the live firewall (after ufw is enabled and SSH is allowed by ufw) and disables netfilter-persistent so they do not return at boot. The
+# original files are copied to /var/backups/consigliere. Docker's own chains and ufw's are never touched. Set false to leave the image's rules alone.
+firewall_remove_image_rules: true

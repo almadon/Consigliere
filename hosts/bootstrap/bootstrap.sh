@@ -100,9 +100,9 @@ if [ -z "${TAILSCALE_AUTHKEY:-}" ] && [ -t 0 ] && ! (command -v tailscale >/dev/
 fi
 export TAILSCALE_AUTHKEY="${TAILSCALE_AUTHKEY:-}"
 
-echo "==> Installing git + ansible"
+echo "==> Installing git and the base packages (ansible follows, once the framework is cloned)"
 apt-get update
-apt-get install -y git ansible curl age sudo gnupg ca-certificates python3-apt
+apt-get install -y git curl age sudo gnupg ca-certificates python3-apt
 
 echo "==> Installing host-local credentials"
 install -d -m 0700 "$CRED_DIR"
@@ -140,6 +140,7 @@ else
 fi
 
 echo "==> Installing sops (pinned, checksum-verified)"
+"$WORKDIR/framework/hosts/bootstrap/install-ansible.sh"
 "$WORKDIR/framework/hosts/bootstrap/install-sops.sh"
 
 echo "==> Making sure this host can read the private fleet-config repo"

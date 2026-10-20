@@ -23,6 +23,8 @@ installs Tailscale, Docker's prerequisites, Ansible, sops and age, clones both r
 The host prints its **age public key** at the end: register it from your admin machine with `scripts/node.sh key <name>` (or `scripts/access.sh add-host`).
 Architectures: x86_64 and aarch64 (ARM64) both work; see [platforms.md](platforms.md).
 
+`bootstrap.sh` also runs `install-ansible.sh` (`ANSIBLE_BUNDLE_VERSION`, default 12.0.0; see [platforms.md](platforms.md#ansible-on-the-host)) and `install-sops.sh`; both can be run by hand and do nothing when already satisfied.
+
 ## `hosts/bootstrap/reconcile.sh`: the reconciler
 
 Run by `fleet-reconcile.service` (timer: 2 min after boot, then every 20 min, randomised by up to 3 min). Pulls both repos, assembles a throw-away run
