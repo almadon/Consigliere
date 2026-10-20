@@ -17,9 +17,8 @@ stacks/
     .env.example        # document required vars; real .env stays untracked
 ```
 
-Two services are scaffolded so far: [`console/`](console/) (this repo's own
-webUI) and [`wazuh/`](wazuh/). Add a directory per service as they're
-containerized.
+Scaffolded so far: [`console/`](console/) (this repo's own webUI), [`wazuh/`](wazuh/) and [`mailflow/`](mailflow/) (a webmail client for IMAP accounts,
+behind Traefik, amd64 and arm64). Add a directory per service as they're containerized.
 
 ### Exception: vendored stacks
 

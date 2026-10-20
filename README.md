@@ -147,6 +147,12 @@ Private). That repo has two jobs:
    sops-encrypted files under `config/secrets/`. The reconciler gives each host a `host_vars/<host>/`
    directory holding its `host` and `routes` files, which Ansible merges.
 
+## Documentation
+
+- [Command-line reference for the host side](docs/cli-reference.md): `bootstrap.sh`, `reconcile.sh`, their environment variables, helpers installed on hosts.
+- [Platforms and architectures](docs/platforms.md): Debian/Ubuntu on x86_64 and ARM64, Unraid, macOS, and which images are multi-arch.
+- Role READMEs under `hosts/roles/*/README.md`; stack examples under `stacks/`.
+
 ### Inventory and group names
 
 Each host reconciles itself, so the inventory is just that host:
