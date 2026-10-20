@@ -67,3 +67,9 @@ baseline_sysctl_raise_only:
 # Trim an FQDN hostname ("nova.core.example.com") to its first label ("nova"), fix /etc/hosts to match, and stop
 # cloud-init from restoring it. A host that already has a short name is untouched.
 baseline_short_hostname: true
+
+# Keys of a bastion (a host such as Warpgate that opens SSH sessions to your nodes on your behalf), written to root's authorized_keys as full lines WITH their
+# options, so you can pin them: for example
+#   - 'from="100.100.1.100",no-agent-forwarding,no-X11-forwarding ssh-ed25519 AAAA... warpgate'
+# `from` limits the key to connections coming from the bastion's address; without it the key works from anywhere. Added next to the admin keys, never replacing them.
+baseline_bastion_ssh_keys: []

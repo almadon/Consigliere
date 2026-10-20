@@ -64,6 +64,16 @@
   loop_control:
     label: "{{ item.split()[-1] if item.split() | length > 2 else item[:30] }}"
 
+- name: Authorize the bastion's key for root (with its options, for example from=<bastion address>)
+  ansible.posix.authorized_key:
+    user: root
+    key: "{{ item }}"
+    comment: fleet bastion key
+    exclusive: false
+  loop: "{{ baseline_bastion_ssh_keys }}"
+  loop_control:
+    label: "{{ item.split()[-1] if item.split() | length > 2 else item[:30] }}"
+
 - name: Turn off SSH password logins (only once an admin key is installed)
   when: not baseline_ssh_password_auth and baseline_admin_ssh_keys | length > 0
   block:
