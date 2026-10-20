@@ -21,6 +21,20 @@ This compose file is the project's `docker-compose.ghcr.yml` trimmed to sit behi
 - **Mail accounts:** each user adds their IMAP/SMTP accounts under their own settings; credentials are encrypted with `ENCRYPTION_KEY`.
 - Outbound only: it connects out to your mail providers (IMAP 993, SMTP 465/587). It does not need an inbound mail port. Note that Oracle Cloud blocks outbound port 25.
 
+## Browser notifications (Web Push, optional)
+
+MailFlow sends browser push notifications with a VAPID key pair that you generate **once** and keep. Generate it inside the backend container (which ships the `web-push` module) and append it
+to `.env` without printing the private key:
+
+    cd /opt/mailflow
+    docker exec mailflow-backend node -e '
+      const k = require("web-push").generateVAPIDKeys();
+      process.stdout.write("VAPID_PUBLIC_KEY=" + k.publicKey + "\nVAPID_PRIVATE_KEY=" + k.privateKey + "\nVAPID_SUBJECT=https://mail.example.org\n");' >> .env
+    docker compose up -d        # recreates only the backend
+
+The public key is 87 characters and the private key 43. `VAPID_SUBJECT` is a contact the push services (Google, Mozilla, Apple) can see: use an https address of the site or a `mailto:`. If you
+lose the private key nothing breaks except that existing browser subscriptions stop working and users re-enable notifications. Keep the new `.env` in your password manager.
+
 ## Back up (Arkeep)
 
 State is in PostgreSQL plus your `.env`. An Arkeep policy on the node's agent: a **Command (stdin)** source named `mailflow-db` with

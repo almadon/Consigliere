@@ -30,6 +30,12 @@ enough it installs that; otherwise (Ubuntu 24.04 packages core 2.16, which lacks
 `/opt/fleet-ansible` (system packages visible, so the apt module finds `python3-apt`) and links `ansible`, `ansible-playbook` and friends into `/usr/local/bin`,
 which comes first on the reconcile service's PATH. `ANSIBLE_BUNDLE_VERSION` (default 12.0.0) picks the release. Collection versions then match the Debian 13 fleet.
 
+## Applying sshd settings
+
+The baseline role handler applies sshd changes with `systemctl restart ssh` when `ssh.socket` (socket activation) is active, and `reload` otherwise (restart as the fallback), and always ends by
+making sure sshd is running. A plain reload is unsafe under socket activation: OpenSSH 10 re-executes itself on `SIGHUP`, cannot bind port 22 because systemd's socket holds it
+(`fatal: Cannot bind any address`), and exits, leaving the service stopped until the next connection starts it. Existing sessions survive the restart (`KillMode=process`).
+
 ## Firewall rules preinstalled by cloud images
 
 Some images (Oracle Cloud's Ubuntu among them) save firewall rules for `netfilter-persistent`: allow SSH, then `REJECT` everything else in `INPUT` and `FORWARD`. Those sit in front of

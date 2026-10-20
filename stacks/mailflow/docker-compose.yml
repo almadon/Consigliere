@@ -47,6 +47,10 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:?}
       REDIS_URL: redis://redis:6379
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?}
+      # Web Push (browser notifications). Generate the pair once: see README.md. VAPID_SUBJECT is a contact the push services see: an https URL or mailto:.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
       # One reverse proxy (Traefik) sits in front.
       TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
       IMAP_MAX_PERSISTENT_PER_HOST: ${IMAP_MAX_PERSISTENT_PER_HOST:-}
