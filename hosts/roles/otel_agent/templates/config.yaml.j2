@@ -47,22 +47,30 @@ receivers:
     protocol: {{ l.protocol | default('rfc3164') }}
     location: {{ otel_agent_syslog_timezone | to_json }}
     operators:
-      # The sender's own name, not this relay's: a message is stored as host_name=<sender>, unit=<program>.
+      # The sender's own name, not this relay's: a message is stored as host_name=<sender>, unit=<program>. A line the parser cannot fully
+      # read (wrong protocol for the sender) is still delivered, as host_name=unknown, rather than dropped.
       - type: add
         field: resource["host.name"]
-        value: 'EXPR(lower(attributes.hostname))'
+        value: 'EXPR(lower(attributes.hostname ?? "unknown"))'
+        on_error: send_quiet
       - type: add
         field: resource["syslog.listener"]
         value: {{ l.name | to_json }}
+        on_error: send_quiet
       - type: move
         from: attributes.appname
         to: attributes.unit
         if: 'attributes.appname != nil'
+        on_error: send_quiet
       - type: move
         from: attributes.message
         to: body
+        if: 'attributes.message != nil'
+        on_error: send_quiet
       - type: remove
         field: attributes.hostname
+        if: 'attributes.hostname != nil'
+        on_error: send_quiet
 {% endfor %}
 
 processors:

@@ -25,7 +25,7 @@ Every line carries `host_name` (`otel_agent_host_name`, the fleet's short name).
   name in `syslog_listener`. Listeners are `tcp` or `udp`, `rfc3164` (classic BSD syslog, what Unraid and most gear send) or `rfc5424`, on an
   unprivileged port. Bind them to the senders' network (a LAN address, not a public one) and open the port to that network only
   (`firewall_extra_rules` on the host). Prefer tcp where the sender allows it, since udp drops lines. rfc3164 timestamps carry no time zone:
-  set `otel_agent_syslog_timezone` to the zone the senders use, or lines land hours off. Tested with TCP and UDP messages into a real Loki.
+  set `otel_agent_syslog_timezone` to the zone the senders use, or lines land hours off. A line the listener cannot read (a sender using the other protocol, garbage) is still delivered, as `host_name="unknown"` with its raw text, so a protocol mismatch shows up instead of vanishing. Tested with TCP and UDP messages into a real Loki.
 - **Failsafes:** the rendered configuration is checked by the collector itself (`otelcol-contrib validate`, which parses every OTTL
   statement) before it replaces the live file, so a mistake stops that host's run with the reason and the working configuration stays.
   After any change the role waits a few seconds and fails, with the service's last journal lines, if the collector is not running
