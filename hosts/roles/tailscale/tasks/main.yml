@@ -98,7 +98,24 @@
       {{ tailscale_args }}
   when: _tailscale_needs_join
   no_log: true   # the command line contains the auth key
-  changed_when: true
+  register: _tailscale_join
+  failed_when: false   # the reason is reported by the next task, with the key left out
+  changed_when: _tailscale_join.rc | default(1) == 0
+
+# no_log hides the whole result, including tailscale's own explanation; show that explanation, minus the key.
+- name: Say why joining failed
+  ansible.builtin.fail:
+    msg: >-
+      `tailscale up` failed (exit {{ _tailscale_join.rc }}):
+      {{ ((_tailscale_join.stderr | default('')) ~ ' ' ~ (_tailscale_join.stdout | default('')))
+         | replace(tailscale_authkey, '<auth key>') | regex_replace('tskey-[A-Za-z0-9_-]+', '<auth key>') | trim }}
+      Usual causes: the auth key was already used (a one-off key works once), has expired, was revoked, or was typed or pasted
+      with extra characters; a key created for another tailnet; or a tagged key whose tag you may not use. Create a fresh key
+      (Tailscale admin console > Settings > Keys, pre-approved) and run bootstrap.sh again with TAILSCALE_AUTHKEY set to it.
+  when:
+    - _tailscale_needs_join
+    - not ansible_check_mode
+    - _tailscale_join.rc | default(0) != 0
 
 - name: Read the node's current Tailscale SSH setting
   ansible.builtin.command: tailscale debug prefs
