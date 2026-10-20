@@ -67,6 +67,13 @@ traefik_server_permissions_policy: >-
 #   relaxed  no CSP (for apps that set their own, or break under one); the other headers stay
 #   framed   no CSP and the page may be embedded by other sites (dashboards, widgets)
 #   none     no security headers at all (not recommended)
+# Two per-route settings adjust the chosen profile's CSP without replacing it (a route that uses either gets a security middleware of its own, `sec-<route name>`):
+#   csp_extra: {script-src: ["https://editor.example.org"], frame-src: ["https://editor.example.org"]}
+#       appends those sources to the directive of that name; a directive the profile does not have is added as "<directive> 'self' <sources>"
+#       (for a page that loads a script from, or embeds, another of your sites)
+#   frame_ancestors: ["https://portal.example.org"]
+#       the page may be embedded by those origins (added to frame-ancestors, or the only CSP directive on a `relaxed`/`framed` route), and X-Frame-Options is dropped,
+#       because SAMEORIGIN would still refuse them (for the site that gets embedded)
 traefik_server_default_profile: app
 traefik_server_csp_app: >-
   default-src 'self'; base-uri 'self'; frame-ancestors 'self'; form-action 'self';

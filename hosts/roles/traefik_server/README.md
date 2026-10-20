@@ -30,6 +30,21 @@ instead of overriding each other, because each layer uses a different name.
         host: vault.example.com
         backend: http://vaultwarden:80      # container on the shared network
 
+## Two sites that embed each other (CSP additions per route)
+
+The default `app` profile sends a Content-Security-Policy that allows scripts and frames from the page's own origin only, and `X-Frame-Options: SAMEORIGIN`. A page that loads a script
+from, or shows an iframe of, another site of yours (an office suite inside a file manager, a dashboard) is blocked by it, and the embedded site refuses to be framed. Adjust both ends
+on their routes instead of loosening a profile:
+
+    - {name: files, host: files.example.org, backend: "http://files:8600",
+       csp_extra: {script-src: ["https://office.example.org"], frame-src: ["https://office.example.org"]}}
+    - {name: office, host: office.example.org, backend: "http://office:9940", profile: relaxed,
+       frame_ancestors: ["https://files.example.org"]}
+
+`csp_extra` is a map of CSP directive names to lists of sources, appended to the profile's directive of that name. `frame_ancestors` is a list of origins that may embed the page. Sources
+may not contain spaces, commas or semicolons, and neither option can be used with `profile: none`; the run stops with the reason otherwise. Tested by rendering the templates and reading the headers
+from a running Traefik.
+
 ## Conflicting routes are refused
 
 Before writing any file the role asserts that route names are unique and that no two routes match the same request

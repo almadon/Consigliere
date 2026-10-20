@@ -21,6 +21,31 @@
         X-Powered-By: ""
         X-Permitted-Cross-Domain-Policies: "none"
 {% endmacro %}
+{# A profile's CSP with a route's additions: csp_extra {directive: [sources]} is appended to the directive of that name (a directive the profile lacks is added as
+   "<directive> 'self' <sources>"), frame_ancestors [origins] to frame-ancestors (added when the profile has no CSP). #}
+{% macro merged_csp(base, extra, ancestors) -%}
+{%- set ns = namespace(out=[], seen=[]) -%}
+{%- for part in (base | replace('\n', ' ')).split(';') -%}
+{%- set d = part | trim -%}
+{%- if d -%}
+{%- set name = d.split(' ')[0] -%}
+{%- set ns.seen = ns.seen + [name] -%}
+{%- if name == 'frame-ancestors' and ancestors -%}
+{%- set d = d ~ ' ' ~ (ancestors | join(' ')) -%}
+{%- elif name in extra -%}
+{%- set d = d ~ ' ' ~ (extra[name] | join(' ')) -%}
+{%- endif -%}
+{%- set ns.out = ns.out + [d] -%}
+{%- endif -%}
+{%- endfor -%}
+{%- for name, srcs in extra.items() if name not in ns.seen -%}
+{%- set ns.out = ns.out + [name ~ " 'self' " ~ (srcs | join(' '))] -%}
+{%- endfor -%}
+{%- if ancestors and 'frame-ancestors' not in ns.seen -%}
+{%- set ns.out = ns.out + ["frame-ancestors 'self' " ~ (ancestors | join(' '))] -%}
+{%- endif -%}
+{{ ns.out | join('; ') }}
+{%- endmacro %}
 http:
   middlewares:
     compress:
@@ -33,6 +58,13 @@ http:
 {{ headers('') | indent(2, true) }}
     sec-framed:
 {{ headers('', true) | indent(2, true) }}
+{# one security middleware of its own for each route that adds to its CSP or may be embedded by other sites #}
+{% for r in _traefik_server_routes if (r.csp_extra is defined or r.frame_ancestors is defined) and r.redirect is not defined %}
+{% set prof = r.profile | default(traefik_server_default_profile) %}
+{% set base = traefik_server_csp_app if prof == 'app' else (traefik_server_csp_strict if prof == 'strict' else '') %}
+    sec-{{ r.name }}:
+{{ headers(merged_csp(base, r.csp_extra | default({}), r.frame_ancestors | default([])), (prof == 'framed') or (r.frame_ancestors is defined)) | indent(2, true) }}
+{% endfor %}
 {% for name, body in traefik_server_extra_middlewares.items() %}
     {{ name }}: {{ body | to_json }}
 {% endfor %}

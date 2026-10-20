@@ -30,6 +30,39 @@
     _traefik_server_without_match: >-
       {{ _traefik_server_routes | rejectattr('host', 'defined') | rejectattr('rule', 'defined') | list | length }}
 
+- name: Find mistakes in the per-route CSP additions
+  ansible.builtin.set_fact:
+    _traefik_server_csp_problems: >-
+      {%- set bad = [] -%}
+      {%- for r in _traefik_server_routes -%}
+      {%- if r.csp_extra is defined -%}
+      {%- if r.csp_extra is not mapping -%}{%- set _ = bad.append(r.name ~ ': csp_extra must be a map of directive to list of sources') -%}
+      {%- else -%}
+      {%- for d, srcs in r.csp_extra.items() -%}
+      {%- if d is not match('^[a-z][a-z-]*$') -%}{%- set _ = bad.append(r.name ~ ': "' ~ d ~ '" is not a CSP directive name') -%}{%- endif -%}
+      {%- if srcs is string or srcs is not iterable -%}{%- set _ = bad.append(r.name ~ ': ' ~ d ~ ' must be a list of sources') -%}
+      {%- else -%}{%- for x in srcs -%}{%- if x is not string or x is not match('^[^\s;,]+$') -%}{%- set _ = bad.append(r.name ~ ': bad source ' ~ (x | string)) -%}{%- endif -%}{%- endfor -%}{%- endif -%}
+      {%- endfor -%}
+      {%- endif -%}
+      {%- endif -%}
+      {%- if r.frame_ancestors is defined -%}
+      {%- if r.frame_ancestors is string or r.frame_ancestors is not iterable -%}{%- set _ = bad.append(r.name ~ ': frame_ancestors must be a list of origins') -%}
+      {%- else -%}{%- for x in r.frame_ancestors -%}{%- if x is not string or x is not match('^[^\s;,]+$') -%}{%- set _ = bad.append(r.name ~ ': bad origin ' ~ (x | string)) -%}{%- endif -%}{%- endfor -%}{%- endif -%}
+      {%- endif -%}
+      {%- if (r.csp_extra is defined or r.frame_ancestors is defined) and (r.profile | default(traefik_server_default_profile)) == 'none' -%}
+      {%- set _ = bad.append(r.name ~ ': csp_extra / frame_ancestors cannot be used with profile none (it sends no security headers)') -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {{ bad | to_json }}
+
+- name: Refuse mistakes in the per-route CSP additions
+  ansible.builtin.assert:
+    that: _traefik_server_csp_problems | from_json | length == 0
+    fail_msg: >-
+      {{ _traefik_server_csp_problems | from_json | join('; ') }}. csp_extra is a map of CSP directive names to lists of sources and frame_ancestors a list of origins;
+      no source may contain spaces, commas or semicolons.
+    quiet: true
+
 - name: Validate the routes
   ansible.builtin.assert:
     that:
