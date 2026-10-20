@@ -40,6 +40,30 @@ receivers:
       - type: remove
         field: attributes.container_id
 {% endif %}
+{% for l in otel_agent_syslog_listeners %}
+  syslog/{{ l.name }}:
+    {{ l.transport }}:
+      listen_address: {{ l.listen | to_json }}
+    protocol: {{ l.protocol | default('rfc3164') }}
+    location: {{ otel_agent_syslog_timezone | to_json }}
+    operators:
+      # The sender's own name, not this relay's: a message is stored as host_name=<sender>, unit=<program>.
+      - type: add
+        field: resource["host.name"]
+        value: 'EXPR(lower(attributes.hostname))'
+      - type: add
+        field: resource["syslog.listener"]
+        value: {{ l.name | to_json }}
+      - type: move
+        from: attributes.appname
+        to: attributes.unit
+        if: 'attributes.appname != nil'
+      - type: move
+        from: attributes.message
+        to: body
+      - type: remove
+        field: attributes.hostname
+{% endfor %}
 
 processors:
   memory_limiter:
@@ -94,6 +118,12 @@ service:
     logs/docker:
       receivers: [file_log/docker]
       processors: [memory_limiter, resource, batch]
+      exporters: [otlp_http/loki]
+{% endif %}
+{% if otel_agent_syslog_listeners | length > 0 %}
+    logs/syslog:
+      receivers: [{% for l in otel_agent_syslog_listeners %}syslog/{{ l.name }}{{ ', ' if not loop.last }}{% endfor %}]
+      processors: [memory_limiter, batch]
       exporters: [otlp_http/loki]
 {% endif %}
   telemetry:

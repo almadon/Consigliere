@@ -19,6 +19,13 @@ Every line carries `host_name` (`otel_agent_host_name`, the fleet's short name).
 - **Limits:** a soft memory limit (`otel_agent_memory_limit_mib`, 128) in the collector, `GOMEMLIMIT`, and `MemoryMax` (256M). Measured on
   the fleet's nine hosts: 67-94 MB of heap per agent (`RssAnon`; the cgroup shows 68-173 MiB including evictable file cache). `ps` reports 240-265 MB
   resident because it also counts the shared file pages of the large executable; those are reclaimable and not extra pressure. Startup spikes higher for a moment. The installed binary is large (~370 MB on disk).
+- **Syslog relay (optional, `otel_agent_syslog_listeners`):** the same collector can also receive syslog from devices that cannot run it (Unraid,
+  UniFi access points and switches, other network gear) and forward it to Loki. Each message is stored under the sender's own name
+  (`host_name`, lower-cased from the syslog header) and program (`unit`), with the severity taken from the syslog priority and the listener's
+  name in `syslog_listener`. Listeners are `tcp` or `udp`, `rfc3164` (classic BSD syslog, what Unraid and most gear send) or `rfc5424`, on an
+  unprivileged port. Bind them to the senders' network (a LAN address, not a public one) and open the port to that network only
+  (`firewall_extra_rules` on the host). Prefer tcp where the sender allows it, since udp drops lines. rfc3164 timestamps carry no time zone:
+  set `otel_agent_syslog_timezone` to the zone the senders use, or lines land hours off. Tested with TCP and UDP messages into a real Loki.
 - **Failsafes:** the rendered configuration is checked by the collector itself (`otelcol-contrib validate`, which parses every OTTL
   statement) before it replaces the live file, so a mistake stops that host's run with the reason and the working configuration stays.
   After any change the role waits a few seconds and fails, with the service's last journal lines, if the collector is not running

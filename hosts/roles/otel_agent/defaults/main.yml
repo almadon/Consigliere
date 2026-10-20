@@ -17,3 +17,13 @@ otel_agent_memory_limit_mib: 128
 otel_agent_memory_max: 256M
 # Extra resource attributes on everything this host sends, for example {environment: lab}.
 otel_agent_attributes: {}
+
+# Syslog listeners: this host also RECEIVES syslog from devices that cannot run the collector (Unraid, UniFi gear, switches) and forwards it to
+# Loki, labelled with the sender's own host name (host_name) and program (unit). Empty = none. Each entry:
+#   - {name: unraid, listen: "10.0.1.3:1514", transport: tcp, protocol: rfc3164}
+#     name: short label for this listener; listen: address:port (an unprivileged port, above 1023); transport: tcp or udp;
+#     protocol: rfc3164 (classic BSD syslog, what Unraid and most gear send) or rfc5424.
+# Open the port to the senders' network only (firewall_extra_rules on this host). Prefer tcp where the sender supports it: udp drops lines.
+otel_agent_syslog_listeners: []
+# Syslog timestamps (rfc3164) carry no time zone: the zone the senders use.
+otel_agent_syslog_timezone: UTC

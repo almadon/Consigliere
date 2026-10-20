@@ -55,7 +55,7 @@ Roles:
   chunks on a dedicated data disk when the host has one, bound to the tailnet, OTLP ingestion) and Grafana (OIDC sign-in, Loki
   provisioned, dashboards from the fleet repo); see [loki](hosts/roles/loki_server/README.md) and [grafana](hosts/roles/grafana_server/README.md)
 - `otel_agent` — the OpenTelemetry Collector (`feat: [otel]`) shipping the systemd journal and Docker container logs to Loki (about
-  about 70-95 MB of heap, offsets and queue kept on disk); see [its README](hosts/roles/otel_agent/README.md)
+  about 70-95 MB of heap, offsets and queue kept on disk); it can also act as a syslog relay for Unraid and UniFi; see [its README](hosts/roles/otel_agent/README.md)
 - `data_disk` — formats (only if blank) and mounts one dedicated data disk shared by `garage` and `loki_server`
 - `garage` — a [Garage](https://garagehq.deuxfleurs.fr) S3-compatible object store on the tailnet (`util: [garage]`,
   secret `garage.server`, optional dedicated data disk, declared buckets and keys); see [its README](hosts/roles/garage/README.md)
