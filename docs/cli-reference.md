@@ -14,6 +14,7 @@ installs Tailscale, Docker's prerequisites, Ansible, sops and age, clones both r
 | `FLEET_CONFIG_REPO_URL` (required) / `FLEET_CONFIG_REPO_BRANCH` | Your private fleet repo |
 | `FLEET_CONFIG_REGISTER_TOKEN` | A GitHub token allowed to manage that repo's deploy keys. Used once, never stored, so the host registers its own read-only deploy key. Without it the host prints the key and waits |
 | `FLEET_CONFIG_DEPLOY_KEY_FILE` | Use a deploy key you already have instead of generating one |
+| `NODE_NAME` | Sets the OS hostname first (lower-case, short): until a host is on the tailnet the fleet identifies it by its hostname, which must equal its key in `hosts.yml`. Also fixes `127.0.1.1` in `/etc/hosts` and stops cloud-init renaming it back. Cloud images usually name the machine after the instance, so set this for them |
 | `TAILSCALE_AUTHKEY` | Auth key for joining the tailnet; asked for (hidden) if unset and the host is not yet on the tailnet |
 | `BOOTSTRAP_APPLY=yes` | Non-interactive: apply and install the timer. Without it a non-interactive run only checks |
 | `CONSIGLIERE_PROFILE=debian\|unraid\|macos` | Override the host-kind detection |

@@ -6,8 +6,9 @@
 # fleet-config repo).
 #
 # Usage:
-#   FRAMEWORK_REPO_URL=... FLEET_CONFIG_REPO_URL=git@github.com:you/fleet.git \
+#   NODE_NAME=<name in hosts.yml> FRAMEWORK_REPO_URL=... FLEET_CONFIG_REPO_URL=git@github.com:you/fleet.git \
 #   ./bootstrap.sh
+# NODE_NAME (optional) sets the OS hostname first: until the host is on the tailnet, the fleet identifies it by that name.
 #
 # Access to the PRIVATE fleet-config repo is set up for you
 # (ensure-access.sh): the host generates its own read-only deploy key and, if
@@ -139,7 +140,10 @@ else
   git clone ${FRAMEWORK_REPO_BRANCH:+--branch "$FRAMEWORK_REPO_BRANCH"} "$FRAMEWORK_REPO_URL" "$WORKDIR/framework" || framework_fail
 fi
 
-echo "==> Installing sops (pinned, checksum-verified)"
+echo "==> Hostname (NODE_NAME, if given)"
+"$WORKDIR/framework/hosts/bootstrap/set-hostname.sh"
+
+echo "==> Installing ansible (if the distribution's is too old) and sops (pinned, checksum-verified)"
 "$WORKDIR/framework/hosts/bootstrap/install-ansible.sh"
 "$WORKDIR/framework/hosts/bootstrap/install-sops.sh"
 
