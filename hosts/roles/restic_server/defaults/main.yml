@@ -13,6 +13,9 @@ restic_server_port: 8000
 # A dedicated data disk, mounted at restic_server_data_dir. Empty = use the root disk.
 # Use a stable path (/dev/disk/by-id/...), not /dev/sdb. A blank disk gets a filesystem;
 # one that already holds a different filesystem makes the run fail rather than be wiped.
+# Create restic_server_data_dir from here. Turn off where the reconciler runs in a container that
+# cannot see the data path (Unraid: the share is created in its UI, and Docker bind-mounts it).
+restic_server_manage_data_dir: true
 restic_server_data_device: ""
 restic_server_data_fstype: ext4
 restic_server_data_mkfs_opts: "-m 0"   # no reserved blocks: this disk only holds backups

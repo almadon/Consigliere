@@ -12,6 +12,7 @@ target restic clients write to over HTTP. Run it on a host tagged `util: [restic
   needs delete rights, so to prune: set `restic_server_append_only: false`, let it
   reconcile, prune from a client, then set it back to true.
 - A dedicated disk: set `restic_server_data_device` (a `/dev/disk/by-id/...` path); a blank disk is formatted (ext4) and mounted at the data dir, one with data on it fails the run instead of being wiped.
+- Unraid: the reconciler runs in a container that cannot see the data path, so set `restic_server_manage_data_dir: false` (Docker bind-mounts the share from the host) and `restic_server_bind_address` to the tailnet address (the tailscale role does not run there). See `fleet64`'s Spire host vars for a worked example.
 - Mirror: list a mirror host's public key in `restic_server_mirror_keys` and it may pull the data read-only with rsync (see `restic_mirror`).
 - Data lives in `restic_server_data_dir` (default `/srv/restic`): size the disk for it and
   back it up (an offsite copy with `restic copy` or rclone).

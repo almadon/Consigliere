@@ -49,9 +49,12 @@
     path: "{{ item.path }}"
     state: directory
     mode: "{{ item.mode }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when: not (item.skip | default(false) | bool)
   loop:
     - {path: "{{ restic_server_dir }}", mode: "0750"}
-    - {path: "{{ restic_server_data_dir }}", mode: "0750"}
+    - {path: "{{ restic_server_data_dir }}", mode: "0750", skip: "{{ not restic_server_manage_data_dir }}"}
 
 - name: Write the htpasswd file (bcrypt hashes)
   ansible.builtin.copy:
