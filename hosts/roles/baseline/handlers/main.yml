@@ -1,5 +1,18 @@
 ---
+# Applying sshd's configuration. A plain `systemctl reload ssh` is unsafe where ssh.socket (socket activation) is in use: OpenSSH 10 re-executes itself
+# on SIGHUP, cannot bind port 22 because systemd's socket holds it ("fatal: Cannot bind any address"), exits, and the service stays stopped until the next
+# connection starts it. So: with the socket active restart the service (the socket keeps the port, and sessions survive: KillMode=process); otherwise
+# reload, falling back to a restart; and in every case end with sshd running.
 - name: Reload sshd
-  ansible.builtin.systemd:
-    name: ssh
-    state: reloaded
+  ansible.builtin.shell: |
+    set -e
+    if systemctl is-active --quiet ssh.socket; then
+      systemctl restart ssh
+    else
+      systemctl reload ssh || systemctl restart ssh
+    fi
+    systemctl is-active --quiet ssh || systemctl start ssh
+  args:
+    executable: /bin/bash
+  changed_when: true
+  when: not ansible_check_mode
