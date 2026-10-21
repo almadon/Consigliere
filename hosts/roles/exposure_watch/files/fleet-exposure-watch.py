@@ -40,20 +40,67 @@ def is_v6(ip):
     return ":" in ip
 
 
-def scan(ip, cfg):
-    """Open TCP ports (and UDP from the list, if any) according to nmap."""
+class Unreliable(Exception):
+    """A scan result that must not be trusted: nmap gave up on the host, or the target answers on a flood of ports (upstream scan protection)."""
+
+
+FLOOD = 200          # more open ports than this on one address is not a service list, it is something answering for everything
+
+
+def run_nmap(cmd):
+    p = subprocess.run(cmd, capture_output=True, text=True, timeout=4 * 3600)
+    # nmap exits 0 and reports a host with no ports when it gives up on it (<host timedout="true">): that is a failed scan, never "nothing open"
+    timed_out = "due to host timeout" in p.stdout + p.stderr
+    try:
+        timed_out = timed_out or any(h.get("timedout") == "true" for h in ET.fromstring(p.stdout).iter("host"))
+    except ET.ParseError:
+        pass
+    if timed_out:
+        raise Unreliable("nmap gave up on the host (host timeout)")
+    return p
+
+
+def nmap_base(ip, cfg, rate, timeout):
+    base = ["nmap", "-Pn", "-n", "--open", "-oX", "-", "--max-retries", str(cfg.get("max_retries", 2)), "--host-timeout", timeout, "--max-rate", str(rate)]
+    return base + (["-6"] if is_v6(ip) else [])
+
+
+def sweep(ip, cfg, rate):
+    cmd = nmap_base(ip, cfg, rate, cfg.get("host_timeout", "60m")) + ["-sT" if os.geteuid() != 0 else "-sS", "-p", str(cfg.get("tcp_ports", "-")), ip]
+    found = parse_nmap(run_nmap(cmd), "tcp")
+    if len(found) > FLOOD:
+        raise Unreliable(f"{len(found)} ports answered: something upstream is answering for the whole address (scan protection?)")
+    return found
+
+
+def verify(ip, cfg, ports):
+    """Probe what the sweep found again, slowly, on its own: a port that only 'opened' under load is dropped."""
+    if not ports:
+        return set()
+    cmd = nmap_base(ip, cfg, 25, "10m") + ["-sS" if os.geteuid() == 0 else "-sT", "-p", ",".join(str(p) for p in sorted(ports)), ip]
+    return parse_nmap(run_nmap(cmd), "tcp")
+
+
+def scan(ip, cfg, target=None):
+    """Open TCP ports (and UDP from the list, if any) according to nmap; raises RuntimeError when no trustworthy answer could be had."""
     if shutil.which("nmap") is None:
         raise RuntimeError("nmap is not installed")
-    base = ["nmap", "-Pn", "-n", "--open", "-oX", "-", "--max-retries", str(cfg.get("max_retries", 2)),
-            "--host-timeout", cfg.get("host_timeout", "20m"), "--max-rate", str(cfg.get("max_rate", 300))]
-    if is_v6(ip):
-        base.append("-6")
-    ports = {"tcp": set(), "udp": set()}
-    cmd = base + ["-sT" if os.geteuid() != 0 else "-sS", "-p-", ip]
-    ports["tcp"] |= parse_nmap(subprocess.run(cmd, capture_output=True, text=True, timeout=3600), "tcp")
+    rate = int((target or {}).get("max_rate", cfg.get("max_rate", 300)))
+    last = ""
+    tcp = None
+    for r in (rate, max(20, rate // 5)):                 # one retry, five times slower
+        try:
+            tcp = verify(ip, cfg, sweep(ip, cfg, r))
+            break
+        except Unreliable as e:
+            last = str(e)
+            log("scan_retry", ip=ip, rate=r, reason=last)
+    if tcp is None:
+        raise RuntimeError(f"scan unreliable ({last}); set a lower max_rate for this target, or rely on Shodan for it")
+    ports = {"tcp": tcp, "udp": set()}
     if cfg.get("udp_ports"):
-        cmd = base + ["-sU", "-p", ",".join(str(p) for p in cfg["udp_ports"]), ip]
-        ports["udp"] |= parse_nmap(subprocess.run(cmd, capture_output=True, text=True, timeout=3600), "udp")
+        cmd = nmap_base(ip, cfg, rate, "20m") + ["-sU", "-p", ",".join(str(p) for p in cfg["udp_ports"]), ip]
+        ports["udp"] |= parse_nmap(run_nmap(cmd), "udp")
     return ports
 
 
@@ -153,10 +200,17 @@ def main(argv):
     for t in targets:
         for ip in t.get("ips", []):
             try:
-                scanned = scan(ip, cfg)
+                scanned = scan(ip, cfg, t)
             except Exception as e:  # noqa: BLE001
                 log("scan_failed", target=t["name"], ip=ip, error=str(e)[:200])
                 failed += 1
+                fid = f"{t['name']}|{ip}|scan-failed"
+                seen_ids.add(fid)
+                rec = state.get(fid)
+                if not a.dry_run and not a.learn and (rec is None or now - rec["last_alert"] > REMIND_AFTER):
+                    notify(f"Exposure scan could not be trusted: {t['name']} {ip}", str(e)[:300])
+                    state[fid] = {"first_seen": now if rec is None else rec["first_seen"], "last_alert": now, "target": t["name"], "ip": ip,
+                                  "finding": {"kind": "scan-failed", "proto": "", "port": 0, "severity": "warn"}}
                 continue
             if a.learn:
                 learn.setdefault(t["name"], {"ips": [], "tcp": set(), "udp": set()})
