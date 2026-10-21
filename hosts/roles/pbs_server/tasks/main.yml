@@ -195,6 +195,14 @@
       when: pbs_server_prune is not none and ('prune-' ~ item.name) not in _pbs_server_have_prune
       changed_when: true
 
+    # A datastore made in the web UI gets a prune job of its own ("default-<store>-<id>", keeping 3 daily and 3 monthly). Prune jobs act
+    # independently, so that stricter one would quietly override the policy set here; this role owns the policy, so it is removed.
+    - name: Remove the prune job PBS makes by default for a datastore
+      ansible.builtin.command: "docker exec pbs proxmox-backup-manager prune-job remove {{ item }}"
+      loop: "{{ _pbs_server_have_prune | select('match', '^default-(' ~ (pbs_server_datastores | map(attribute='name') | join('|')) ~ ')-') | list }}"
+      when: pbs_server_prune is not none and pbs_server_remove_default_prune | bool and pbs_server_datastores | length > 0
+      changed_when: true
+
     - name: Add the remotes to pull from (the token's secret goes in on stdin)
       ansible.builtin.command:
         argv:

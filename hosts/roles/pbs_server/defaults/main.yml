@@ -37,3 +37,5 @@ pbs_server_prune:
   keep_monthly: 6
   keep_yearly: 1
 pbs_server_prune_schedule: "sat 02:30"
+# Remove the prune job PBS creates by itself for a datastore made in the web UI (it would override the policy above).
+pbs_server_remove_default_prune: true
