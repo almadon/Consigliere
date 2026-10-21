@@ -1,0 +1,26 @@
+{#- The hosts for the page: the fleet's host table plus each host's routes (vars/routes/<host>.yml), straight from the repo. -#}
+{%- set table = (_cmdr_hosts_raw.content | b64decode | from_yaml).all.hosts -%}
+{%- set routes_by_host = {} -%}
+{%- for f in _cmdr_route_files.results -%}
+{%- set hn = (f.item.path | basename | regex_replace('\\.ya?ml$', '')) | lower -%}
+{%- set doc = f.content | b64decode | from_yaml -%}
+{%- set acc = namespace(items=[]) -%}
+{%- for k, v in (doc or {}).items() -%}{%- if v is sequence and v is not string -%}{%- set acc.items = acc.items + v -%}{%- endif -%}{%- endfor -%}
+{%- set _ = routes_by_host.update({hn: acc.items}) -%}
+{%- endfor -%}
+{%- set out = [] -%}
+{%- for name in table.keys() | sort -%}
+{%- set a = table[name] or {} -%}
+{%- set rts = [] -%}
+{%- for r in routes_by_host.get(name | lower, []) -%}
+{%- set hs = r.host if (r.host is defined and r.host is not string) else ([r.host] if r.host is defined else []) -%}
+{%- set intern = namespace(on=(r.internal | default(false) | bool)) -%}
+{%- for hh in hs -%}{%- for d in cmdr_internal_domains -%}{%- if hh == d or hh.endswith('.' ~ d) -%}{%- set intern.on = true -%}{%- endif -%}{%- endfor -%}{%- endfor -%}
+{%- set _ = rts.append({'name': r.name | default(''), 'hosts': hs, 'backend': r.backend | default(''), 'profile': r.profile | default(''), 'internal': intern.on,
+                        'redirect': (r.redirect.to if r.redirect is defined else '')}) -%}
+{%- endfor -%}
+{%- set _ = out.append({'name': name, 'type': a.type | default(''), 'org': a.org | default(''), 'site': a.site | default(''),
+                        'util': a.util | default([]), 'feat': a.feat | default([]), 'prop': a.prop | default([]), 'cert': a.cert | default([]),
+                        'fw': a.fw | default([]), 'routes': rts}) -%}
+{%- endfor -%}
+{{ out | to_json }}

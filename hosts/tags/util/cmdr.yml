@@ -1,0 +1,5 @@
+---
+description: "cmdr: the fleet's control page (hosts from the repo, live status from Loki, launch buttons), signed in through the identity provider"
+order: 60
+roles: [cmdr]
+secrets: [cmdr.server]

@@ -1,0 +1,118 @@
+---
+- name: Check the settings
+  ansible.builtin.assert:
+    that:
+      - cmdr_url | length > 0
+      - cmdr_oidc_issuer_url | length > 0
+      - cmdr_admin_groups | length > 0 or cmdr_viewer_groups | length > 0
+    fail_msg: Set cmdr_url (the public https URL), cmdr_oidc_issuer_url and at least one group (config/vars/group/util_cmdr.yml).
+    quiet: true
+
+- name: Load the sign-in client and the session secret (secret cmdr.server)
+  ansible.builtin.include_role:
+    name: load_secrets
+  vars:
+    load_secrets_scopes: [cmdr.server]
+
+- name: Require real secrets
+  ansible.builtin.assert:
+    that:
+      - cmdr_oidc_client_id is defined
+      - cmdr_oidc_client_secret is defined
+      - cmdr_session_secret is defined
+      - cmdr_session_secret | length >= 32
+      - "'CHANGEME' not in cmdr_oidc_client_id"
+      - "'CHANGEME' not in cmdr_oidc_client_secret"
+    fail_msg: >-
+      The identity-provider client or the session secret is not set up. Create a confidential client for {{ cmdr_url }} (callback
+      {{ cmdr_url | trim('/') }}/auth/callback), then run scripts/cmdr.sh init in the fleet repo.
+    quiet: true
+  no_log: true
+
+- name: Create the directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ cmdr_dir }}"
+    - "{{ cmdr_dir }}/app"
+    - "{{ cmdr_dir }}/app/static"
+    - "{{ cmdr_dir }}/data"
+
+- name: Install the page's code (restarts it when it changes)
+  ansible.builtin.copy:
+    src: "app/{{ item }}"
+    dest: "{{ cmdr_dir }}/app/{{ item }}"
+    mode: "0644"
+  loop: [server.py, static/index.html, static/style.css, static/app.js]
+  notify: Restart cmdr
+
+# The hosts come straight from the fleet repo's checkout on this host, so the page can never disagree with what is declared.
+- name: Read the host table
+  ansible.builtin.slurp:
+    src: "{{ cmdr_conf_dir }}/inventory/hosts.yml"
+  register: _cmdr_hosts_raw
+
+- name: Find the route files
+  ansible.builtin.find:
+    paths: "{{ cmdr_conf_dir }}/vars/routes"
+    patterns: "*.yml"
+  register: _cmdr_route_find
+
+- name: Read the route files
+  ansible.builtin.slurp:
+    src: "{{ item.path }}"
+  loop: "{{ _cmdr_route_find.files }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
+  register: _cmdr_route_files
+
+- name: Work out the hosts
+  ansible.builtin.set_fact:
+    _cmdr_hosts_list: "{{ lookup('ansible.builtin.template', 'hosts_list.json.j2') | from_json }}"
+
+- name: Write the page's data (what the repo declares; nothing secret)
+  ansible.builtin.template:
+    src: inventory.json.j2
+    dest: "{{ cmdr_dir }}/data/inventory.json"
+    mode: "0644"
+
+- name: Which tag-manifest directories exist here
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ fleet_tags_dirs | default([]) }}"
+  register: _cmdr_tags_stat
+
+- name: Remember the ones that do
+  ansible.builtin.set_fact:
+    _cmdr_tags_dir_paths: "{{ _cmdr_tags_stat.results | selectattr('stat.exists') | map(attribute='item') | list }}"
+
+- name: Write the compose file (it holds the sign-in client secret)
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ cmdr_dir }}/docker-compose.yml"
+    mode: "0600"
+  no_log: true
+  register: _cmdr_compose
+
+- name: Create the shared proxy network
+  community.docker.docker_network:
+    name: "{{ cmdr_network }}"
+  when: cmdr_network | length > 0
+
+- name: Check that no container this role needs is already taken by something else
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: guard_containers
+  vars:
+    docker_guard_containers: [cmdr]
+    docker_guard_dir: "{{ cmdr_dir }}"
+
+- name: Start the page
+  community.docker.docker_compose_v2:
+    project_src: "{{ cmdr_dir }}"
+    state: present
+    pull: "{{ 'always' if _cmdr_compose.changed else 'missing' }}"
+  # In a check run the directory and compose file above are not really written yet.
+  when: not ansible_check_mode or not _cmdr_compose.changed

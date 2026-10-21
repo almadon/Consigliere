@@ -1,0 +1,54 @@
+# Managed by Ansible (hosts/roles/cmdr) -- edits here get overwritten on the next reconciliation run.
+services:
+  cmdr:
+    image: {{ cmdr_image }}
+    container_name: cmdr
+    init: true
+    restart: unless-stopped
+    user: "65534:65534"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    command: ["python", "-u", "/app/server.py"]
+{% if cmdr_network | length == 0 %}
+    ports:
+      - "{{ cmdr_bind_address }}:{{ cmdr_port }}:8080"
+{% endif %}
+    environment:
+      PORT: "8080"
+      CMDR_URL: {{ cmdr_url | to_json }}
+      CMDR_AUTH: oidc
+      CMDR_ISSUER: {{ cmdr_oidc_issuer_url | to_json }}
+      CMDR_CLIENT_ID: {{ cmdr_oidc_client_id | to_json }}
+      CMDR_CLIENT_SECRET: {{ cmdr_oidc_client_secret | to_json }}
+      CMDR_SESSION_SECRET: {{ cmdr_session_secret | to_json }}
+      CMDR_ADMIN_GROUPS: {{ (cmdr_admin_groups | join(',')) | to_json }}
+      CMDR_VIEWER_GROUPS: {{ (cmdr_viewer_groups | join(',')) | to_json }}
+      CMDR_FRAME_ANCESTORS: {{ (cmdr_frame_ancestors | join(' ') if cmdr_frame_ancestors | length > 0 else "'none'") | to_json }}
+      CMDR_LOKI: {{ cmdr_loki_url | to_json }}
+      CMDR_STATUS_INTERVAL: "{{ cmdr_status_interval }}"
+      CMDR_INVENTORY: /data/inventory.json
+{% if _cmdr_tags_dir_paths | length > 0 %}
+      CMDR_TAGS_DIRS: "{% for d in _cmdr_tags_dir_paths %}/tags/{{ loop.index0 }}{{ ':' if not loop.last else '' }}{% endfor %}"
+{% endif %}
+{% if cmdr_proxy_secret | default('') | length > 0 %}
+      CMDR_PROXY_SECRET: {{ cmdr_proxy_secret | to_json }}
+{% endif %}
+    volumes:
+      - {{ cmdr_dir }}/app:/app:ro
+      - {{ cmdr_dir }}/data:/data:ro
+{% for d in _cmdr_tags_dir_paths %}
+      - {{ d }}:/tags/{{ loop.index0 }}:ro
+{% endfor %}
+{% if cmdr_network | length > 0 %}
+    networks:
+      - {{ cmdr_network }}
+
+networks:
+  {{ cmdr_network }}:
+    external: true
+{% endif %}

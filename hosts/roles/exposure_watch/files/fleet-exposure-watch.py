@@ -168,7 +168,8 @@ def main(argv):
             findings = evaluate(t, ip, scanned, shod)
             report["targets"].setdefault(t["name"], {})[ip] = {"open_tcp": sorted(scanned["tcp"]), "open_udp": sorted(scanned["udp"]),
                                                                "findings": findings}
-            log("scanned", target=t["name"], ip=ip, open_tcp=sorted(scanned["tcp"]), findings=len(findings))
+            log("scanned", target=t["name"], ip=ip, open_tcp=sorted(scanned["tcp"]), open_udp=sorted(scanned["udp"]), findings=len(findings),
+                finding_list=[{"kind": f["kind"], "proto": f["proto"], "port": f["port"], "severity": f["severity"], "note": f.get("note", "")} for f in findings])
             for f in findings:
                 fid = f"{t['name']}|{ip}|{f['kind']}|{f['proto']}|{f['port']}|{f.get('note', '')}"
                 seen_ids.add(fid)

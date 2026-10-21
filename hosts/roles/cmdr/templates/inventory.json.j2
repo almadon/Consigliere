@@ -1,0 +1,6 @@
+{{ {
+  'generated': now().timestamp() | int,
+  'hosts': _cmdr_hosts_list,
+  'tools': cmdr_tools,
+  'host_links': cmdr_host_links
+} | to_nice_json }}

@@ -1,0 +1,33 @@
+---
+# cmdr: the fleet's control page. A small read-only web page (standard-library Python in a stock python image, no build step) that shows every host
+# from the fleet repo (what it is, what it provides and runs, its routes), live status read from Loki (is it sending logs, did the last reconcile
+# succeed, the exposure scan), and launch buttons for the admin tools. Sign-in is OpenID Connect (documented for Pocket ID).
+#
+# Secret cmdr.server (config/secrets/cmdr/server.yml), made by scripts/cmdr.sh init:
+#   cmdr_oidc_client_id, cmdr_oidc_client_secret, cmdr_session_secret (32+ random characters), cmdr_proxy_secret (optional)
+# In the identity provider: a confidential client whose callback URL is  <cmdr_url>/auth/callback, allowed to read the "groups" claim, and groups
+# for the people who may use the page (cmdr_admin_groups, cmdr_viewer_groups).
+cmdr_dir: /opt/cmdr
+cmdr_image: "python:3.13-alpine"
+# The public https URL (required: the identity provider sends the browser back to it).
+cmdr_url: ""
+cmdr_port: 8083
+# Publish on this address (the tailnet address by default, as for the other admin tools: Traefik reaches it there), or join cmdr_network instead.
+cmdr_bind_address: "{{ tailscale_ipv4 | default('127.0.0.1', true) }}"
+cmdr_network: ""
+cmdr_oidc_issuer_url: ""
+cmdr_admin_groups: [Muximux-Admins]
+cmdr_viewer_groups: []
+# Sites that may frame the page (the console that embeds it). 'none' = nobody.
+cmdr_frame_ancestors: []
+# Loki, for the live status (the tailnet address of the host that runs it).
+cmdr_loki_url: ""
+cmdr_status_interval: 60
+# Where the fleet repo's config directory is on this host (the reconciler's checkout). Derived from the secrets directory it links.
+cmdr_conf_dir: "{{ fleet_secrets_dir | realpath | dirname }}"
+# Domains whose routes are only served to the LAN and tailnet (shown with a dashed border).
+cmdr_internal_domains: []
+# Launch buttons:  - {name: Arkeep, url: "https://ark.ctrl.a64.one", group: Fleet, tailnet: false, desc: "backups"}
+cmdr_tools: []
+# Per-host buttons; {host} and {host_q} (URL-encoded) are replaced with the host's name:  - {name: Logs, url: "https://gf.ctrl.a64.one/explore?...{host_q}..."}
+cmdr_host_links: []

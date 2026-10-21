@@ -1,0 +1,30 @@
+# cmdr
+
+The fleet's control page: one place that shows every host, its status, and the way to every admin tool. It is the "what do I have, is it healthy, take me there"
+layer; the engines stay where they are (Arcane for containers, Arkeep for backups, Grafana and Loki for logs, Beszel for host metrics, Wazuh later).
+
+- **Hosts and routes come from the fleet repo**, read from the reconciler's checkout on this host (`inventory/hosts.yml` and `vars/routes/*.yml`), so the page
+  can never disagree with what is declared. Tag descriptions come from the tag manifests.
+- **Live status comes from Loki**, which already receives every host's journal: a host is *reporting* if it sent logs in the last 10 minutes; its last
+  reconcile is the `ok= changed= failed=` recap of `fleet-reconcile.service`; the exposure table is the last `fleet-exposure-watch` scan. If Loki is
+  unreachable the page says so and still shows the repo's data and the links.
+- **Launch buttons**: `cmdr_tools` (fleet-wide, with a `tailnet` badge for names that only open on the LAN or tailnet) and `cmdr_host_links` (per host, with
+  `{host}` / `{host_q}`), plus a one-click `ssh root@<host>` copy.
+- **Read-only.** It shows and links; it runs nothing. Actions (reconcile now, a drift check) come later, narrow and audited.
+
+## Sign-in
+
+OpenID Connect (authorization code + PKCE) against your identity provider, documented for Pocket ID, then a signed, HttpOnly session cookie. Members of
+`cmdr_admin_groups` are admins, `cmdr_viewer_groups` viewers; anyone else is turned away. In the provider: a confidential client with callback
+`<cmdr_url>/auth/callback`, scopes `openid profile email groups`, and the groups above. The page can sit inside the Muximux console: they share the
+identity provider's session, so framing it signs in silently (allow it with `cmdr_frame_ancestors`).
+
+A trusted proxy may instead pass the identity in `Remote-User` / `Remote-Groups` headers, but only together with the shared secret `cmdr_proxy_secret` in an
+`X-Cmdr-Proxy` header that the proxy adds; headers without it are ignored, so a client on the tailnet cannot forge them.
+
+## Run
+
+`scripts/cmdr.sh init` (in the fleet repo) stores the client id and secret and a generated session secret in the secret `cmdr.server` and tags the host
+`util: [cmdr]`. The container is a stock `python` image running a standard-library script from `/opt/cmdr/app` (read-only, no capabilities, no build step).
+Tested against a mock identity provider and a mock Loki (sign-in flow, wrong group, tampered cookie, forged headers, open redirect, path traversal) and in a
+browser against the real fleet repo; not yet on the fleet.

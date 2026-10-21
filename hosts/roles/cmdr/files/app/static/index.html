@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cmdr</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23304ffe'/%3E%3Cpath d='M8 11l6 5-6 5M17 22h8' stroke='white' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="logo" aria-hidden="true">&gt;_</span><span>cmdr</span></div>
+  <div class="summary" id="summary" aria-live="polite"></div>
+  <input id="q" type="search" placeholder="Filter hosts, tags, names" autocomplete="off" aria-label="Filter">
+  <div class="user" id="user"></div>
+</header>
+<div class="banner" id="banner" hidden></div>
+<main>
+  <section id="tools" aria-label="Tools"></section>
+  <section id="attention" aria-label="Needs attention" hidden></section>
+  <section>
+    <div class="bar"><h2>Hosts</h2><div class="chips" id="chips"></div></div>
+    <div class="grid" id="hosts"></div>
+  </section>
+  <section id="exposure" aria-label="Public exposure"></section>
+</main>
+<aside id="drawer" class="drawer" hidden aria-label="Host details"></aside>
+<footer class="foot" id="foot"></footer>
+<script src="/static/app.js"></script>
+</body>
+</html>

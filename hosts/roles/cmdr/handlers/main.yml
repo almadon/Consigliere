@@ -1,0 +1,5 @@
+---
+- name: Restart cmdr
+  ansible.builtin.command: docker restart cmdr
+  when: not ansible_check_mode
+  changed_when: true
