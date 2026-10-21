@@ -1,0 +1,8 @@
+{{ {
+  'shodan': exposure_watch_shodan | bool,
+  'max_rate': exposure_watch_max_rate | int,
+  'max_retries': exposure_watch_max_retries | int,
+  'host_timeout': exposure_watch_host_timeout,
+  'udp_ports': exposure_watch_udp_ports,
+  'targets': exposure_watch_targets | rejectattr('name', 'equalto', inventory_hostname) | list
+} | to_nice_json }}

@@ -1,0 +1,72 @@
+---
+- name: Load the secret (the Shodan API key, which may be empty)
+  ansible.builtin.include_role:
+    name: load_secrets
+  vars:
+    load_secrets_scopes: [shodan.api]
+
+- name: Require at least one target
+  ansible.builtin.assert:
+    that: exposure_watch_targets | length > 0
+    fail_msg: Set exposure_watch_targets (config/vars/group/util_exposure.yml); scripts/exposure.sh learn shows what is open now.
+    quiet: true
+
+- name: Install nmap
+  ansible.builtin.apt:
+    name: nmap
+    state: present
+
+- name: Install the scanner
+  ansible.builtin.copy:
+    src: fleet-exposure-watch.py
+    dest: /usr/local/sbin/fleet-exposure-watch
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Write the configuration (the declared ports of every target except this host)
+  ansible.builtin.template:
+    src: fleet-exposure-watch.json.j2
+    dest: /etc/fleet-exposure-watch.json
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Store the Shodan API key (root only)
+  ansible.builtin.copy:
+    content: "{{ exposure_watch_shodan_key }}\n"
+    dest: /etc/fleet-exposure-watch.key
+    owner: root
+    group: root
+    mode: "0600"
+  when: exposure_watch_shodan_key | default('') | length > 0
+  no_log: true
+
+- name: Remove the key file when there is no key (the free InternetDB is used instead)
+  ansible.builtin.file:
+    path: /etc/fleet-exposure-watch.key
+    state: absent
+  when: exposure_watch_shodan_key | default('') | length == 0
+
+- name: Keep the state directory
+  ansible.builtin.file:
+    path: /var/lib/fleet-exposure-watch
+    state: directory
+    mode: "0750"
+
+- name: Install the service and timer
+  ansible.builtin.template:
+    src: "fleet-exposure-watch.{{ item }}.j2"
+    dest: "/etc/systemd/system/fleet-exposure-watch.{{ item }}"
+    mode: "0644"
+  loop: [service, timer]
+  notify: Reload systemd for the exposure watch
+  register: _exposure_watch_units
+
+- name: Enable the timer
+  ansible.builtin.systemd:
+    name: fleet-exposure-watch.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not ansible_check_mode or not _exposure_watch_units.changed

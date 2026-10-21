@@ -1,0 +1,11 @@
+# Managed by Ansible (hosts/roles/exposure_watch)
+[Unit]
+Description=Scheduled exposure watch
+
+[Timer]
+OnCalendar={{ exposure_watch_schedule }}
+RandomizedDelaySec={{ exposure_watch_randomized_delay }}
+Persistent=true
+
+[Install]
+WantedBy=timers.target

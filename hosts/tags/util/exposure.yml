@@ -1,0 +1,5 @@
+---
+description: "Exposure watch: scans the fleet's public addresses (and asks Shodan) and alerts on open ports that are not declared"
+order: 70
+roles: [exposure_watch]
+secrets: [shodan.api]

@@ -1,0 +1,15 @@
+# Managed by Ansible (hosts/roles/exposure_watch)
+[Unit]
+Description=Check the fleet's public addresses for ports that should not be open
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/fleet-exposure-watch
+Nice=10
+TimeoutStartSec=3h
+ProtectHome=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/fleet-exposure-watch

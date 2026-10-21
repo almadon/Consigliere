@@ -1,0 +1,17 @@
+---
+# Exposure watch: what the internet can reach on the fleet's public addresses, against what is declared. Run it on a host OUTSIDE the networks it
+# scans (a VPS at another provider); it skips any target named like itself. See README.md.
+#
+#   exposure_watch_targets   [{name, ips: [v4 or v6 addresses], tcp: [declared open ports], udp: [declared open UDP ports]}]
+#
+# The Shodan API key (optional) is in the secret shodan.api (exposure_watch_shodan_key); without one the free InternetDB is used.
+exposure_watch_targets: []
+exposure_watch_shodan: true
+exposure_watch_schedule: "*-*-* 04:10:00"
+exposure_watch_randomized_delay: 30min
+# Packets per second per scan: low on purpose (a polite scan of your own addresses), a full 65535-port TCP scan takes a few minutes per address.
+exposure_watch_max_rate: 300
+exposure_watch_max_retries: 2
+exposure_watch_host_timeout: 20m
+# UDP ports worth probing as well (UDP scans are slow; keep this list short), for example [53, 123, 1194, 51820].
+exposure_watch_udp_ports: []
