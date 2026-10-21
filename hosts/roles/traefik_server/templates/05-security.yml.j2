@@ -50,6 +50,11 @@ http:
   middlewares:
     compress:
       compress: {}
+    # Only the private ranges (LAN, tailnet) may use a route that carries this: `internal: true` on a route, or any route under
+    # traefik_server_internal_domains. The check is on the connection's own address, never on a header the client sent.
+    internal-only:
+      ipAllowList:
+        sourceRange: {{ traefik_server_internal_sources | to_json }}
     sec-app:
 {{ headers(traefik_server_csp_app) | indent(2, true) }}
     sec-strict:

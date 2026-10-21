@@ -18,7 +18,9 @@ http:
 {% set hosts = r.host if (r.host is defined and r.host is not string) else ([r.host] if r.host is defined else []) %}
 {% set profile = r.profile | default(traefik_server_default_profile) %}
 {% set normal = (['compress@file'] if (r.compress | default(true)) else []) + (['sec-' ~ (r.name if (r.csp_extra is defined or r.frame_ancestors is defined) else profile) ~ '@file'] if profile != 'none' else []) + (r.middlewares | default([])) %}
-{% set chain = ['redirect-' ~ r.name ~ '@file'] if r.redirect is defined else normal %}
+{% set internal = namespace(on=(r.internal | default(false) | bool)) %}
+{% for h in hosts %}{% for d in traefik_server_internal_domains %}{% if h == d or h.endswith('.' ~ d) %}{% set internal.on = true %}{% endif %}{% endfor %}{% endfor %}
+{% set chain = (['internal-only@file'] if internal.on else []) + (['redirect-' ~ r.name ~ '@file'] if r.redirect is defined else normal) %}
     # from {{ r._src }}
     {{ r.name }}:
       rule: {{ (r.rule | default(hosts | map('regex_replace', '^(.*)$', 'Host(`\\1`)') | join(' || '))) | to_json }}

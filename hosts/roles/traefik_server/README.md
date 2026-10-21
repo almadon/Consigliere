@@ -61,3 +61,10 @@ Traefik trusts its `X-Forwarded-*` headers.
 Not run against a live host. That Traefik reloads when a referenced certificate file changes is handled by
 touching `20-tls.yml` after renewal (the fetch script does this); I haven't
 confirmed it against a running Traefik.
+
+## Internal-only routes
+
+A route with `internal: true`, and every route under a domain listed in `traefik_server_internal_domains`, is answered only to
+`traefik_server_internal_sources` (the private ranges and the tailnet); anyone else gets a 403 from Traefik. The test is the
+connection's own address, not a header the client sent, so a host that is also reachable from the internet (a NAT'd edge host) can
+still serve names that must stay inside. Listing the domain means a route added later under it is protected without remembering the flag.

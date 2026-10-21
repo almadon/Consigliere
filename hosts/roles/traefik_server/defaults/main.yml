@@ -29,7 +29,21 @@
 #     profile:     security-header profile: app (default), strict, relaxed, framed or none; see below
 #     compress:    false to turn compression off for this route (default true)
 #     insecure:    true when the backend is HTTPS with a certificate Traefik can't verify
+#     internal:    true to answer only the private ranges (traefik_server_internal_sources: LAN and tailnet); anyone else gets 403
 #     pass_host_header: false to send the backend's own host:port as Host (default true)
+
+# Internal-only routes. A route with `internal: true`, and EVERY route whose host is one of these domains or below them, is served to
+# these source ranges only (the connection's own address; a forwarded header from the client is not believed). Everyone else gets 403.
+# Use it for a name like sp.a64.one that must never be reachable from outside the LAN or the tailnet even though the host is public.
+traefik_server_internal_domains: []
+traefik_server_internal_sources:
+  - 10.0.0.0/8
+  - 172.16.0.0/12
+  - 192.168.0.0/16
+  - 100.64.0.0/10          # the tailnet
+  - 127.0.0.1/32
+  - ::1/128
+  - fd7a:115c:a1e0::/48    # the tailnet, IPv6
 
 traefik_server_dir: /opt/traefik
 traefik_server_deploy: true
