@@ -88,30 +88,59 @@
       delay: 3
       changed_when: false
 
-    # The image starts with admin@pbs and a published default password, so it is replaced on the first run. The password
-    # goes in on stdin (never on a command line) and a hash of it is kept to tell when the secret changes.
-    - name: Read the marker of the admin password that is set
-      ansible.builtin.slurp:
-        src: "{{ pbs_server_dir }}/.admin-password.sha256"
-      register: _pbs_server_pw_marker
-      failed_when: false
-
-    - name: Set the admin password
-      ansible.builtin.command:
-        argv: [docker, exec, -i, pbs, sh, -c, 'read -r pw; exec proxmox-backup-manager user update admin@pbs --password "$pw"']
-        stdin: "{{ pbs_server_admin_password }}"
-      when: (_pbs_server_pw_marker.content | default('') | b64decode | trim) != (pbs_server_admin_password | hash('sha256'))
+    # The image starts with admin@pbs and a published default password, so it is replaced on the first run. This goes through PBS's
+    # own API (what the web UI uses): the command-line "user update --password" is accepted but does not take effect in this image.
+    - name: Try to sign in as admin with the secret's password
+      ansible.builtin.uri:
+        url: "https://{{ pbs_server_bind_address }}:{{ pbs_server_port }}/api2/json/access/ticket"
+        method: POST
+        body_format: form-urlencoded
+        body: {username: "admin@pbs", password: "{{ pbs_server_admin_password }}"}
+        validate_certs: false
+        status_code: [200, 401]
+      register: _pbs_server_login
+      until: _pbs_server_login.status is defined and _pbs_server_login.status in [200, 401]
+      retries: 20
+      delay: 3
       no_log: true
-      register: _pbs_server_pw_set
-      changed_when: true
 
-    - name: Remember which admin password is set
-      ansible.builtin.copy:
-        content: "{{ pbs_server_admin_password | hash('sha256') }}\n"
-        dest: "{{ pbs_server_dir }}/.admin-password.sha256"
-        mode: "0600"
-      when: _pbs_server_pw_set is not skipped
+    - name: Set the admin password (the image's default is still in place)
+      when: _pbs_server_login.status == 401
       no_log: true
+      block:
+        - name: Sign in with the image's default password
+          ansible.builtin.uri:
+            url: "https://{{ pbs_server_bind_address }}:{{ pbs_server_port }}/api2/json/access/ticket"
+            method: POST
+            body_format: form-urlencoded
+            body: {username: "admin@pbs", password: "pbspbs"}
+            validate_certs: false
+            status_code: [200, 401]
+          register: _pbs_server_default_login
+
+        - name: Stop if neither password works
+          ansible.builtin.fail:
+            msg: >-
+              PBS rejects both the password in the secret pbs.server and the image's default, so the admin password was
+              changed some other way. Set it to the secret's value in the PBS UI (Configuration > Access Control), or
+              update the secret to match.
+          when: _pbs_server_default_login.status != 200
+
+        - name: Change it to the secret's password
+          ansible.builtin.uri:
+            url: "https://{{ pbs_server_bind_address }}:{{ pbs_server_port }}/api2/json/access/password"
+            method: PUT
+            body_format: form-urlencoded
+            body:
+              userid: "admin@pbs"
+              password: "{{ pbs_server_admin_password }}"
+              confirmation-password: "pbspbs"
+            headers:
+              Cookie: "PBSAuthCookie={{ _pbs_server_default_login.json.data.ticket | urlencode }}"
+              CSRFPreventionToken: "{{ _pbs_server_default_login.json.data.CSRFPreventionToken }}"
+            validate_certs: false
+            status_code: 200
+          changed_when: true
 
     - name: List what PBS already has
       ansible.builtin.command: "docker exec pbs proxmox-backup-manager {{ item }} list --output-format json"

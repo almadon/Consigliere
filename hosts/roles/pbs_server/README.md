@@ -13,8 +13,10 @@ and gain nothing; PBS's own sync is incremental and verifiable.
   are created once: changing one that exists is done in the PBS UI. A prune job and a weekly garbage collection are made per datastore.
 - **Pull only**: the remote is a read-only API token on the primary; nothing here can change the primary. Jobs are made with
   `remove-vanished` off, so what the primary prunes or loses stays here (a last resort grows; the prune job on this side sets how far back).
-- **Ownership**: PBS runs as uid 34 and refuses to start when its config, state or datastore directories belong to anyone else; the role
-  creates them with that numeric owner. The first run replaces the image's published default admin password.
+- **Ownership**: PBS runs as uid 34 and refuses to start (on some hosts) when its config, state or datastore directories belong to
+  anyone else; the role creates them with that numeric owner.
+- **Admin password**: the image starts with a published default. The first run changes it to the secret's value through PBS's API
+  (the command-line `user update --password` does not take effect in this image). If PBS accepts neither, the run stops and says so.
 - **Where the data goes**: `pbs_server_data_dir` (default `/srv/pbs`), mounted at `/backups`. On a host whose data disk also holds
   restic repositories, use a directory beside them and list it in the restic mirror's `restic_mirror_excludes`.
 - Tested: the CLI sequence (password, datastore, prune job, remote, pull job) against the image; the full role is applied with a
