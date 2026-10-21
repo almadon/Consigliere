@@ -1,4 +1,9 @@
 ---
+# A dedicated data disk, when the host has one (data_disk_device in its vars): mounted before anything is written under it.
+- name: Prepare the data disk
+  ansible.builtin.include_role:
+    name: data_disk
+
 - name: Load the secrets (admin password, sync token)
   ansible.builtin.include_role:
     name: load_secrets

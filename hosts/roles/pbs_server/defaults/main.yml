@@ -18,6 +18,7 @@ pbs_server_bind_address: "{{ tailscale_ipv4 | default('127.0.0.1', true) }}"
 pbs_server_port: 8007
 pbs_server_hostname: "{{ inventory_hostname }}-pbs"
 # Where the datastores live on the host (mounted at /backups in the container). A directory per datastore is made below it.
+# On a host with a dedicated data disk (data_disk_device, see the data_disk role) put it under the mount, for example /srv/pbs.
 pbs_server_data_dir: /srv/pbs
 # Make pbs_server_data_dir here. Turn off where the path is created some other way (for example the reconciler runs in a container).
 pbs_server_manage_data_dir: true

@@ -19,6 +19,12 @@
   when: not restic_server_no_auth
   no_log: true
 
+# A dedicated data disk shared with other services (data_disk_device in the host's vars, mounted for example at /srv): the data_disk role.
+- name: Prepare the shared data disk
+  ansible.builtin.include_role:
+    name: data_disk
+
+# The disk used by this role alone, mounted at restic_server_data_dir.
 - name: Prepare the data disk
   when: restic_server_data_device | length > 0
   block:
