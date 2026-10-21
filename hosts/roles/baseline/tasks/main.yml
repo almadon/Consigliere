@@ -17,6 +17,7 @@
 
 # --- unattended upgrades ----------------------------------------------------
 - name: Turn on the periodic apt update + unattended upgrade
+  when: baseline_unattended_upgrades_manage | bool
   ansible.builtin.copy:
     dest: /etc/apt/apt.conf.d/20auto-upgrades
     content: |
@@ -30,6 +31,7 @@
 # apt.conf.d in order and the last value wins, so this needs no particular
 # contents (or even the package) to exist first, and survives package upgrades.
 - name: Configure unattended-upgrades (reboot, cleanup, extra origins)
+  when: baseline_unattended_upgrades_manage | bool
   ansible.builtin.copy:
     dest: /etc/apt/apt.conf.d/52consigliere-unattended-upgrades
     content: |
@@ -46,6 +48,7 @@
     mode: "0644"
 
 - name: Make sure the apt timers that drive it are enabled
+  when: baseline_unattended_upgrades_manage | bool
   ansible.builtin.systemd:
     name: "{{ item }}"
     enabled: true

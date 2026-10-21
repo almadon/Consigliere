@@ -19,6 +19,10 @@ baseline_packages:
   - unattended-upgrades
   - apt-listchanges
 
+# Set false on a host whose packages must only change on purpose (a Proxmox VE node: see the util: [pve] tag): the role then writes no
+# unattended-upgrades configuration and leaves the apt timers alone. Also leave "unattended-upgrades" out of baseline_packages there, because
+# installing that package turns the upgrades on by itself.
+baseline_unattended_upgrades_manage: true
 # Unattended upgrades: security and stable updates from Debian's default origins are
 # applied automatically (Debian's own 50unattended-upgrades is left alone; this role adds
 # a drop-in that is read after it).
