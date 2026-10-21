@@ -1,0 +1,5 @@
+---
+description: "Proxmox Backup Server that pulls a primary PBS's backups (a second copy)"
+order: 45
+roles: [pbs_server]
+secrets: [pbs.server]

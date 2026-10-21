@@ -17,6 +17,9 @@ log="$(mktemp)"; trap 'rm -f "$log"' EXIT
 src="$(tailscale ip -4 {{ restic_mirror_source }} 2>/dev/null | head -n1)"
 src="${src:-{{ restic_mirror_source }}}"
 if rsync -a --numeric-ids --partial --ignore-existing --exclude='locks/' \
+{% for x in restic_mirror_excludes %}
+    --exclude={{ x | quote }} \
+{% endfor %}
     -e "ssh -i /root/.ssh/restic_mirror -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
     "root@${src}:/" "{{ restic_mirror_dest_dir }}/" >"$log" 2>&1; then
   echo "mirror ok"

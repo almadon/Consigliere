@@ -16,3 +16,5 @@ on a systemd timer.
 - Corruption on the source would be copied too. Run `restic check --read-data` against
   the source now and then.
 - Not tested against a live host.
+
+- `restic_mirror_excludes: [/.pbs/]` keeps paths that are not restic repositories (for example another service on the source's data disk) out of the copy.

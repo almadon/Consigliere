@@ -10,3 +10,6 @@ restic_mirror_source_dir: /srv/restic
 restic_mirror_dest_dir: /srv/restic
 restic_mirror_schedule: "*-*-* 03:30:00"
 restic_mirror_randomized_delay: 15min
+# Paths (relative to the source's data dir, rsync --exclude syntax) the mirror must not copy, for example /.pbs/ when the source's
+# disk also holds something that is not a restic repository.
+restic_mirror_excludes: []

@@ -1,0 +1,212 @@
+---
+- name: Load the secrets (admin password, sync token)
+  ansible.builtin.include_role:
+    name: load_secrets
+  vars:
+    load_secrets_scopes: [pbs.server]
+
+- name: Require an admin password
+  ansible.builtin.assert:
+    that:
+      - pbs_server_admin_password is defined
+      - pbs_server_admin_password | length >= 8
+    fail_msg: >-
+      pbs_server_admin_password is missing or shorter than 8 characters. Make the secret with scripts/pbs.sh init
+      (or: scripts/secrets.sh create pbs.server).
+    quiet: true
+  no_log: true
+
+- name: Require a sync secret for each remote
+  ansible.builtin.assert:
+    that:
+      - (pbs_server_remote_secrets | default({}))[item.name] is defined
+    fail_msg: "pbs_server_remote_secrets.{{ item.name }} (the API token's secret) is missing from the secret pbs.server."
+    quiet: true
+  loop: "{{ pbs_server_remotes }}"
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: true
+
+- name: Create the service directory
+  ansible.builtin.file:
+    path: "{{ pbs_server_dir }}"
+    state: directory
+    mode: "0750"
+
+# PBS runs as uid 34 (the image's "backup" user) and refuses to start when its configuration, state or datastore directories
+# belong to anyone else, so they are made with that numeric owner (the host has no such user, which is why it is not by name).
+- name: Create PBS's configuration, state, log and datastore directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "34"
+    group: "34"
+    mode: "{{ item.mode }}"
+  loop:
+    - {path: "{{ pbs_server_dir }}/etc", mode: "0700"}
+    - {path: "{{ pbs_server_dir }}/lib", mode: "0755"}
+    - {path: "{{ pbs_server_dir }}/logs", mode: "0755"}
+    - {path: "{{ pbs_server_data_dir }}", mode: "0755", skip: "{{ not pbs_server_manage_data_dir }}"}
+  loop_control:
+    label: "{{ item.path }}"
+  when: not (item.skip | default(false) | bool)
+
+- name: Write the compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ pbs_server_dir }}/docker-compose.yml"
+    mode: "0640"
+  register: _pbs_server_compose
+
+- name: Check that no container this role needs is already taken by something else
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: guard_containers
+  vars:
+    docker_guard_containers: [pbs]
+    docker_guard_dir: "{{ pbs_server_dir }}"
+
+- name: Start PBS
+  community.docker.docker_compose_v2:
+    project_src: "{{ pbs_server_dir }}"
+    state: present
+    pull: "{{ 'always' if _pbs_server_compose.changed else 'missing' }}"
+  # In a check run the directory and compose file above are not really written yet.
+  when: not ansible_check_mode or not _pbs_server_compose.changed
+
+# Everything below talks to the running container, so a check run (which may not have one yet) stops here.
+- name: Configure PBS through its own CLI
+  when: not ansible_check_mode
+  block:
+    - name: Wait until PBS answers
+      # The CLI answers before the services have made their keys, so the key file is part of the test.
+      ansible.builtin.command:
+        argv: [docker, exec, pbs, sh, -c, 'test -f /etc/proxmox-backup/authkey.key && proxmox-backup-manager datastore list --output-format json']
+      register: _pbs_server_ready
+      until: _pbs_server_ready.rc == 0
+      retries: 40
+      delay: 3
+      changed_when: false
+
+    # The image starts with admin@pbs and a published default password, so it is replaced on the first run. The password
+    # goes in on stdin (never on a command line) and a hash of it is kept to tell when the secret changes.
+    - name: Read the marker of the admin password that is set
+      ansible.builtin.slurp:
+        src: "{{ pbs_server_dir }}/.admin-password.sha256"
+      register: _pbs_server_pw_marker
+      failed_when: false
+
+    - name: Set the admin password
+      ansible.builtin.command:
+        argv: [docker, exec, -i, pbs, sh, -c, 'read -r pw; exec proxmox-backup-manager user update admin@pbs --password "$pw"']
+        stdin: "{{ pbs_server_admin_password }}"
+      when: (_pbs_server_pw_marker.content | default('') | b64decode | trim) != (pbs_server_admin_password | hash('sha256'))
+      no_log: true
+      register: _pbs_server_pw_set
+      changed_when: true
+
+    - name: Remember which admin password is set
+      ansible.builtin.copy:
+        content: "{{ pbs_server_admin_password | hash('sha256') }}\n"
+        dest: "{{ pbs_server_dir }}/.admin-password.sha256"
+        mode: "0600"
+      when: _pbs_server_pw_set is not skipped
+      no_log: true
+
+    - name: List what PBS already has
+      ansible.builtin.command: "docker exec pbs proxmox-backup-manager {{ item }} list --output-format json"
+      loop: [datastore, prune-job, remote, sync-job]
+      register: _pbs_server_have
+      changed_when: false
+
+    - name: Work out the names that exist
+      ansible.builtin.set_fact:
+        _pbs_server_have_stores: "{{ _pbs_server_have.results[0].stdout | from_json | map(attribute='name') | list }}"
+        _pbs_server_have_prune: "{{ _pbs_server_have.results[1].stdout | from_json | map(attribute='id') | list }}"
+        _pbs_server_have_remotes: "{{ _pbs_server_have.results[2].stdout | from_json | map(attribute='name') | list }}"
+        _pbs_server_have_syncs: "{{ _pbs_server_have.results[3].stdout | from_json | map(attribute='id') | list }}"
+
+    - name: Create the datastores
+      ansible.builtin.command:
+        argv:
+          - docker
+          - exec
+          - pbs
+          - proxmox-backup-manager
+          - datastore
+          - create
+          - "{{ item.name }}"
+          - "{{ item.path | default('/backups/' ~ item.name) }}"
+          - --gc-schedule
+          - "{{ item.gc_schedule | default(pbs_server_gc_schedule) }}"
+      loop: "{{ pbs_server_datastores }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: item.name not in _pbs_server_have_stores
+      changed_when: true
+
+    - name: Work out the prune job's keep options
+      ansible.builtin.set_fact:
+        _pbs_server_prune_args: >-
+          {% set out = [] %}{% for k, v in (pbs_server_prune or {}).items() %}{% if v | int > 0 %}{% set _ = out.extend(['--' ~ (k | replace('_', '-')), v | string]) %}{% endif %}{% endfor %}{{ out }}
+
+    - name: Create a prune job for each datastore
+      ansible.builtin.command:
+        argv: >-
+          {{ ['docker', 'exec', 'pbs', 'proxmox-backup-manager', 'prune-job', 'create', 'prune-' ~ item.name,
+              '--store', item.name, '--schedule', pbs_server_prune_schedule] + _pbs_server_prune_args }}
+      loop: "{{ pbs_server_datastores }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: pbs_server_prune is not none and ('prune-' ~ item.name) not in _pbs_server_have_prune
+      changed_when: true
+
+    - name: Add the remotes to pull from (the token's secret goes in on stdin)
+      ansible.builtin.command:
+        argv:
+          - docker
+          - exec
+          - -i
+          - pbs
+          - sh
+          - -c
+          - 'read -r pw; exec proxmox-backup-manager remote create "$1" --host "$2" --auth-id "$3" --fingerprint "$4" --password "$pw"'
+          - _
+          - "{{ item.name }}"
+          - "{{ item.host }}"
+          - "{{ item.auth_id }}"
+          - "{{ item.fingerprint }}"
+        stdin: "{{ pbs_server_remote_secrets[item.name] }}"
+      loop: "{{ pbs_server_remotes }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: item.name not in _pbs_server_have_remotes
+      no_log: true
+      changed_when: true
+
+    # remove-vanished stays off: what the primary prunes or deletes is NOT deleted here, so this copy outlives a mistake or an attack there.
+    - name: Add the pull jobs
+      ansible.builtin.command:
+        argv:
+          - docker
+          - exec
+          - pbs
+          - proxmox-backup-manager
+          - sync-job
+          - create
+          - "{{ item.id }}"
+          - --store
+          - "{{ item.store }}"
+          - --remote
+          - "{{ item.remote }}"
+          - --remote-store
+          - "{{ item.remote_store }}"
+          - --schedule
+          - "{{ item.schedule | default('daily') }}"
+          - --remove-vanished
+          - "false"
+      loop: "{{ pbs_server_sync_jobs }}"
+      loop_control:
+        label: "{{ item.id }}"
+      when: item.id not in _pbs_server_have_syncs
+      changed_when: true

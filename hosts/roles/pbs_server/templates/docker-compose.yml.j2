@@ -1,0 +1,19 @@
+# Managed by Ansible (hosts/roles/pbs_server) -- edits here get overwritten on the next
+# reconciliation run. Change the role's defaults / fleet vars instead.
+services:
+  pbs:
+    image: ayufan/proxmox-backup-server:{{ pbs_server_version }}
+    container_name: pbs
+    hostname: {{ pbs_server_hostname }}
+    restart: unless-stopped
+    # A running verify or garbage collection should not be cut short by a restart.
+    stop_grace_period: 1h
+    ports:
+      - "{{ pbs_server_bind_address ~ ':' if pbs_server_bind_address else '' }}{{ pbs_server_port }}:8007"
+    tmpfs:
+      - /run
+    volumes:
+      - {{ pbs_server_dir }}/etc:/etc/proxmox-backup
+      - {{ pbs_server_dir }}/lib:/var/lib/proxmox-backup
+      - {{ pbs_server_dir }}/logs:/var/log/proxmox-backup
+      - {{ pbs_server_data_dir }}:/backups
