@@ -4,6 +4,12 @@ DEST={{ certwarden_agent_dir | quote }}
 CA_FILE={{ certwarden_agent_ca_file | quote }}
 VERIFY_TLS={{ 'true' if certwarden_agent_verify_tls else 'false' }}
 TOUCH_FILES={{ (certwarden_agent_touch_on_change | join(' ')) | quote }}
+# Certificates that come from a different Cert Warden than SERVER_URL (certwarden_agent_server_urls).
+declare -A CERT_SERVER=(
+{% for n, u in certwarden_agent_server_urls.items() %}
+  [{{ n | quote }}]={{ u | quote }}
+{% endfor %}
+)
 CERTS=(
 {% for c in _certwarden_agent_all_certs %}
   {{ (c.name ~ ' ' ~ _certwarden_agent_all_keys[c.name].cert ~ '.' ~ _certwarden_agent_all_keys[c.name].key) | quote }}

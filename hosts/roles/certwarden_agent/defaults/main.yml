@@ -18,6 +18,9 @@
 certwarden_agent_dir: "{{ common_dir | default('/opt/common') }}/certs"
 certwarden_agent_server_url: ""
 certwarden_agent_certs: []
+# Certificates that live on a DIFFERENT Cert Warden than certwarden_agent_server_url: {<certificate name>: <server url>}.
+# Their API keys are still the secret cw.<name>. Example: an org's host that also serves a name issued by another Cert Warden.
+certwarden_agent_server_urls: {}
 
 # Cert Warden presents a self-signed certificate until it has issued one for
 # itself. Preferred: point this at its CA/cert file. Setting verify to false

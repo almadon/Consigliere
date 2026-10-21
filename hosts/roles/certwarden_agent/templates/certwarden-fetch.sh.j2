@@ -27,7 +27,7 @@ for entry in "${CERTS[@]}"; do
   # The key is sent via a curl config on stdin so it never shows in `ps`.
   if ! printf 'header = "X-API-Key: %s"\n' "$apikey" |
        curl "${curl_args[@]}" -K - -o "$t/bundle.pem" \
-         "$SERVER_URL/certwarden/api/v1/download/privatecertchains/$name"; then
+         "${CERT_SERVER[$name]:-$SERVER_URL}/certwarden/api/v1/download/privatecertchains/$name"; then
     echo "FAILED  $name: could not download" >&2; rc=1; continue
   fi
 
