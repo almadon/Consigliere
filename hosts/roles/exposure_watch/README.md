@@ -13,7 +13,7 @@ For each target in `exposure_watch_targets` (`{name, ips, tcp, udp}`):
 scan is fast enough (SYN-proxy "scan protection"), which looks like thousands of open ports. The scanner detects both (`<host timedout="true">`, and more
 than 200 ports open on one address), retries five times slower, re-probes whatever it found one port at a time at 25 packets per second (a port that only
 "opened" under load is dropped), and if there is still no trustworthy answer it reports `scan unreliable` (notified once a week while it persists) and never
-"nothing open". A target may set its own `max_rate` (for example 100 for a provider that trips at 300).
+"nothing open". A target may set its own `max_rate`, `tcp_ports` and `host_timeout`: a provider that throttles scans (Empros's answers every SYN once a sweep is fast, and drops replies at any rate) gets `tcp_ports: top1000` and a low rate, and Shodan covers the long tail.
 
 Findings: an open port that is not declared (`alert`), a known vulnerability on an address (`alert`), a declared port that is closed (`warn`), a port
 Shodan lists that the scan did not see (`info`). New alerts and warnings are sent once through `fleet-notify` (Pushover/Apprise), repeated weekly while

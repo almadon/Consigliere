@@ -10,11 +10,12 @@ exposure_watch_shodan: true
 exposure_watch_schedule: "*-*-* 04:10:00"
 exposure_watch_randomized_delay: 30min
 # Packets per second per scan: low on purpose (a polite scan of your own addresses), a full 65535-port TCP scan takes a few minutes per address.
-# A target may set its own `max_rate` (a provider whose scan protection trips at a lower rate); an untrusted result is retried five times slower.
+# A target may set its own `max_rate`, `tcp_ports` and `host_timeout` (a provider whose scan protection trips at a lower rate); an untrusted result is retried five times slower.
 exposure_watch_max_rate: 300
 exposure_watch_max_retries: 2
 exposure_watch_host_timeout: 60m
-# The TCP ports to sweep (nmap syntax): all of them by default; a narrower range is for tests.
+# The TCP ports to sweep (nmap syntax): all of them by default. "top1000" (or any number) means nmap's most common ports: for a target whose provider
+# throttles a full sweep (the sweep then cannot finish and its result is not trusted); Shodan covers the rest. A narrower range is also for tests.
 exposure_watch_tcp_ports: "-"
 # UDP ports worth probing as well (UDP scans are slow; keep this list short), for example [53, 123, 1194, 51820].
 exposure_watch_udp_ports: []

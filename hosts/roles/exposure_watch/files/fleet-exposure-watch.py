@@ -65,8 +65,12 @@ def nmap_base(ip, cfg, rate, timeout):
     return base + (["-6"] if is_v6(ip) else [])
 
 
-def sweep(ip, cfg, rate):
-    cmd = nmap_base(ip, cfg, rate, cfg.get("host_timeout", "60m")) + ["-sT" if os.geteuid() != 0 else "-sS", "-p", str(cfg.get("tcp_ports", "-")), ip]
+def sweep(ip, cfg, rate, target=None):
+    t = target or {}
+    spec = str(t.get("tcp_ports", cfg.get("tcp_ports", "-")))
+    # "top1000" (any number) = nmap's most common ports, for a target whose provider throttles a full sweep; otherwise an nmap port list ("-" = all)
+    which = ["--top-ports", spec[3:]] if spec.startswith("top") and spec[3:].isdigit() else ["-p", spec]
+    cmd = nmap_base(ip, cfg, rate, t.get("host_timeout", cfg.get("host_timeout", "60m"))) + ["-sT" if os.geteuid() != 0 else "-sS"] + which + [ip]
     found = parse_nmap(run_nmap(cmd), "tcp")
     if len(found) > FLOOD:
         raise Unreliable(f"{len(found)} ports answered: something upstream is answering for the whole address (scan protection?)")
@@ -90,7 +94,7 @@ def scan(ip, cfg, target=None):
     tcp = None
     for r in (rate, max(20, rate // 5)):                 # one retry, five times slower
         try:
-            tcp = verify(ip, cfg, sweep(ip, cfg, r))
+            tcp = verify(ip, cfg, sweep(ip, cfg, r, target))
             break
         except Unreliable as e:
             last = str(e)
