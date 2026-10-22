@@ -197,6 +197,8 @@ def fleet_view(user):
 
 
 # ---------------------------------------------------------------- web
+# What the sign-in panel inside a frame needs before anyone is signed in (nothing about the fleet).
+PUBLIC_STATIC = {"/static/signin.js", "/static/style.css"}
 CT = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml"}
 
 
@@ -257,18 +259,27 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self.redirect("/auth/signed-out", [self.set_cookie("cmdr_session", "", 0)])
         if path == "/auth/signed-out":
             return self.send(200, b"<!doctype html><meta charset=utf-8><title>Signed out</title><p>Signed out. <a href='/'>Sign in again</a>", "text/html; charset=utf-8")
+        if path == "/auth/done":
+            return self.send(200, b"<!doctype html><meta charset=utf-8><title>Signed in</title><p>Signed in. You can close this tab and go back to the page that was waiting.",
+                             "text/html; charset=utf-8")
         u = self.user()
         if not u:
             if path.startswith("/api/"):
                 return self.send(401, b'{"error":"sign in"}', "application/json")
+            if path in PUBLIC_STATIC:
+                return self.static(path.lstrip("/")[len("static/"):])
+            if self.headers.get("Sec-Fetch-Dest") == "iframe":
+                # The identity provider refuses to be framed, so signing in cannot happen here: ask for it in a real tab; this frame reloads when the cookie exists.
+                return self.static("signin.html")
             return self.redirect("/auth/login?next=" + urllib.parse.quote(self.path if self.path.startswith("/") and not self.path.startswith("//") else "/"))
         if path == "/api/fleet":
             return self.send(200, json.dumps(fleet_view(u)).encode(), "application/json")
         if path == "/api/me":
             return self.send(200, json.dumps(u).encode(), "application/json")
         name = "index.html" if path == "/" else path.lstrip("/")
-        if name.startswith("static/"):
-            name = name[len("static/"):]
+        return self.static(name[len("static/"):] if name.startswith("static/") else name)
+
+    def static(self, name):
         full = os.path.normpath(os.path.join(STATIC, name))
         if not full.startswith(STATIC + os.sep) or not os.path.isfile(full):
             return self.send(404, b"not found")

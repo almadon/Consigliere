@@ -16,8 +16,10 @@ layer; the engines stay where they are (Arcane for containers, Arkeep for backup
 
 OpenID Connect (authorization code + PKCE) against your identity provider, documented for Pocket ID, then a signed, HttpOnly session cookie. Members of
 `cmdr_admin_groups` are admins, `cmdr_viewer_groups` viewers; anyone else is turned away. In the provider: a confidential client with callback
-`<cmdr_url>/auth/callback`, scopes `openid profile email groups`, and the groups above. The page can sit inside the Muximux console: they share the
-identity provider's session, so framing it signs in silently (allow it with `cmdr_frame_ancestors`).
+`<cmdr_url>/auth/callback`, scopes `openid profile email groups`, and the groups above. The page can sit inside the Muximux console (allow it with `cmdr_frame_ancestors`). Identity providers refuse to be
+shown in a frame (Pocket ID sends `X-Frame-Options: SAMEORIGIN`), so a frame without a session cannot sign in: it shows a small "Sign in" panel that opens the
+sign-in in a real tab, and reloads itself the moment the session cookie exists (both pages are on the same site, so the cookie reaches the frame). After
+that the frame just works until the session expires (8 hours).
 
 A trusted proxy may instead pass the identity in `Remote-User` / `Remote-Groups` headers, but only together with the shared secret `cmdr_proxy_secret` in an
 `X-Cmdr-Proxy` header that the proxy adds; headers without it are ignored, so a client on the tailnet cannot forge them.
