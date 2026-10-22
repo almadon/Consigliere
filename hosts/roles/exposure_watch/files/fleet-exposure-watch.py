@@ -18,6 +18,7 @@ import argparse
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -83,6 +84,16 @@ def verify(ip, cfg, ports):
         return set()
     cmd = nmap_base(ip, cfg, 25, "10m") + ["-sS" if os.geteuid() == 0 else "-sT", "-p", ",".join(str(p) for p in sorted(ports)), ip]
     return parse_nmap(run_nmap(cmd), "tcp")
+
+
+def routable(ip):
+    """False when this host has no route to the address (typically IPv6 from a host without it): the scan could only say 'nothing open'."""
+    try:
+        with socket.socket(socket.AF_INET6 if is_v6(ip) else socket.AF_INET, socket.SOCK_DGRAM) as sk:
+            sk.connect((ip, 9))                      # UDP connect sends nothing; it only needs a route
+        return True
+    except OSError:
+        return False
 
 
 def scan(ip, cfg, target=None):
@@ -200,9 +211,13 @@ def main(argv):
     targets = [t for t in cfg["targets"] if not a.target or t["name"] in a.target]
     state = {} if a.dry_run or a.learn else load_json(STATE, {})
     now = int(time.time())
-    seen_ids, report, learn, failed = set(), {"time": now, "targets": {}}, {}, 0
+    seen_ids, report, learn, failed, skipped = set(), {"time": now, "targets": {}}, {}, 0, 0
     for t in targets:
         for ip in t.get("ips", []):
+            if not routable(ip):
+                log("scan_skipped", target=t["name"], ip=ip, reason="this host has no route to the address (IPv6?): it cannot be checked from here")
+                skipped += 1
+                continue
             try:
                 scanned = scan(ip, cfg, t)
             except Exception as e:  # noqa: BLE001
@@ -256,7 +271,7 @@ def main(argv):
         save_json(STATE, state)
         save_json(REPORT, report)
     n_alert = sum(1 for t in report["targets"].values() for r in t.values() for f in r["findings"] if f["severity"] == "alert")
-    log("summary", targets=len(targets), alerts=n_alert, scan_failures=failed)
+    log("summary", targets=len(targets), alerts=n_alert, scan_failures=failed, skipped=skipped)
     if a.dry_run:
         for name, ips in report["targets"].items():
             for ip, r in ips.items():
