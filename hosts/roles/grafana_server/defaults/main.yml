@@ -31,7 +31,7 @@ grafana_server_oidc_editor_groups: [Grafana-Editors]
 grafana_server_local_login: true
 
 # Data sources. Loki is always provisioned; add more as Grafana provisioning entries:
-#   - {name: Prometheus, type: prometheus, url: "http://victoria:8428", access: proxy}
+#   - {name: VictoriaMetrics, type: prometheus, url: "http://victoria:8428", access: proxy}
 grafana_server_loki_url: "http://loki:3100"
 grafana_server_datasources_extra: []
 # Dashboards as inline JSON, written to {{ grafana_server_dir }}/dashboards: [{name: fleet-overview, json: {...}}]

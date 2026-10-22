@@ -1,0 +1,30 @@
+# Managed by Ansible (hosts/roles/victoria_server) -- edits here get overwritten on the next reconciliation run.
+services:
+  victoria:
+    image: victoriametrics/victoria-metrics:{{ victoria_server_version }}
+    container_name: victoria
+    restart: unless-stopped
+    user: "{{ victoria_server_uid }}:{{ victoria_server_gid }}"
+    command:
+      - -storageDataPath=/data
+      - -retentionPeriod={{ victoria_server_retention }}
+      - -httpListenAddr=:8428
+      - -memory.allowedPercent=60
+    mem_limit: {{ victoria_server_memory_limit }}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    ports:
+      - "{{ victoria_server_bind_address }}:{{ victoria_server_port }}:8428"
+    volumes:
+      - {{ victoria_server_data_dir }}:/data
+{% if victoria_server_network | length > 0 %}
+    networks:
+      - {{ victoria_server_network }}
+
+networks:
+  {{ victoria_server_network }}:
+    external: true
+{% endif %}

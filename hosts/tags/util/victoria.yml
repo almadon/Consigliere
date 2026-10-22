@@ -1,0 +1,4 @@
+---
+description: "VictoriaMetrics: the fleet's metrics store (12 months by default), on the tailnet only; Grafana and OpenTelemetry senders use it"
+order: 56
+roles: [victoria_server]

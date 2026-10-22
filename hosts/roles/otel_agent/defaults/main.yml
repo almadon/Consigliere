@@ -27,3 +27,11 @@ otel_agent_attributes: {}
 otel_agent_syslog_listeners: []
 # Syslog timestamps (rfc3164) carry no time zone: the zone the senders use.
 otel_agent_syslog_timezone: UTC
+
+# Metrics relay (optional): this collector RECEIVES OTLP/HTTP metrics (JSON or protobuf) from software on this host and forwards them to
+# VictoriaMetrics as protobuf, which is all VictoriaMetrics accepts. Used for Proxmox's built-in metric server (Datacenter > Metric Server >
+# OpenTelemetry, server 127.0.0.1, port 4318, path /v1/metrics). Both empty = off.
+#   otel_agent_metrics_url: VictoriaMetrics' OTLP base, for example http://vm.ctrl.a64.one:8428/opentelemetry
+#   otel_agent_otlp_listen: address:port to listen on; keep it on 127.0.0.1 so only this host can send.
+otel_agent_metrics_url: ""
+otel_agent_otlp_listen: ""

@@ -33,8 +33,11 @@ Every line carries `host_name` (`otel_agent_host_name`, the fleet's short name).
   Loki's stream count stays bounded.
 - **No data lost across restarts:** read offsets and the send queue are kept on disk (`file_storage`); if Loki is unreachable the agent
   queues and retries.
-- No secret is needed: Loki takes logs only from the tailnet. Metrics (host metrics, Docker stats) are not sent yet, because there is no
-  metrics store.
+- **Metrics relay (optional, `otel_agent_metrics_url` + `otel_agent_otlp_listen`):** the collector also receives OTLP/HTTP metrics from software on
+  the host (Proxmox's built-in metric server, pointed at `127.0.0.1:4318`, path `/v1/metrics`) and forwards them to
+  [VictoriaMetrics](../victoria_server/README.md) as protobuf, with the same on-disk queue. Proxmox may send JSON, which VictoriaMetrics rejects;
+  the collector accepts both. Host metrics and Docker stats are not collected (Beszel does that).
+- No secret is needed: Loki and VictoriaMetrics take data only from the tailnet.
 - Unraid hosts are not supported by this role (no systemd, no apt).
 
 Tested on a clean Debian 13 machine against Loki 3.7.8 with Docker and a running container: check, apply, check, apply (the last two

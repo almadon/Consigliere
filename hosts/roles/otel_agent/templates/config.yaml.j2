@@ -40,6 +40,12 @@ receivers:
       - type: remove
         field: attributes.container_id
 {% endif %}
+{% if _otel_agent_metrics %}
+  otlp/metrics:
+    protocols:
+      http:
+        endpoint: {{ otel_agent_otlp_listen | to_json }}
+{% endif %}
 {% for l in otel_agent_syslog_listeners %}
   syslog/{{ l.name }}:
     {{ l.transport }}:
@@ -113,6 +119,15 @@ exporters:
     retry_on_failure:
       max_elapsed_time: 0s
 
+{% if _otel_agent_metrics %}
+  otlp_http/victoria:
+    endpoint: {{ otel_agent_metrics_url | to_json }}
+    sending_queue:
+      storage: file_storage
+    retry_on_failure:
+      max_elapsed_time: 0s
+{% endif %}
+
 service:
   extensions: [file_storage]
   pipelines:
@@ -133,6 +148,12 @@ service:
       receivers: [{% for l in otel_agent_syslog_listeners %}syslog/{{ l.name }}{{ ', ' if not loop.last }}{% endfor %}]
       processors: [memory_limiter, batch]
       exporters: [otlp_http/loki]
+{% endif %}
+{% if _otel_agent_metrics %}
+    metrics/relay:
+      receivers: [otlp/metrics]
+      processors: [memory_limiter, resource, batch]
+      exporters: [otlp_http/victoria]
 {% endif %}
   telemetry:
     logs:

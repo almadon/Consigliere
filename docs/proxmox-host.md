@@ -31,3 +31,11 @@ place in the cluster. The fleet identifies a host by its **Tailscale name**, whi
    --hostname=radon"` in the host's own vars file (it replaces the group value, so repeat `--accept-dns=false`).
 2. On the node, as root, run the bootstrap **without** `NODE_NAME`, and with a tagged one-off Tailscale auth key (`TAILSCALE_AUTHKEY`).
 3. Add the printed deploy key (read-only) to the fleet repo, then register the age key with `scripts/node.sh key <name>`.
+
+## Metrics to VictoriaMetrics
+
+Proxmox VE 9 can push its own metrics (nodes, guests, storage) over OpenTelemetry. With `util: [pve]` and `util: [victoria]` somewhere in the fleet, set
+`otel_agent_otlp_listen: "127.0.0.1:4318"` and `otel_agent_metrics_url` (VictoriaMetrics' `/opentelemetry` base) for the Proxmox hosts. Then, once for the
+cluster: Datacenter > Metric Server > Add > OpenTelemetry, server `127.0.0.1`, port `4318`, protocol HTTP, path `/v1/metrics`, verify SSL off. Each node's
+`pvestatd` sends to its own local collector, which forwards to VictoriaMetrics as protobuf (which is all VictoriaMetrics accepts; Proxmox may send JSON).
+Metric names arrive as `proxmox_node_*`, `proxmox_vm_*`, `proxmox_storage_*`; the `cpustat` ones are ratios, not percentages.
