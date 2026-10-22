@@ -3,6 +3,11 @@
 Checks, on a schedule, what the internet can reach on the fleet's public addresses, against what the fleet **declares**. Run it on a host outside the
 networks it scans (tag `util: [exposure]`; it skips any target named like itself, so give another host the same tag to cover this one).
 
+**More than one scanner.** A scanner only reaches the address families it has: a host without IPv6 cannot check an IPv6 address. Tag a host that has IPv6
+with `util: [exposure]` as well and give each scanner its share, so every address has exactly one scanner and a finding is not reported twice:
+`exposure_watch_families: [4]` or `[6]` (default both) and `exposure_watch_only: [<target names>]` (default all). A scanner that does not ask Shodan sets
+`exposure_watch_shodan: false` and never decrypts the key.
+
 For each target in `exposure_watch_targets` (`{name, ips, tcp, udp}`):
 
 1. **Active scan** of every address, all 65535 TCP ports (and any listed UDP ports) with `nmap`, at a low rate. This is the authority: it is immediate.

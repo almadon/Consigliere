@@ -6,6 +6,10 @@
 #
 # The Shodan API key (optional) is in the secret shodan.api (exposure_watch_shodan_key); without one the free InternetDB is used.
 exposure_watch_targets: []
+# Which address families this scanner covers (a host with IPv6 can scan the IPv6 addresses an IPv4-only scanner cannot reach) and, optionally, which
+# targets (names); empty = all. Give each address exactly one scanner, so a finding is not reported twice.
+exposure_watch_families: [4, 6]
+exposure_watch_only: []
 exposure_watch_shodan: true
 exposure_watch_schedule: "*-*-* 04:10:00"
 exposure_watch_randomized_delay: 30min

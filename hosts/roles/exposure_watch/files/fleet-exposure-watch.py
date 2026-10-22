@@ -208,12 +208,16 @@ def main(argv):
         key = open(KEYFILE).read().strip()
     except OSError:
         pass
-    targets = [t for t in cfg["targets"] if not a.target or t["name"] in a.target]
+    only = set(cfg.get("only") or [])
+    targets = [t for t in cfg["targets"] if (not a.target or t["name"] in a.target) and (not only or t["name"] in only)]
+    families = set(int(f) for f in cfg.get("families", [4, 6]))
     state = {} if a.dry_run or a.learn else load_json(STATE, {})
     now = int(time.time())
     seen_ids, report, learn, failed, skipped = set(), {"time": now, "targets": {}}, {}, 0, 0
     for t in targets:
         for ip in t.get("ips", []):
+            if (6 if is_v6(ip) else 4) not in families:        # another scanner covers this family
+                continue
             if not routable(ip):
                 log("scan_skipped", target=t["name"], ip=ip, reason="this host has no route to the address (IPv6?): it cannot be checked from here")
                 skipped += 1

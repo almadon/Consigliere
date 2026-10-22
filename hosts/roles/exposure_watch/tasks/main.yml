@@ -1,9 +1,11 @@
 ---
+# Only a scanner that asks Shodan needs the key (a second scanner for another address family does not).
 - name: Load the secret (the Shodan API key, which may be empty)
   ansible.builtin.include_role:
     name: load_secrets
   vars:
     load_secrets_scopes: [shodan.api]
+  when: exposure_watch_shodan | bool
 
 - name: Require at least one target
   ansible.builtin.assert:
