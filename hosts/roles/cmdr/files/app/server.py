@@ -3,7 +3,7 @@
 
 Standard library only. Sign-in is OpenID Connect (authorization code + PKCE) against your identity provider, with a signed session
 cookie; optionally a trusted reverse proxy may pass the identity in headers (only with a shared secret the proxy adds).
-Everything is read-only: this page shows and links, it runs nothing.
+This page shows and links; it runs nothing on any host. The only thing it can do is re-read its own live status (POST /api/refresh).
 """
 import base64
 import hashlib
@@ -37,6 +37,7 @@ TAGS_DIRS = [d for d in (ENV("CMDR_TAGS_DIRS") or "").split(":") if d]
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 SESSION_TTL = int(ENV("CMDR_SESSION_TTL", str(8 * 3600)))
 SECURE = URL.startswith("https://")
+REFRESH_MIN = 10
 RECAP = re.compile(r"ok=(\d+)\s+changed=(\d+)\s+unreachable=(\d+)\s+failed=(\d+)")
 
 
@@ -172,6 +173,9 @@ def collect():
         STATUS.update({"updated": int(time.time()), "ok": not errors, "error": "; ".join(errors), "alive": alive, "reconcile": recon, "exposure": expo})
 
 
+WAKE = threading.Event()
+
+
 def collector():
     while True:
         if LOKI:
@@ -179,7 +183,8 @@ def collector():
         else:
             with LOCK:
                 STATUS.update({"updated": int(time.time()), "ok": False, "error": "no Loki configured"})
-        time.sleep(INTERVAL)
+        WAKE.wait(INTERVAL)
+        WAKE.clear()
 
 
 def fleet_view(user):
@@ -192,13 +197,14 @@ def fleet_view(user):
         rec = st["reconcile"].get(n)
         hosts.append(dict(h, status={"alive": (st["alive"].get(n, 0) > 0) if st["alive"] else None, "reconcile": rec}))
     return {"user": user, "generated": inv.get("generated", 0), "hosts": hosts, "tools": inv.get("tools", []), "host_links": inv.get("host_links", []),
+            "host_commands": inv.get("host_commands", []), "commands": inv.get("commands", []),
             "tags": load_tag_descriptions(), "exposure": sorted(st["exposure"].values(), key=lambda e: (e["target"] or "", e["ip"] or "")),
             "status": {"updated": st["updated"], "ok": st["ok"], "error": st["error"]}}
 
 
 # ---------------------------------------------------------------- web
 # What the sign-in panel inside a frame needs before anyone is signed in (nothing about the fleet).
-PUBLIC_STATIC = {"/static/signin.js", "/static/style.css"}
+PUBLIC_STATIC = {"/static/signin.js", "/static/style.css", "/static/theme.js", "/static/logo.svg", "/static/done.js"}
 CT = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml"}
 
 
@@ -260,13 +266,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == "/auth/signed-out":
             return self.send(200, b"<!doctype html><meta charset=utf-8><title>Signed out</title><p>Signed out. <a href='/'>Sign in again</a>", "text/html; charset=utf-8")
         if path == "/auth/done":
-            return self.send(200, b"<!doctype html><meta charset=utf-8><title>Signed in</title><p>Signed in. You can close this tab and go back to the page that was waiting.",
-                             "text/html; charset=utf-8")
+            return self.static("done.html")
         u = self.user()
         if not u:
             if path.startswith("/api/"):
                 return self.send(401, b'{"error":"sign in"}', "application/json")
-            if path in PUBLIC_STATIC:
+            if path in PUBLIC_STATIC or path == "/static/done.html":
                 return self.static(path.lstrip("/")[len("static/"):])
             if self.headers.get("Sec-Fetch-Dest") == "iframe":
                 # The identity provider refuses to be framed, so signing in cannot happen here: ask for it in a real tab; this frame reloads when the cookie exists.
@@ -278,6 +283,23 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self.send(200, json.dumps(u).encode(), "application/json")
         name = "index.html" if path == "/" else path.lstrip("/")
         return self.static(name[len("static/"):] if name.startswith("static/") else name)
+
+    def do_POST(self):  # noqa: N802
+        path = urllib.parse.urlsplit(self.path).path
+        u = self.user()
+        if not u:
+            return self.send(401, b'{"error":"sign in"}', "application/json")
+        # A custom header cannot be sent cross-site without a CORS preflight, which this server never approves: a page on another site cannot trigger this.
+        if path != "/api/refresh" or self.headers.get("X-Cmdr") != "1":
+            return self.send(404, b"not found")
+        now = time.time()
+        with LOCK:
+            wait = REFRESH_MIN - (now - STATUS.get("refresh_asked", 0))
+            if wait > 0:
+                return self.send(429, b'{"error":"just refreshed"}', "application/json")
+            STATUS["refresh_asked"] = now
+        WAKE.set()
+        return self.send(202, b'{"ok":true}', "application/json")
 
     def static(self, name):
         full = os.path.normpath(os.path.join(STATIC, name))

@@ -3,28 +3,50 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>cmdr</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23304ffe'/%3E%3Cpath d='M8 11l6 5-6 5M17 22h8' stroke='white' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<meta name="color-scheme" content="dark light">
+<title>cmdr · fleet console</title>
+<link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+<script src="/static/theme.js"></script>
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 <header class="top">
-  <div class="brand"><span class="logo" aria-hidden="true">&gt;_</span><span>cmdr</span></div>
-  <div class="summary" id="summary" aria-live="polite"></div>
-  <input id="q" type="search" placeholder="Filter hosts, tags, names" autocomplete="off" aria-label="Filter">
+  <a class="brand" href="/" aria-label="cmdr home"><img src="/static/logo.svg" alt=""><span><span>cmdr</span><span class="cursor" aria-hidden="true"></span><small>fleet console</small></span></a>
+  <button class="omni" id="omni" type="button" aria-label="Search and commands"><span>Search hosts, services, commands…</span><kbd class="hide-s">⌘K</kbd></button>
+  <div class="spacer"></div>
+  <button class="iconbtn" id="refresh" type="button" title="Re-read live status now">↻ <span class="hide-s">Refresh</span></button>
+  <button class="iconbtn" id="theme" type="button" title="Theme: auto / dark / light" aria-label="Switch theme">◐</button>
   <div class="user" id="user"></div>
 </header>
 <div class="banner" id="banner" hidden></div>
 <main>
-  <section id="tools" aria-label="Tools"></section>
-  <section id="attention" aria-label="Needs attention" hidden></section>
-  <section>
-    <div class="bar"><h2>Hosts</h2><div class="chips" id="chips"></div></div>
-    <div class="grid" id="hosts"></div>
+  <section class="strip" id="strip" aria-label="Fleet at a glance"></section>
+  <section aria-label="Needs attention" id="attention" hidden></section>
+  <section aria-label="Launchpad"><div class="bar"><h2>Launchpad</h2></div><div class="pad" id="tools"></div></section>
+  <section aria-label="Hosts">
+    <div class="bar">
+      <h2>Hosts</h2>
+      <div class="chips" id="chips"></div>
+      <span class="grow"></span>
+      <div class="tools-row">
+        <input id="q" type="search" placeholder="Filter hosts…  ( / )" autocomplete="off" aria-label="Filter hosts">
+        <select id="sort" aria-label="Sort"><option value="status">Needs attention first</option><option value="name">Name</option><option value="type">Type</option></select>
+        <div class="seg" role="group" aria-label="Layout"><button type="button" id="v-grid" aria-pressed="true">Cards</button><button type="button" id="v-list" aria-pressed="false">Rows</button></div>
+      </div>
+    </div>
+    <div class="grid" id="hosts"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
   </section>
-  <section id="exposure" aria-label="Public exposure"></section>
+  <section aria-label="Public exposure" id="exposure"></section>
 </main>
+<div class="scrim" id="scrim" hidden></div>
 <aside id="drawer" class="drawer" hidden aria-label="Host details"></aside>
+<div class="scrim" id="pscrim" hidden></div>
+<div class="pal" id="pal" role="dialog" aria-label="Command palette" hidden>
+  <input id="pin" type="text" placeholder="Type a host, a service, or a command…" autocomplete="off" spellcheck="false" aria-label="Search">
+  <ul id="plist" role="listbox"></ul>
+  <div class="hint"><span><kbd>↑</kbd> <kbd>↓</kbd> move</span><span><kbd>↵</kbd> open / copy</span><span><kbd>esc</kbd> close</span></div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <footer class="foot" id="foot"></footer>
 <script src="/static/app.js"></script>
 </body>

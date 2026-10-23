@@ -3,15 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>cmdr: sign in</title>
+<meta name="color-scheme" content="dark light">
+<title>cmdr · sign in</title>
+<link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+<script src="/static/theme.js"></script>
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<main style="min-height:80vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center">
-  <div class="brand"><span class="logo" aria-hidden="true">&gt;_</span><span>cmdr</span></div>
-  <p class="mute" style="max-width:420px;margin:0">Sign in to see the fleet. Your identity provider cannot be shown inside this frame, so sign-in opens in its own tab; this panel loads by itself when you are done.</p>
-  <a class="tool" id="go" href="/auth/login?next=/auth/done" target="_blank" rel="noopener">Sign in with your identity provider</a>
-  <p class="mute" id="note" style="font-size:12.5px;margin:0">Waiting for sign-in…</p>
+<main class="gate">
+  <div class="box">
+    <img class="mark" src="/static/logo.svg" alt="">
+    <h1>cmdr<span class="cursor" aria-hidden="true"></span></h1>
+    <p id="msg">Sign in to see the fleet. Your identity provider cannot be shown inside this frame, so sign-in opens in its own window and this panel loads by itself when you are done.</p>
+    <a class="btn" id="go" href="/auth/login?next=/auth/done" target="_blank" rel="noopener">Sign in</a>
+    <p id="note" class="mute"><span class="spin" aria-hidden="true"></span> Waiting for sign-in…</p>
+  </div>
 </main>
 <script src="/static/signin.js"></script>
 </body>

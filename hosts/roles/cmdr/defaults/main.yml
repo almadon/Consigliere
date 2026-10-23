@@ -31,3 +31,16 @@ cmdr_internal_domains: []
 cmdr_tools: []
 # Per-host buttons; {host} and {host_q} (URL-encoded) are replaced with the host's name:  - {name: Logs, url: "https://gf.ctrl.a64.one/explore?...{host_q}..."}
 cmdr_host_links: []
+# Copy-to-clipboard command buttons. cmdr never runs anything itself: a button copies the command (with {host} filled in) for you to paste into a
+# terminal in the fleet repo checkout. Per host (the first one is the quick button on each host card; the command palette offers every host x command):
+cmdr_host_commands:
+  - {name: Reconcile now, cmd: "scripts/reconcile-now.sh {host}"}
+  - {name: Preview changes, cmd: "scripts/reconcile-now.sh {host} --check"}
+  - {name: Containers, cmd: "scripts/fleet-run.sh {host} --yes -- 'docker ps'"}
+  - {name: Disk and load, cmd: "scripts/fleet-run.sh {host} --yes -- 'uptime; df -h /'"}
+  - {name: Recent errors, cmd: "scripts/fleet-run.sh {host} --yes -- 'journalctl -p err -n 40 --no-pager'"}
+# Fleet-wide:
+cmdr_commands:
+  - {name: Reconcile every host, cmd: "scripts/reconcile-now.sh all"}
+  - {name: Preview changes on every host, cmd: "scripts/reconcile-now.sh all --check"}
+  - {name: Run the exposure scan now, cmd: "scripts/exposure.sh run"}

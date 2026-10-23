@@ -1,7 +1,11 @@
 (() => {
   'use strict';
   const $ = (id) => document.getElementById(id);
-  const state = { data: null, q: '', types: new Set(), problems: false, selected: null };
+  const store = {
+    get(k, d) { try { return localStorage.getItem('cmdr.' + k) || d; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem('cmdr.' + k, v); } catch (e) { /* private mode: not remembered */ } },
+  };
+  const state = { data: null, q: '', types: new Set(), problems: false, selected: null, view: store.get('view', 'grid'), sort: store.get('sort', 'status'), pal: { items: [], at: 0 } };
 
   // DOM helper: text only, never HTML, so nothing from the data can inject markup.
   function h(tag, props, ...kids) {
@@ -24,7 +28,26 @@
     return Math.round(s / 86400) + ' d ago';
   };
   const safeUrl = (u) => (/^https?:\/\//i.test(u) ? u : '#');
+  const fill = (tpl, host) => tpl.replaceAll('{host_q}', encodeURIComponent(host)).replaceAll('{host}', host);
+  const hue = (s) => { let x = 7; for (const c of s) x = (x * 31 + c.charCodeAt(0)) % 360; return x; };
 
+  // ---------------------------------------------------------------- feedback
+  let toastTimer = 0;
+  function toast(text) {
+    const t = $('toast');
+    t.textContent = text; t.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 2600);
+  }
+  function copy(text, btn, label) {
+    const done = () => {
+      toast('Copied: ' + text);
+      if (btn) { const old = btn.textContent; btn.classList.add('done'); btn.textContent = 'copied ✓'; setTimeout(() => { btn.classList.remove('done'); btn.textContent = old; }, 1400); }
+    };
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, () => toast('Could not copy: select it by hand'));
+    else { const t = h('textarea', { class: 'sr' }); t.value = text; document.body.append(t); t.select(); try { document.execCommand('copy'); done(); } catch (e) { toast('Could not copy: select it by hand'); } t.remove(); }
+  }
+
+  // ---------------------------------------------------------------- health
   function hostHealth(host) {
     const st = host.status || {};
     const r = st.reconcile;
@@ -39,58 +62,69 @@
     const dot = st.alive === null || st.alive === undefined ? 'unk' : st.alive ? 'ok' : ships ? 'bad' : 'unk';
     if (!ships && !st.alive && !r) rec = { cls: 'unk', text: 'not set up to ship logs or report runs' };
     const attention = dot === 'bad' || rec.cls === 'bad';
-    return { dot, rec, attention, ships };
+    const level = attention ? 'bad' : rec.cls === 'warn' ? 'warn' : dot === 'ok' ? 'ok' : 'unk';
+    return { dot, rec, attention, ships, level };
   }
-
+  const rank = { bad: 0, warn: 1, unk: 2, ok: 3 };
   function routeNames(host) {
     const seen = new Map();
     for (const r of host.routes || []) for (const n of r.hosts || []) if (!seen.has(n)) seen.set(n, !!r.internal);
     return [...seen].map(([name, internal]) => ({ name, internal }));
   }
-
-  function exposureFor(name) {
-    return (state.data.exposure || []).filter((e) => e.target === name);
-  }
+  const exposureFor = (name) => (state.data.exposure || []).filter((e) => e.target === name);
+  const alertsFor = (name) => exposureFor(name).some((e) => (e.findings || []).some((f) => f.severity === 'alert'));
 
   function matches(host) {
     if (state.types.size && !state.types.has(host.type || '?')) return false;
     if (state.problems) {
       const hh = hostHealth(host);
-      const ex = exposureFor(host.name).some((e) => (e.findings || []).some((f) => f.severity === 'alert'));
-      if (!hh.attention && !ex && hh.rec.cls !== 'warn') return false;
+      if (!hh.attention && !alertsFor(host.name) && hh.rec.cls !== 'warn') return false;
     }
     if (!state.q) return true;
     const hay = [host.name, host.type, host.org, host.site, ...(host.util || []), ...(host.feat || []), ...(host.prop || []), ...(host.cert || []),
       ...(host.routes || []).flatMap((r) => r.hosts || [])].join(' ').toLowerCase();
     return state.q.toLowerCase().split(/\s+/).every((w) => hay.includes(w));
   }
-
-  function copy(text, btn) {
-    const done = () => { const old = btn.textContent; btn.textContent = 'copied'; setTimeout(() => { btn.textContent = old; }, 1200); };
-    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, () => {});
-    else { const t = h('textarea', { style: 'position:fixed;opacity:0' }); t.value = text; document.body.append(t); t.select(); try { document.execCommand('copy'); done(); } catch (e) { /* ignore */ } t.remove(); }
+  function sorted(list) {
+    const by = state.sort;
+    return [...list].sort((a, b) => {
+      if (by === 'status') { const d = rank[hostHealth(a).level] - rank[hostHealth(b).level]; if (d) return d; }
+      if (by === 'type') { const d = (a.type || '').localeCompare(b.type || ''); if (d) return d; }
+      return a.name.localeCompare(b.name);
+    });
   }
 
-  function hostLinks(host) {
-    return (state.data.host_links || []).map((l) => h('a', { class: 'b', href: safeUrl(l.url.replaceAll('{host}', host.name).replaceAll('{host_q}', encodeURIComponent(host.name))), target: '_blank', rel: 'noopener noreferrer' }, l.name));
+  // ---------------------------------------------------------------- commands
+  const hostCmds = () => state.data.host_commands || [];
+  const globalCmds = () => state.data.commands || [];
+  const hostLinks = (host) => (state.data.host_links || []).map((l) => h('a', { class: 'b', href: safeUrl(fill(l.url, host.name)), target: '_blank', rel: 'noopener noreferrer' }, l.name + ' ↗'));
+  function quick(host) {
+    const first = hostCmds()[0];
+    return h('div', { class: 'btns', onclick: (e) => e.stopPropagation() },
+      first ? h('button', { class: 'b go', type: 'button', title: fill(first.cmd, host.name), onclick: (e) => copy(fill(first.cmd, host.name), e.currentTarget) }, first.name) : null,
+      h('button', { class: 'b', type: 'button', title: 'ssh root@' + host.name, onclick: (e) => copy('ssh root@' + host.name, e.currentTarget) }, 'ssh'),
+      hostLinks(host),
+      h('button', { class: 'b', type: 'button', onclick: () => openHost(host.name) }, 'more…'));
   }
 
+  // ---------------------------------------------------------------- cards
   function card(host) {
     const hh = hostHealth(host);
     const tags = [...(host.util || []).map((t) => ['util', t]), ...(host.feat || []).map((t) => ['feat', t]), ...(host.prop || []).map((t) => ['prop', t])];
-    return h('div', { class: 'card' + (hh.attention ? ' attn' : ''), tabindex: '0', role: 'button', 'aria-label': 'Details for ' + host.name, onclick: () => open(host.name),
-      onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(host.name); } } },
+    const routes = routeNames(host);
+    return h('div', { class: `card s-${hh.level}`, tabindex: '0', role: 'button', 'aria-label': 'Details for ' + host.name, onclick: () => openHost(host.name),
+      onkeydown: (e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openHost(host.name); } } },
       h('div', { class: 'row' }, h('span', { class: 'dot ' + hh.dot, title: hh.dot === 'ok' ? 'sending logs' : hh.dot === 'bad' ? 'no logs in 10 minutes' : 'unknown' }),
         h('span', { class: 'name' }, host.name), h('span', { class: 'type' }, host.type || '?')),
       h('div', { class: 'stat' }, h('span', { class: 'dot ' + hh.rec.cls }), h('span', null, hh.rec.text)),
       tags.length ? h('div', { class: 'row' }, tags.map(([k, t]) => h('span', { class: 'tag ' + k, title: (state.data.tags[k] || {})[t] || '' }, t))) : null,
-      routeNames(host).length ? h('div', { class: 'routes' }, routeNames(host).map((r) =>
+      routes.length ? h('div', { class: 'routes' }, routes.map((r) =>
         h('a', { class: 'route' + (r.internal ? ' int' : ''), href: safeUrl('https://' + r.name), target: '_blank', rel: 'noopener noreferrer', onclick: (e) => e.stopPropagation(), title: r.internal ? 'tailnet / LAN only' : '' }, r.name))) : null,
-      h('div', { class: 'btns', onclick: (e) => e.stopPropagation() },
-        h('button', { class: 'b', type: 'button', onclick: (e) => copy('ssh root@' + host.name, e.currentTarget) }, 'copy ssh'), hostLinks(host)));
+      quick(host));
   }
 
-  function open(name) {
+  // ---------------------------------------------------------------- drawer
+  function openHost(name) {
     state.selected = name;
     const host = state.data.hosts.find((x) => x.name === name);
     if (!host) return;
@@ -98,10 +132,17 @@
     const kv = (k, v) => h('tr', null, h('th', null, k), h('td', null, v));
     const tags = (list, kind) => (list || []).length ? h('span', null, list.map((t) => h('span', { class: 'tag ' + kind, title: (state.data.tags[kind] || {})[t] || '' }, t + ' '))) : h('span', { class: 'mute' }, 'none');
     const ex = exposureFor(name);
+    const cmds = [{ name: 'Shell', cmd: 'ssh root@{host}' }, ...hostCmds()];
     const d = $('drawer');
     d.replaceChildren(
-      h('div', { class: 'row' }, h('h3', null, host.name), h('button', { class: 'b x', type: 'button', onclick: close }, 'close')),
-      h('div', { class: 'stat' }, h('span', { class: 'dot ' + hh.dot }), h('span', null, hh.dot === 'ok' ? 'sending logs' : hh.dot === 'bad' ? 'silent for 10 minutes' : hh.ships ? 'status unknown' : 'not set up to ship logs'), h('span', { class: 'mute' }, '· ' + hh.rec.text)),
+      h('div', { class: 'row' }, h('span', { class: 'dot ' + hh.dot }), h('h3', null, host.name), h('button', { class: 'b x', type: 'button', onclick: closeHost }, 'close ✕')),
+      h('div', { class: 'stat' }, h('span', null, hh.dot === 'ok' ? 'sending logs' : hh.dot === 'bad' ? 'silent for 10 minutes' : hh.ships ? 'status unknown' : 'not set up to ship logs'), h('span', null, '· ' + hh.rec.text)),
+      h('div', { class: 'btns' }, h('a', { class: 'b go', href: 'ssh://root@' + encodeURIComponent(host.name) }, 'open ssh ↗'), hostLinks(host)),
+      h('h2', null, 'Commands'),
+      h('div', { class: 'cmds' }, cmds.map((c) => { const full = fill(c.cmd, host.name);
+        return h('div', { class: 'cmd' }, h('b', null, c.name), h('code', null, full), h('button', { class: 'b', type: 'button', onclick: (e) => copy(full, e.currentTarget) }, 'copy')); })),
+      h('div', { class: 'note' }, 'Paste into a terminal in the fleet repo checkout. cmdr itself never runs anything on a host.'),
+      h('h2', null, 'Details'),
       h('table', null,
         kv('Type', host.type || '?'), kv('Organisation', host.org || ''), kv('Site', host.site || ''),
         kv('Provides (util)', tags(host.util, 'util')), kv('Runs (feat)', tags(host.feat, 'feat')), kv('Properties', tags(host.prop, 'prop')),
@@ -113,74 +154,161 @@
       h('h2', null, 'Public exposure'),
       ex.length ? h('table', null, ex.map((e) => h('tr', null, h('td', null, e.ip), h('td', null, 'open ' + ((e.open_tcp || []).join(', ') || 'nothing')),
         h('td', null, (e.findings || []).length ? e.findings.map((f) => h('div', { class: 'sev-' + f.severity }, `${f.kind} ${f.proto}/${f.port}`)) : h('span', { class: 'sev-info' }, 'as declared'))))) :
-        h('div', { class: 'empty' }, 'No scan result seen for this host yet.'),
-      h('div', { class: 'btns' }, h('button', { class: 'b', type: 'button', onclick: (e) => copy('ssh root@' + host.name, e.currentTarget) }, 'copy ssh'), hostLinks(host)));
-    d.hidden = false;
-    d.focus && d.setAttribute('tabindex', '-1');
+        h('div', { class: 'empty' }, 'No scan result seen for this host yet.'));
+    d.hidden = false; $('scrim').hidden = false;
+    d.setAttribute('tabindex', '-1'); d.focus();
   }
-  function close() { $('drawer').hidden = true; state.selected = null; }
+  function closeHost() { $('drawer').hidden = true; $('scrim').hidden = true; state.selected = null; }
 
-  function renderTools() {
-    const groups = new Map();
-    for (const t of state.data.tools || []) { const g = t.group || 'Tools'; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(t); }
-    $('tools').replaceChildren(h('div', { class: 'tools' }, [...groups].map(([g, items]) => h('div', { class: 'tgroup' }, h('span', { class: 'gl' }, g),
-      items.map((t) => h('a', { class: 'tool', href: safeUrl(t.url), target: '_blank', rel: 'noopener noreferrer', title: t.desc || '' }, t.name, t.tailnet ? h('small', null, 'tailnet') : null))))));
-  }
-
-  function renderSummary() {
+  // ---------------------------------------------------------------- sections
+  function renderStrip() {
     const hosts = state.data.hosts;
-    const bad = hosts.filter((x) => hostHealth(x).attention).length;
-    const alerts = (state.data.exposure || []).reduce((n, e) => n + (e.findings || []).filter((f) => f.severity === 'alert').length, 0);
-    const silent = hosts.filter((x) => hostHealth(x).dot === 'bad').length;
-    $('summary').replaceChildren(h('span', { class: 'pill' }, hosts.length + ' hosts'),
-      h('span', { class: 'pill ' + (silent ? 'bad' : 'ok') }, silent ? silent + ' silent' : 'all reporting'),
-      h('span', { class: 'pill ' + (bad - silent > 0 ? 'bad' : 'ok') }, bad - silent > 0 ? (bad - silent) + ' reconcile problem' + (bad - silent > 1 ? 's' : '') : 'reconciles ok'),
-      h('span', { class: 'pill ' + (alerts ? 'bad' : 'ok') }, alerts ? alerts + ' exposure alert' + (alerts > 1 ? 's' : '') : 'no exposure alerts'));
     const att = hosts.filter((x) => hostHealth(x).attention);
+    const silent = hosts.filter((x) => hostHealth(x).dot === 'bad').length;
+    const rbad = att.length - silent;
+    const reporting = hosts.filter((x) => hostHealth(x).dot === 'ok').length;
+    const alerts = (state.data.exposure || []).reduce((n, e) => n + (e.findings || []).filter((f) => f.severity === 'alert').length, 0);
+    const types = {}; for (const x of hosts) types[x.type || '?'] = (types[x.type || '?'] || 0) + 1;
+    const T = (cls, k, v, s, onclick) => h(onclick ? 'button' : 'div', { class: 'tile ' + cls, type: onclick ? 'button' : false, onclick }, h('span', { class: 'k' }, k), h('span', { class: 'v' }, v), h('span', { class: 's' }, s));
+    $('strip').replaceChildren(
+      T('', 'Fleet', hosts.length, Object.entries(types).map(([k, n]) => `${n} ${k}`).join(' · ')),
+      T(silent ? 'bad' : 'ok', 'Reporting', `${reporting}/${hosts.length}`, silent ? `${silent} silent for 10 min` : 'every host is sending logs', silent ? () => { state.problems = true; render(); } : null),
+      T(rbad ? 'bad' : 'ok', 'Reconciles', rbad ? rbad : 'OK', rbad ? 'host' + (rbad > 1 ? 's' : '') + ' with a failed run' : 'last runs succeeded', rbad ? () => { state.problems = true; render(); } : null),
+      T(alerts ? 'bad' : 'ok', 'Exposure', alerts || 'Clear', alerts ? 'unexpected open port' + (alerts > 1 ? 's' : '') + ' on the internet' : 'nothing unexpected is open'));
     const s = $('attention');
     if (att.length) { s.hidden = false; s.replaceChildren(h('div', { class: 'bar' }, h('h2', null, 'Needs attention')), h('div', { class: 'grid' }, att.map(card))); } else s.hidden = true;
   }
-
+  function renderTools() {
+    const groups = new Map();
+    for (const t of state.data.tools || []) { const g = t.group || 'Tools'; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(t); }
+    $('tools').replaceChildren(...[...groups].map(([g, items]) => h('div', { class: 'tgroup' }, h('span', { class: 'gl' }, g),
+      h('div', { class: 'tiles' }, items.map((t) => {
+        const ic = h('span', { class: 'ic', 'aria-hidden': 'true' }, t.name.trim().slice(0, 2));
+        ic.style.background = `hsl(${hue(t.name)} 38% 34%)`;
+        return h('a', { class: 'tool', href: safeUrl(t.url), target: '_blank', rel: 'noopener noreferrer' }, ic,
+          h('span', null, h('b', null, t.name), t.desc ? h('small', null, t.desc) : null), t.tailnet ? h('span', { class: 'tn', title: 'reachable from the LAN or tailnet only' }, 'tailnet') : null);
+      })))));
+  }
   function renderChips() {
     const types = [...new Set(state.data.hosts.map((x) => x.type || '?'))].sort();
     $('chips').replaceChildren(...types.map((t) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(state.types.has(t)), onclick: () => { state.types.has(t) ? state.types.delete(t) : state.types.add(t); render(); } }, t)),
       h('button', { class: 'chip', type: 'button', 'aria-pressed': String(state.problems), onclick: () => { state.problems = !state.problems; render(); } }, 'problems only'));
   }
-
   function renderExposure() {
     const rows = state.data.exposure || [];
     $('exposure').replaceChildren(h('div', { class: 'bar' }, h('h2', null, 'Public exposure')),
       rows.length ? h('div', { class: 'exp' }, h('table', null,
         h('tr', null, h('th', null, 'Target'), h('th', null, 'Address'), h('th', null, 'Open TCP'), h('th', null, 'Findings'), h('th', null, 'Scanned')),
-        rows.map((e) => h('tr', null, h('td', null, e.target), h('td', null, e.ip), h('td', null, (e.open_tcp || []).join(', ') || 'none'),
+        rows.map((e) => h('tr', null, h('td', null, e.target), h('td', { class: 'mono' }, e.ip), h('td', { class: 'mono' }, (e.open_tcp || []).join(', ') || 'none'),
           h('td', null, (e.findings || []).length ? e.findings.map((f) => h('div', { class: 'sev-' + f.severity }, `${f.kind} ${f.proto}/${f.port}`)) : h('span', { class: 'sev-info' }, 'as declared')), h('td', { class: 'mute' }, ago(e.ts)))))) :
         h('div', { class: 'empty' }, 'No exposure scan seen in the logs yet. It runs daily from the scanner host; run it now with scripts/exposure.sh run.'));
   }
-
   function render() {
     const d = state.data;
-    renderSummary(); renderTools(); renderChips(); renderExposure();
-    const list = d.hosts.filter(matches);
-    $('hosts').replaceChildren(...(list.length ? list.map(card) : [h('div', { class: 'empty' }, 'No hosts match.')]));
+    renderStrip(); renderTools(); renderChips(); renderExposure();
+    const list = sorted(d.hosts.filter(matches));
+    const g = $('hosts');
+    g.className = 'grid' + (state.view === 'list' ? ' list' : '');
+    g.replaceChildren(...(list.length ? list.map(card) : [h('div', { class: 'empty' }, 'No hosts match.')]));
+    $('v-grid').setAttribute('aria-pressed', String(state.view !== 'list')); $('v-list').setAttribute('aria-pressed', String(state.view === 'list'));
+    $('sort').value = state.sort;
     const b = $('banner');
     if (!d.status.ok) { b.hidden = false; b.textContent = 'Live status is incomplete: ' + (d.status.error || 'not collected yet') + '. Inventory and links below are from the fleet repo and still correct.'; } else b.hidden = true;
-    $('user').replaceChildren(h('span', null, d.user.name + ' · ' + d.user.role), h('a', { href: '/auth/logout' }, 'sign out'));
+    const initials = (d.user.name || '?').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+    $('user').replaceChildren(h('span', { class: 'avatar', 'aria-hidden': 'true' }, initials), h('span', { class: 'hide-s' }, d.user.name + ' · ' + d.user.role), h('a', { href: '/auth/logout' }, 'sign out'));
     $('foot').textContent = 'inventory generated ' + (d.generated ? ago(d.generated) : 'never') + ' · status updated ' + (d.status.updated ? ago(d.status.updated) : 'never');
-    if (state.selected) open(state.selected);
+    if (state.selected) openHost(state.selected);
   }
 
+  // ---------------------------------------------------------------- command palette
+  function paletteIndex() {
+    const d = state.data; const items = [];
+    const act = (title, hint, run) => items.push({ kind: 'action', title, hint, run });
+    act('Refresh live status', 'read Loki now', refresh);
+    act('Show problems only', 'filter hosts', () => { state.problems = true; render(); });
+    act('Show all hosts', 'clear filters', () => { state.problems = false; state.types.clear(); state.q = ''; $('q').value = ''; render(); });
+    act('Switch theme', 'auto / dark / light', cycleTheme);
+    for (const c of globalCmds()) items.push({ kind: 'run', title: c.name, hint: c.cmd, run: () => copy(c.cmd) });
+    for (const x of d.hosts) items.push({ kind: 'host', title: x.name, hint: [x.type, ...(x.util || [])].filter(Boolean).join(' · '), run: () => openHost(x.name) });
+    for (const x of d.hosts) for (const c of hostCmds()) { const full = fill(c.cmd, x.name); items.push({ kind: 'run', title: `${c.name} · ${x.name}`, hint: full, run: () => copy(full) }); }
+    for (const x of d.hosts) for (const r of routeNames(x)) items.push({ kind: 'open', title: r.name, hint: x.name + (r.internal ? ' · tailnet' : ''), run: () => window.open(safeUrl('https://' + r.name), '_blank', 'noopener') });
+    for (const t of d.tools || []) items.push({ kind: 'open', title: t.name, hint: t.group || 'tool', run: () => window.open(safeUrl(t.url), '_blank', 'noopener') });
+    return items;
+  }
+  function paletteFilter(q) {
+    const all = paletteIndex();
+    const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+    if (!words.length) return all.filter((i) => i.kind === 'action' || (i.kind === 'run' && !i.title.includes(' · '))).concat(all.filter((i) => i.kind === 'host')).slice(0, 14);
+    const scored = [];
+    for (const i of all) {
+      const t = i.title.toLowerCase(); const hay = `${i.kind} ${t} ${i.hint.toLowerCase()}`;
+      if (!words.every((w) => hay.includes(w))) continue;
+      scored.push([t.startsWith(words[0]) ? 0 : t.includes(words[0]) ? 1 : 2, i]);
+    }
+    return scored.sort((a, b) => a[0] - b[0]).slice(0, 40).map((x) => x[1]);
+  }
+  function paletteRender() {
+    const q = $('pin').value; const items = paletteFilter(q); state.pal.items = items;
+    state.pal.at = Math.min(state.pal.at, Math.max(items.length - 1, 0));
+    const kindLabel = { host: 'host', run: 'copy', open: 'open', action: 'do' };
+    $('plist').replaceChildren(...(items.length ? items.map((i, n) => h('li', { role: 'option', 'aria-selected': String(n === state.pal.at), onmouseenter: () => { state.pal.at = n; mark(); }, onclick: () => paletteRun(n) },
+      h('span', { class: 'kind' }, kindLabel[i.kind]), h('span', { class: 't' }, i.title), h('span', { class: 'h' }, i.kind === 'run' ? '' : i.hint))) : [h('li', null, h('span', { class: 't mute' }, 'Nothing matches.'))]));
+  }
+  function mark() { [...$('plist').children].forEach((li, n) => { li.setAttribute('aria-selected', String(n === state.pal.at)); if (n === state.pal.at) li.scrollIntoView({ block: 'nearest' }); }); }
+  function paletteRun(n) { const it = state.pal.items[n]; if (!it) return; paletteClose(); it.run(); }
+  function paletteOpen() { if (!state.data) return; $('pal').hidden = false; $('pscrim').hidden = false; $('pin').value = ''; state.pal.at = 0; paletteRender(); $('pin').focus(); }
+  function paletteClose() { $('pal').hidden = true; $('pscrim').hidden = true; }
+
+  // ---------------------------------------------------------------- theme, refresh, load
+  function cycleTheme() {
+    const cur = document.documentElement.dataset.theme || 'auto';
+    const next = cur === 'auto' ? 'dark' : cur === 'dark' ? 'light' : 'auto';
+    if (next === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = next;
+    store.set('theme', next); toast('Theme: ' + next);
+  }
+  async function refresh() {
+    const b = $('refresh'); b.setAttribute('aria-busy', 'true');
+    try {
+      const r = await fetch('/api/refresh', { method: 'POST', credentials: 'same-origin', headers: { 'X-Cmdr': '1' } });
+      if (r.status === 429) toast('Just refreshed: give it a few seconds');
+      else if (!r.ok) toast('Refresh failed (' + r.status + ')');
+      else { toast('Reading live status…'); await new Promise((ok) => setTimeout(ok, 2500)); await load(); }
+    } catch (e) { toast('Refresh failed: ' + e.message); }
+    b.removeAttribute('aria-busy');
+  }
   async function load() {
     try {
       const r = await fetch('/api/fleet', { credentials: 'same-origin' });
-      if (r.status === 401) { location.href = '/auth/login?next=' + encodeURIComponent(location.pathname); return; }
+      if (r.status === 401) { location.reload(); return; }
       state.data = await r.json();
       render();
     } catch (e) {
       const b = $('banner'); b.hidden = false; b.textContent = 'Could not load the fleet data: ' + e.message;
     }
   }
+
   $('q').addEventListener('input', (e) => { state.q = e.target.value.trim(); if (state.data) render(); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  $('sort').addEventListener('change', (e) => { state.sort = e.target.value; store.set('sort', state.sort); if (state.data) render(); });
+  $('v-grid').addEventListener('click', () => { state.view = 'grid'; store.set('view', 'grid'); if (state.data) render(); });
+  $('v-list').addEventListener('click', () => { state.view = 'list'; store.set('view', 'list'); if (state.data) render(); });
+  $('omni').addEventListener('click', paletteOpen);
+  $('refresh').addEventListener('click', refresh);
+  $('theme').addEventListener('click', cycleTheme);
+  $('scrim').addEventListener('click', closeHost);
+  $('pscrim').addEventListener('click', paletteClose);
+  $('pin').addEventListener('input', () => { state.pal.at = 0; paletteRender(); });
+  $('pin').addEventListener('keydown', (e) => {
+    const n = state.pal.items.length;
+    if (e.key === 'ArrowDown') { e.preventDefault(); state.pal.at = (state.pal.at + 1) % Math.max(n, 1); mark(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); state.pal.at = (state.pal.at - 1 + Math.max(n, 1)) % Math.max(n, 1); mark(); }
+    else if (e.key === 'Enter') { e.preventDefault(); paletteRun(state.pal.at); }
+  });
+  document.addEventListener('keydown', (e) => {
+    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement && document.activeElement.tagName);
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); $('pal').hidden ? paletteOpen() : paletteClose(); }
+    else if (e.key === 'Escape') { if (!$('pal').hidden) paletteClose(); else closeHost(); }
+    else if (e.key === '/' && !typing) { e.preventDefault(); $('q').focus(); }
+  });
   load();
   setInterval(load, 60000);
 })();

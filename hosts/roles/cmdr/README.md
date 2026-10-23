@@ -30,3 +30,14 @@ A trusted proxy may instead pass the identity in `Remote-User` / `Remote-Groups`
 `util: [cmdr]`. The container is a stock `python` image running a standard-library script from `/opt/cmdr/app` (read-only, no capabilities, no build step).
 Tested against a mock identity provider and a mock Loki (sign-in flow, wrong group, tampered cookie, forged headers, open redirect, path traversal) and in a
 browser against the real fleet repo; not yet on the fleet.
+
+## The page
+
+- **Look:** charcoal and brass, mono type for anything you could type; follows the system light/dark setting (button in the header overrides, remembered per browser).
+- **Status strip:** hosts, who is reporting, last reconciles, public exposure; the red tiles filter the host list to the problems.
+- **Launchpad:** `cmdr_tools`. **Hosts:** cards or rows, sorted by what needs attention, filterable.
+- **Command palette** (Ctrl/Cmd+K, `/` filters hosts): hosts, services, tools and commands. **Command buttons** copy a ready-to-paste command
+  (`cmdr_host_commands`, `cmdr_commands`, `{host}` filled in) - cmdr itself never runs anything on a host. **Refresh** (POST `/api/refresh`) re-reads live
+  status from Loki now; it is the only thing the page can do.
+- **Sign-in in a frame:** the identity provider cannot be framed, so the frame shows a branded panel; sign-in opens in a small window that tells the frame
+  at once (BroadcastChannel; polling is the fallback) and closes itself after 3 seconds.
