@@ -292,7 +292,7 @@ def fleet_view(user):
         rec = st["reconcile"].get(n)
         hosts.append(dict(h, status={"alive": (st["alive"].get(n, 0) > 0) if st["alive"] else None, "reconcile": rec, "stats": st.get("stats", {}).get(n)}))
     return {"user": user, "generated": inv.get("generated", 0), "hosts": hosts, "tools": inv.get("tools", []), "host_links": inv.get("host_links", []),
-            "host_commands": inv.get("host_commands", []), "commands": inv.get("commands", []), "tag_kinds": inv.get("tag_kinds", {}), "tag_overrides": inv.get("tag_overrides", {}),
+            "host_commands": inv.get("host_commands", []), "commands": inv.get("commands", []), "tag_kinds": inv.get("tag_kinds", {}), "mgmt_kinds": inv.get("mgmt_kinds", {}), "tag_overrides": inv.get("tag_overrides", {}),
             "idp_name": inv.get("idp_name", ""), "stats_on": bool(VICTORIA),
             "tags": load_tag_descriptions(), "exposure": sorted(st["exposure"].values(), key=lambda e: (e["target"] or "", e["ip"] or "")),
             "status": {"updated": st["updated"], "ok": st["ok"], "error": st["error"]}}

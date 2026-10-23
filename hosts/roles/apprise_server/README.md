@@ -8,7 +8,7 @@ and not in the fleet repository.
 
 | What | Where | Who can reach it |
 |---|---|---|
-| Admin panel (web UI: channels, tags, test sends) | an internal name, for example `apr.sp.a64.one` (a Liaison route; `sp.a64.one` is LAN and tailnet only) | LAN and tailnet, **and** the admin login |
+| Admin panel (web UI: channels, tags, test sends) | an internal name, for example `ntfy.sp.a64.one` (a Liaison route; `sp.a64.one` is LAN and tailnet only) | LAN and tailnet, **and** the admin login |
 | Notify endpoint | a public name on a proxy host, for example `notify.a64.one`, route rule `Host(...) && Method(POST) && PathPrefix(/notify/)` plus a rate limit | the internet, but only that one call; any other path or method gets 404 |
 | Grafana and other containers on the host | `http://apprise:8000` on the shared `observability` network | that host |
 

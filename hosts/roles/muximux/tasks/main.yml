@@ -42,12 +42,17 @@
     - "{{ muximux_dir }}"
     - "{{ muximux_dir }}/data"
 
-- name: Write the console's configuration (no secrets in it)
+- name: Write the console's configuration (no secrets in it), read-only for the user
   ansible.builtin.template:
     src: config.yaml.j2
     dest: "{{ muximux_dir }}/config.yaml"
     mode: "0644"
   notify: Recreate muximux
+  when: not muximux_user_editable | bool
+
+- name: Merge the repo's tiles into the console's own configuration (the user keeps the rest)
+  ansible.builtin.include_tasks: editable_config.yml
+  when: muximux_user_editable | bool
 
 - name: Write the compose file (it holds the sign-in client secret)
   ansible.builtin.template:

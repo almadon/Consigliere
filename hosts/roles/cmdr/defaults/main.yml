@@ -58,3 +58,9 @@ cmdr_tag_kinds:
 # Per-tag overrides, keyed by tag name (or kind/name to be exact). Anything left out keeps the kind's colour and the manifest's own description:
 #   otel: {label: logs, desc: "Ships its journal and Docker logs to Loki.", color: "#4aa8ff"}
 cmdr_tag_overrides: {}
+
+# Who owns an app's settings. A tool in cmdr_tools can say  mgmt: repo | mixed | ui  and shows that badge (explained in the page's key). Names, meanings and colours:
+cmdr_mgmt_kinds:
+  repo: {label: repo-managed, color: "#8b9bff", desc: "Its settings come from the fleet repo; anything changed in the app itself is put back at the next run."}
+  mixed: {label: shared, color: "#dcb053", desc: "The repo sets part of it (tiles, data sources, jobs); the rest is yours and is kept."}
+  ui: {label: your settings, color: "#3fbb7c", desc: "Only the deployment is managed. Its settings live inside the app: back them up (Arkeep) rather than expect them in git."}

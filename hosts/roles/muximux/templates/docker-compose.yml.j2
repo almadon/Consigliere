@@ -32,7 +32,9 @@ services:
 {% endif %}
     volumes:
       - {{ muximux_dir }}/data:/app/data
+{% if not muximux_user_editable | bool %}
       - {{ muximux_dir }}/config.yaml:/app/data/config.yaml:ro
+{% endif %}
 {% if muximux_network | length > 0 %}
     networks:
       - {{ muximux_network }}

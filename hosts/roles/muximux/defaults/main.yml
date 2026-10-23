@@ -1,7 +1,10 @@
 ---
 # The fleet console: a Muximux dashboard (https://github.com/mescon/Muximux), generated from the fleet repo.
-# Tiles, groups and theme come from the variables below; the config file is mounted read-only, so the fleet repo is
-# the single source of truth (a change made in Muximux's own settings page would only be lost at the next run).
+# Tiles, groups and theme come from the variables below. Two modes (muximux_user_editable):
+#   false (default)  the config file is mounted read-only: the fleet repo is the single source of truth, Muximux's own settings page cannot change anything.
+#   true             the fleet repo owns the tiles and groups it declares (they are put back if edited or deleted, and removed when you remove them from the repo);
+#                    everything else is yours to change in Muximux's UI and is kept: tiles and groups you add, and (after the first run) the theme, navigation,
+#                    health and other settings. Sign-in settings (auth) and the listen address always follow the repo.
 #
 # Sign-in is OIDC against your identity provider (documented for Pocket ID). The client id and secret come from the
 # secret muximux.server (config/secrets/muximux/server.yml):
@@ -9,6 +12,10 @@
 # In the identity provider: a confidential client whose callback URL is  <muximux_url>/api/auth/oidc/callback,
 # allowed to read the "groups" claim, and a group (muximux_oidc_admin_groups) for the people who may use the console.
 muximux_version: "3.6.2"
+muximux_user_editable: false
+# The user the container runs as after its entrypoint drops privileges (owns the editable config file).
+muximux_run_uid: "1000"
+muximux_run_gid: "1000"
 muximux_dir: /opt/muximux
 muximux_port: 8080
 # The public https URL of the console (required: the identity provider sends the browser back to it).

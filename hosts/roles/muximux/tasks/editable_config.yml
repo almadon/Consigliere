@@ -1,0 +1,94 @@
+---
+# muximux_user_editable: true. The repo owns the tiles and groups it declares; the user owns everything else in data/config.yaml.
+#   - first run (no state file): the file is replaced by the repo's configuration (the old one is kept as config.yaml.pre-merge)
+#   - later runs: every tile and group of the repo is put back as declared (extra fields Muximux added are kept); tiles and groups the repo
+#     declared last time but not now are removed; tiles and groups the user added stay; theme, navigation, health and the like stay;
+#     auth and the listen address always follow the repo.
+# The file is only written when its content really differs, so a Muximux that re-saves it in its own format does not cause a restart every run.
+- name: Is there a console configuration already?
+  ansible.builtin.slurp:
+    src: "{{ muximux_dir }}/data/config.yaml"
+  register: _muximux_current
+  failed_when: false
+
+- name: Which tiles and groups did the repo manage last time?
+  ansible.builtin.slurp:
+    src: "{{ muximux_dir }}/managed.json"
+  register: _muximux_state
+  failed_when: false
+
+- name: Work out the merged configuration
+  ansible.builtin.set_fact:
+    _muximux_managed: "{{ lookup('ansible.builtin.template', 'config.yaml.j2') | from_yaml }}"
+    _muximux_cur: "{{ (_muximux_current.content | b64decode | from_yaml | default({}, true)) if _muximux_current.content is defined else {} }}"
+    _muximux_prev: "{{ (_muximux_state.content | b64decode | from_json) if _muximux_state.content is defined else None }}"
+
+- name: Index the console's current tiles and groups by name
+  ansible.builtin.set_fact:
+    _muximux_cur_apps: "{{ dict((_muximux_cur.apps | default([]) | map(attribute='name') | list) | zip(_muximux_cur.apps | default([]))) }}"
+    _muximux_cur_groups: "{{ dict((_muximux_cur.groups | default([]) | map(attribute='name') | list) | zip(_muximux_cur.groups | default([]))) }}"
+    _muximux_apps_out: []
+    _muximux_groups_out: []
+
+- name: The repo's tiles, as declared over what Muximux has stored for them
+  ansible.builtin.set_fact:
+    _muximux_apps_out: "{{ _muximux_apps_out + [(_muximux_cur_apps[item.name] | default({})) | combine(item)] }}"
+  loop: "{{ _muximux_managed.apps }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: The repo's groups, as declared over what Muximux has stored for them
+  ansible.builtin.set_fact:
+    _muximux_groups_out: "{{ _muximux_groups_out + [(_muximux_cur_groups[item.name] | default({})) | combine(item)] }}"
+  loop: "{{ _muximux_managed.groups }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Combine them with what the user added
+  ansible.builtin.set_fact:
+    _muximux_skip_apps: "{{ ((_muximux_prev.apps | default([])) if _muximux_prev else []) + (_muximux_managed.apps | map(attribute='name') | list) }}"
+    _muximux_skip_groups: "{{ ((_muximux_prev.groups | default([])) if _muximux_prev else []) + (_muximux_managed.groups | map(attribute='name') | list) }}"
+    _muximux_first: "{{ _muximux_prev is none or _muximux_cur | length == 0 }}"
+
+- name: The merged configuration
+  ansible.builtin.set_fact:
+    _muximux_merged: >-
+      {{ _muximux_managed if _muximux_first | bool else
+         _muximux_cur | combine({
+           'server': (_muximux_cur.server | default({})) | combine({'listen': _muximux_managed.server.listen}),
+           'auth': (_muximux_cur.auth | default({})) | combine(_muximux_managed.auth),
+           'apps': _muximux_apps_out + (_muximux_cur.apps | default([]) | rejectattr('name', 'in', _muximux_skip_apps) | list),
+           'groups': _muximux_groups_out + (_muximux_cur.groups | default([]) | rejectattr('name', 'in', _muximux_skip_groups) | list)
+         }) }}
+
+- name: Keep the old configuration once, before the first merge
+  ansible.builtin.copy:
+    src: "{{ muximux_dir }}/data/config.yaml"
+    dest: "{{ muximux_dir }}/config.yaml.pre-merge"
+    remote_src: true
+    force: false
+    mode: "0600"
+  when:
+    - _muximux_first | bool
+    - _muximux_current.content is defined
+
+- name: Write the merged configuration (only when it differs)
+  ansible.builtin.copy:
+    content: "{{ _muximux_merged | to_nice_yaml(indent=2) }}"
+    dest: "{{ muximux_dir }}/data/config.yaml"
+    owner: "{{ muximux_run_uid }}"
+    group: "{{ muximux_run_gid }}"
+    mode: "0600"
+  when: _muximux_merged != _muximux_cur
+  notify: Recreate muximux
+
+- name: Remember which tiles and groups the repo manages
+  ansible.builtin.copy:
+    content: "{{ {'apps': _muximux_managed.apps | map(attribute='name') | list, 'groups': _muximux_managed.groups | map(attribute='name') | list} | to_json }}\n"
+    dest: "{{ muximux_dir }}/managed.json"
+    mode: "0644"
+
+- name: The old read-only copy is no longer used
+  ansible.builtin.file:
+    path: "{{ muximux_dir }}/config.yaml"
+    state: absent

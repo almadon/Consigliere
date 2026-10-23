@@ -246,8 +246,11 @@
       h('div', { class: 'tiles' }, items.map((t) => {
         const ic = h('span', { class: 'ic', 'aria-hidden': 'true' }, t.name.trim().slice(0, 2));
         ic.style.background = `hsl(${hue(t.name)} 38% 34%)`;
+        const mk = (state.data.mgmt_kinds || {})[t.mgmt];
+        const badge = mk ? h('span', { class: 'mg', title: `${mk.label}: ${mk.desc}` }, mk.label) : null;
+        if (badge && mk.color) badge.style.setProperty('--k', mk.color);
         return h('a', { class: 'tool', href: safeUrl(t.url), target: '_blank', rel: 'noopener noreferrer' }, ic,
-          h('span', null, h('b', null, t.name), t.desc ? h('small', null, t.desc) : null), t.tailnet ? h('span', { class: 'tn', title: 'reachable from the LAN or tailnet only' }, 'tailnet') : null);
+          h('span', null, h('b', null, t.name), t.desc ? h('small', null, t.desc) : null, badge), t.tailnet ? h('span', { class: 'tn', title: 'reachable from the LAN or tailnet only' }, 'tailnet') : null);
       })))));
   }
   function renderKey() {
@@ -262,6 +265,8 @@
           'Top dot: sending logs (green) or silent for 10 minutes (red). Second line: the last reconcile run: in sync, changed something, failed, or not seen in 24 hours. The bar on the left edge takes the worst of these.')),
         h('div', { class: 'kcol' }, h('h4', null, 'Serves'), h('p', null, 'The hostnames Traefik serves for this host. Dashed with a "tailnet" label = only reachable from the LAN or tailnet.')),
         h('div', { class: 'kcol' }, h('h4', null, 'CPU, MEM, DISK'), h('p', null, 'Right now, from the host\'s metrics agent. Amber from 75%, red from 90%. DISK is the root filesystem. Hosts without the agent show no bars.'))),
+      h('div', { class: 'kcols' }, Object.entries(d.mgmt_kinds || {}).map(([k, m]) => { const t = h('span', { class: 'mg' }, m.label); if (m.color) t.style.setProperty('--k', m.color);
+        return h('div', { class: 'kcol' }, h('h4', null, 'Launchpad badge'), h('p', null, t, ' ', m.desc)); })),
       h('p', { class: 'note' }, 'Names and colours of the kinds, and any single tag, are set in the fleet repo (cmdr_tag_kinds, cmdr_tag_overrides); a tag\'s description comes from its manifest.'));
   }
   function renderChips() {
