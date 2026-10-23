@@ -45,7 +45,7 @@
     src: "app/{{ item }}"
     dest: "{{ cmdr_dir }}/app/{{ item }}"
     mode: "0644"
-  loop: [server.py, static/index.html, static/style.css, static/app.js, static/signin.html, static/signin.js]
+  loop: [server.py, static/index.html, static/style.css, static/app.js, static/theme.js, static/logo.svg, static/signin.html, static/signin.js, static/done.html, static/done.js]
   notify: Restart cmdr
 
 # The hosts come straight from the fleet repo's checkout on this host, so the page can never disagree with what is declared.
