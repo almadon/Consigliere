@@ -69,12 +69,13 @@
   # In a check run the directory and compose file above are not really written yet.
   when: not ansible_check_mode or not _apprise_server_compose.changed
 
-- name: Wait until Apprise answers
+- name: Wait until Apprise answers (a 401 is an answer)
   ansible.builtin.uri:
     url: "http://{{ apprise_server_bind_address }}:{{ apprise_server_port }}/status"
-    return_content: true
+    # The service requires its login even for /status: a 401 means it is up and guarding itself, which is all this check needs to know.
+    status_code: [200, 401]
   register: _apprise_server_status
-  until: _apprise_server_status.status == 200
+  until: _apprise_server_status.status in [200, 401]
   retries: 12
   delay: 5
   changed_when: false
