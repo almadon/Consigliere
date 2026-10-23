@@ -22,7 +22,8 @@
       - apprise_server_admin_password | length >= 12
       - apprise_server_web_secret | length >= 32
       - "'CHANGEME' not in apprise_server_admin_password"
-    fail_msg: The admin password or the session secret is not set up: run scripts/apprise.sh init in the fleet repo.
+    fail_msg: >-
+      The admin password or the session secret is not set up. Run scripts/apprise.sh init in the fleet repo.
     quiet: true
   no_log: true
 
