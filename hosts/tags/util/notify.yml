@@ -1,0 +1,5 @@
+---
+description: "Apprise API: the fleet's one notification service (admin panel internal, only POST /notify public), Pushover and others as channels"
+order: 57
+roles: [apprise_server]
+secrets: [apprise.server]

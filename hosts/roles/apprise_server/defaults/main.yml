@@ -1,0 +1,31 @@
+---
+# Apprise API (https://github.com/caronc/apprise-api): the fleet's one notification service. Other things POST a message to
+#   https://<public notify name>/notify/<key>      (tags choose who gets it: alert, info, ...)
+# and the service forwards it to the real channels (Pushover, ntfy, email, Telegram, ...). The channel tokens live only in its own configuration,
+# which you edit in the admin panel (its web UI) after signing in as the admin.
+#
+# Exposure, by design (set up with traefik_server routes; see README):
+#   - the admin panel is served only on an internal name (for example apr.sp.a64.one: LAN and tailnet only) and needs the admin login too
+#   - the WAN gets only  POST /notify/...  on a separate name, nothing else
+#   - "stateless" notify (a caller supplying its own target URLs) is OFF: it would let anyone who reaches the endpoint use it as a relay
+# Secret apprise.server (config/secrets/apprise/server.yml), made by scripts/apprise.sh init:
+#   apprise_server_admin_password, apprise_server_web_secret
+apprise_server_version: "2.0.1"
+apprise_server_dir: /opt/apprise
+# Publish on this address (the tailnet address by default: Traefik on the proxy hosts reaches it there).
+apprise_server_bind_address: "{{ tailscale_ipv4 | default('127.0.0.1', true) }}"
+apprise_server_port: 8010
+# Shared Docker network with Grafana (and anything else on this host): they use http://apprise:8000. Empty = none.
+apprise_server_network: observability
+apprise_server_admin_user: admin
+# Names the service answers to (Host header); everything else is refused. The bind address and localhost are added automatically.
+apprise_server_allowed_hosts: []
+# The admin panel's public URL, so the browser may save changes from it (https://apr.sp.a64.one).
+apprise_server_admin_url: ""
+apprise_server_memory_limit: 256m
+# The user the container runs as; owns the configuration directory.
+apprise_server_uid: "10004"
+apprise_server_gid: "10004"
+apprise_server_admin_owner: root
+apprise_server_admin_group: root
+apprise_server_timezone: "{{ timezone_name | default('UTC', true) }}"

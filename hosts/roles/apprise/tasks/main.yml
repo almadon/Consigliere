@@ -1,10 +1,51 @@
 ---
-- name: Load the notification URLs (secret apprise.notify)
+- name: Load the notification URLs or the central key (secret apprise.notify)
   ansible.builtin.include_role:
     name: load_secrets
   vars:
     load_secrets_scopes: [apprise.notify]
 
+# ---- central mode: send through the fleet's Apprise API; no channel tokens on this host ----
+- name: Central mode needs an https endpoint and the key
+  ansible.builtin.assert:
+    that:
+      - apprise_endpoint is match('^https://')
+      - apprise_endpoint_key is defined
+      - apprise_endpoint_key | length >= 24
+    fail_msg: >-
+      With apprise_endpoint set, the secret apprise.notify must hold apprise_endpoint_key (the long random key of the saved configuration in
+      the Apprise admin panel), and the endpoint must be an https URL. scripts/secrets.sh edit apprise.notify
+    quiet: true
+  no_log: true
+  when: apprise_endpoint | length > 0
+
+- name: Write the endpoint and key (a secret)
+  ansible.builtin.copy:
+    content: "{{ {'endpoint': apprise_endpoint | trim('/'), 'key': apprise_endpoint_key} | to_json }}\n"
+    dest: /etc/apprise-endpoint.json
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  when: apprise_endpoint | length > 0
+
+- name: Make sure curl is installed (central mode)
+  ansible.builtin.apt:
+    name: curl
+    state: present
+    cache_valid_time: 3600
+  when: apprise_endpoint | length > 0
+
+- name: Install the fleet-notify helper (central mode)
+  ansible.builtin.template:
+    src: fleet-notify-central.j2
+    dest: /usr/local/bin/fleet-notify
+    owner: root
+    group: root
+    mode: "0755"
+  when: apprise_endpoint | length > 0
+
+# ---- local mode: Apprise itself on this host, with the channel URLs from the secret ----
 - name: Require at least one notification URL
   ansible.builtin.assert:
     that:
@@ -15,6 +56,7 @@
       scripts/secrets.sh edit apprise.notify
     quiet: true
   no_log: true
+  when: apprise_endpoint | length == 0
 
 - name: Install the Python venv tooling
   ansible.builtin.apt:
@@ -22,18 +64,21 @@
     state: present
     update_cache: true
     cache_valid_time: 3600
+  when: apprise_endpoint | length == 0
 
 - name: Install Apprise (pinned) into its own virtualenv
   ansible.builtin.pip:
     name: "apprise=={{ apprise_version }}"
     virtualenv: "{{ apprise_venv }}"
     virtualenv_command: python3 -m venv
+  when: apprise_endpoint | length == 0
 
 - name: Create the Apprise config directory
   ansible.builtin.file:
     path: "{{ apprise_config_dir }}"
     state: directory
     mode: "0750"
+  when: apprise_endpoint | length == 0
 
 - name: Write the Apprise config (contains tokens)
   ansible.builtin.copy:
@@ -43,11 +88,13 @@
     group: root
     mode: "0600"
   no_log: true
+  when: apprise_endpoint | length == 0
 
-- name: Install the fleet-notify helper
+- name: Install the fleet-notify helper (local mode)
   ansible.builtin.template:
     src: fleet-notify.j2
     dest: /usr/local/bin/fleet-notify
     owner: root
     group: root
     mode: "0755"
+  when: apprise_endpoint | length == 0

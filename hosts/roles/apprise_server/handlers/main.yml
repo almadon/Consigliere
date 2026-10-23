@@ -1,0 +1,7 @@
+---
+- name: Recreate apprise
+  community.docker.docker_compose_v2:
+    project_src: "{{ apprise_server_dir }}"
+    state: present
+    recreate: always
+  when: not ansible_check_mode

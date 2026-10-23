@@ -1,0 +1,45 @@
+# Managed by Ansible (hosts/roles/apprise_server) -- edits here get overwritten on the next reconciliation run.
+services:
+  apprise:
+    image: caronc/apprise:{{ apprise_server_version }}
+    container_name: apprise
+    restart: unless-stopped
+    user: "{{ apprise_server_uid }}:{{ apprise_server_gid }}"
+    read_only: true
+    mem_limit: {{ apprise_server_memory_limit }}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    ports:
+      - "{{ apprise_server_bind_address }}:{{ apprise_server_port }}:8000"
+    environment:
+      TZ: {{ apprise_server_timezone | to_json }}
+      APPRISE_STATEFUL_MODE: simple
+      # A caller may only use configurations saved here, never supply its own target URLs (that would make this an open relay).
+      APPRISE_STATELESS_MODE: disabled
+      STRICT_MODE: "yes"
+      APPRISE_WORKER_COUNT: "1"
+      APPRISE_ATTACH_SIZE: "0"
+      APPRISE_AUTH_REQUIRED: "yes"
+      APPRISE_USER: {{ apprise_server_admin_user | to_json }}
+      APPRISE_PASSWORD: {{ apprise_server_admin_password | to_json }}
+      APPRISE_WEB_AUTH_SECRET: {{ apprise_server_web_secret | to_json }}
+      ALLOWED_HOSTS: {{ (apprise_server_allowed_hosts + [apprise_server_bind_address, '127.0.0.1', 'localhost', 'apprise']) | unique | join(' ') | to_json }}
+{% if apprise_server_admin_url | length > 0 %}
+      APPRISE_TRUSTED_ORIGINS: {{ apprise_server_admin_url | to_json }}
+{% endif %}
+    volumes:
+      - {{ apprise_server_dir }}/config:/config
+      - {{ apprise_server_dir }}/plugin:/plugin
+      - {{ apprise_server_dir }}/attach:/attach
+    tmpfs:
+      - /tmp
+{% if apprise_server_network | length > 0 %}
+    networks:
+      - {{ apprise_server_network }}
+
+networks:
+  {{ apprise_server_network }}:
+    external: true
+{% endif %}

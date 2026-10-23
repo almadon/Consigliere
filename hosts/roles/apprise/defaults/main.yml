@@ -19,3 +19,8 @@ apprise_config_dir: /etc/apprise
 apprise_notify_urls: []
 # Prepended to every title so you can tell hosts apart.
 apprise_title_prefix: "{{ inventory_hostname }}"
+
+# Central mode: send through the fleet's Apprise API (role apprise_server) instead of holding channel tokens on this host. Set the notify
+# endpoint (https://notify.a64.one); the saved-configuration key is in the secret apprise.notify as apprise_endpoint_key (a long random value).
+# The tag (alert, info, ...) is still FLEET_NOTIFY_TAG. With an endpoint set, apprise_notify_urls and the Apprise install are not used.
+apprise_endpoint: ""

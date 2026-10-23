@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Managed by Ansible (hosts/roles/apprise), central mode.
+# fleet-notify "<title>" ["<body>"]     (body is read from stdin if omitted)
+# Sends through the fleet's Apprise API; the tag is FLEET_NOTIFY_TAG (default: alert). An "alert" is delivered as a failure, anything else as info.
+set -u
+title="${1:-notification}"
+body="${2:-}"
+[ -n "$body" ] || { [ -t 0 ] || body="$(cat)"; }
+[ -n "$body" ] || body="(no details)"
+tag="${FLEET_NOTIFY_TAG:-alert}"
+type=info; [ "$tag" = alert ] && type=failure
+cfg=/etc/apprise-endpoint.json
+endpoint="$(sed -n 's/.*"endpoint": *"\([^"]*\)".*/\1/p' "$cfg")"
+key="$(sed -n 's/.*"key": *"\([^"]*\)".*/\1/p' "$cfg")"
+[ -n "$endpoint" ] && [ -n "$key" ] || { echo "fleet-notify: $cfg is incomplete" >&2; exit 1; }
+# The URL holds the key, so it goes in through a curl config read from a pipe, not on the command line (which any user can see in the process list).
+exec curl -fsS -m 20 -K <(printf 'url = "%s/notify/%s"\n' "$endpoint" "$key") -X POST \
+  --data-urlencode "tag=$tag" --data-urlencode "type=$type" \
+  --data-urlencode "title=[{{ apprise_title_prefix }}] $title" --data-urlencode "body=$body"
