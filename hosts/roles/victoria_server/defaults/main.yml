@@ -2,8 +2,9 @@
 # VictoriaMetrics (https://victoriametrics.com/): the fleet's metrics store, single node. Hosts and Proxmox send metrics with OpenTelemetry
 # (OTLP/HTTP, protobuf: http://<this host>:8428/opentelemetry/v1/metrics) or Prometheus remote write; Grafana reads it as a Prometheus
 # data source. No sign-in of its own: it is bound to this host's Tailscale address only, never given a public route.
-# 1.136 is the project's long-term-support line (security and bug fixes only).
-victoria_server_version: "v1.136.15"
+# The project publishes its long-term-support patch releases (1.136.x) only as enterprise images, so this follows the regular community
+# releases (a tag that exists on Docker Hub: check before bumping).
+victoria_server_version: "v1.154.0"
 victoria_server_dir: /opt/victoria
 # The time series data. On a host with a dedicated data disk (see the data_disk role) put it under the mount, for example /srv/bulk/victoria.
 victoria_server_data_dir: /srv/victoria

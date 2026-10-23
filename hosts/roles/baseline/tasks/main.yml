@@ -92,6 +92,59 @@
         validate: /usr/sbin/sshd -t -f %s
       notify: Reload sshd
 
+- name: Trust the SSH certificate authority for root (only when one is configured)
+  when: baseline_ssh_user_ca_keys | length > 0
+  block:
+    - name: Write the trusted CA public keys
+      ansible.builtin.copy:
+        dest: /etc/ssh/trusted_user_ca_keys
+        content: "{{ baseline_ssh_user_ca_keys | join('\n') }}\n"
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Reload sshd
+
+    - name: Create the principals directory
+      ansible.builtin.file:
+        path: /etc/ssh/auth_principals
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Say which certificate principals may log in as root
+      ansible.builtin.copy:
+        dest: /etc/ssh/auth_principals/root
+        content: "{{ baseline_ssh_ca_principals | join('\n') }}\n"
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Reload sshd
+
+    - name: Tell sshd to use them
+      ansible.builtin.copy:
+        dest: /etc/ssh/sshd_config.d/11-consigliere-ca.conf
+        content: |
+          # Managed by Ansible (hosts/roles/baseline). Certificates signed by the listed CA are accepted when they carry a principal listed for the account.
+          TrustedUserCAKeys /etc/ssh/trusted_user_ca_keys
+          AuthorizedPrincipalsFile /etc/ssh/auth_principals/%u
+        owner: root
+        group: root
+        mode: "0644"
+        validate: /usr/sbin/sshd -t -f %s
+      notify: Reload sshd
+
+- name: Stop trusting any SSH certificate authority when none is configured
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/ssh/sshd_config.d/11-consigliere-ca.conf
+    - /etc/ssh/trusted_user_ca_keys
+    - /etc/ssh/auth_principals/root
+  when: baseline_ssh_user_ca_keys | length == 0
+  notify: Reload sshd
+
 - name: Remove the password-login lock-down again when it is not wanted
   ansible.builtin.file:
     path: /etc/ssh/sshd_config.d/10-consigliere.conf

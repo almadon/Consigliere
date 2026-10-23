@@ -77,3 +77,10 @@ baseline_short_hostname: true
 #   - 'from="100.100.1.100",no-agent-forwarding,no-X11-forwarding ssh-ed25519 AAAA... warpgate'
 # `from` limits the key to connections coming from the bastion's address; without it the key works from anywhere. Added next to the admin keys, never replacing them.
 baseline_bastion_ssh_keys: []
+
+# SSH user certificates. List the PUBLIC key(s) of a certificate authority here and sshd trusts certificates signed by it for root, instead of (and next to) listed keys:
+# you sign a short-lived certificate for a throwaway key once (one approval in your agent) and use it on every host with no further prompts. See the fleet repo's
+# runbooks/ssh-certificates.md and scripts/ssh-cert.sh. A certificate must carry one of baseline_ssh_ca_principals to be accepted for root. Empty list = no change;
+# removing a CA from the list revokes everything it signed at the next run. Your admin keys keep working either way (the break-glass path).
+baseline_ssh_user_ca_keys: []
+baseline_ssh_ca_principals: [fleet-admin]
