@@ -1,0 +1,36 @@
+---
+- name: Check the settings
+  ansible.builtin.assert:
+    that:
+      - nic_offload_interfaces | selectattr('name', 'defined') | list | length == nic_offload_interfaces | length
+      - nic_offload_interfaces | selectattr('disable', 'defined') | list | length == nic_offload_interfaces | length
+      - nic_offload_interfaces | map(attribute='name') | select('match', '^[a-zA-Z0-9_.-]+$') | list | length == nic_offload_interfaces | length
+      - nic_offload_interfaces | map(attribute='disable') | flatten | select('match', '^[a-z0-9-]+$') | list | length == nic_offload_interfaces | map(attribute='disable') | flatten | length
+    fail_msg: Each nic_offload_interfaces entry needs a name (eno1) and a disable list of ethtool feature names (tso, gso, gro).
+    quiet: true
+  when: nic_offload_interfaces | length > 0
+
+- name: Make sure ethtool is installed
+  ansible.builtin.apt:
+    name: ethtool
+    state: present
+    cache_valid_time: 3600
+  when: nic_offload_interfaces | length > 0
+
+- name: Write the unit that applies them at every boot
+  ansible.builtin.template:
+    src: consigliere-nic-offload.service.j2
+    dest: /etc/systemd/system/consigliere-nic-offload.service
+    owner: root
+    group: root
+    mode: "0644"
+  when: nic_offload_interfaces | length > 0
+  register: _nic_offload_unit
+
+- name: Enable it, and apply it now when it changed
+  ansible.builtin.systemd:
+    name: consigliere-nic-offload
+    enabled: true
+    state: "{{ 'restarted' if _nic_offload_unit.changed else 'started' }}"
+    daemon_reload: "{{ _nic_offload_unit.changed }}"
+  when: nic_offload_interfaces | length > 0 and not ansible_check_mode

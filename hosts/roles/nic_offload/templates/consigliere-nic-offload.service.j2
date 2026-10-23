@@ -1,0 +1,18 @@
+# Managed by Ansible (hosts/roles/nic_offload) -- edits here get overwritten on the next reconciliation run.
+[Unit]
+Description=NIC offload settings ({% for i in nic_offload_interfaces %}{{ i.name }}{{ ', ' if not loop.last }}{% endfor %})
+{% for i in nic_offload_interfaces %}
+After=sys-subsystem-net-devices-{{ i.name }}.device
+Wants=sys-subsystem-net-devices-{{ i.name }}.device
+{% endfor %}
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+{% for i in nic_offload_interfaces %}
+ExecStart=/usr/sbin/ethtool -K {{ i.name }}{% for f in i.disable %} {{ f }} off{% endfor %}
+
+{% endfor %}
+
+[Install]
+WantedBy=multi-user.target

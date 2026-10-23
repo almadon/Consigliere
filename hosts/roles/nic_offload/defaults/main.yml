@@ -1,0 +1,8 @@
+---
+# Switch off NIC offload features on named interfaces, persistently. Needed for Intel e1000e ports (I217/I218/I219, common on small servers and mini PCs), whose
+# TSO/GSO/GRO handling can wedge the port ("e1000e ... Detected Hardware Unit Hang" in the kernel log) until the machine is power-cycled.
+#   nic_offload_interfaces:
+#     - {name: eno1, disable: [tso, gso, gro]}
+# Empty = nothing to do. The names are the ones ethtool -K takes (tso, gso, gro, lro, sg, rx, tx, ...). A systemd unit applies them at every boot as soon as the interface exists
+# (the interface's own network configuration is not touched). Changing them on a running interface can reset the link for a moment.
+nic_offload_interfaces: []

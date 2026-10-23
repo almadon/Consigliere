@@ -1,4 +1,4 @@
 ---
 description: "A Proxmox VE host: the baseline's settings that would break it are off (hostname kept as is, no ufw, no unattended upgrades); set in the fleet's vars/group/util_pve.yml"
 order: 10
-roles: []
+roles: [nic_offload]

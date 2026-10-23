@@ -39,3 +39,16 @@ Proxmox VE 9 can push its own metrics (nodes, guests, storage) over OpenTelemetr
 cluster: Datacenter > Metric Server > Add > OpenTelemetry, server `127.0.0.1`, port `4318`, protocol HTTP, path `/v1/metrics`, verify SSL off. Each node's
 `pvestatd` sends to its own local collector, which forwards to VictoriaMetrics as protobuf (which is all VictoriaMetrics accepts; Proxmox may send JSON).
 Metric names arrive as `proxmox_node_*`, `proxmox_vm_*`, `proxmox_storage_*`; the `cpustat` ones are ratios, not percentages.
+
+## Intel e1000e network ports can hang
+
+A Proxmox node whose onboard Intel port uses the `e1000e` driver can lose its network under load until it is power-cycled; the kernel log of the previous boot shows
+`e1000e ... Detected Hardware Unit Hang`. Switch off TSO/GSO/GRO on that port: set `nic_offload_interfaces` for the host (role `nic_offload`, applied by `util: [pve]`), for example
+`[{name: eno1, disable: [tso, gso, gro]}]`. Applying it can reset that link for a second or two.
+
+## Two nodes and a quorum device
+
+Votes decide whether a node may change the cluster. With two nodes of one vote each and a quorum device (an arbitrator on a third machine, `corosync-qnetd`) holding one more, either node
+plus the device is 2 of 3 and keeps working alone (the failover case). **A node with extra votes instead (say Radon with 2 and Argon with 1) works alone with no device, but then the other node can
+never be quorate by itself, so it cannot take over; adding a device on top of that makes the heavy node depend on the device.** Pick one scheme on purpose. The device's host must be reachable on
+5403/tcp from both nodes, and `pvecm qdevice setup <ip>` needs root SSH to it with `corosync-qnetd` installed.
