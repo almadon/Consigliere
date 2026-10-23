@@ -1,5 +1,6 @@
 ---
-# muximux_user_editable: true. The repo owns the tiles and groups it declares; the user owns everything else in data/config.yaml.
+# muximux_user_editable: true. With muximux_repo_owns_tiles: true the repo owns the tiles and groups it declares; with false only the first run writes them.
+# Either way the user owns everything else in data/config.yaml.
 #   - first run (no state file): the file is replaced by the repo's configuration (the old one is kept as config.yaml.pre-merge)
 #   - later runs: every tile and group of the repo is put back as declared (extra fields Muximux added are kept); tiles and groups the repo
 #     declared last time but not now are removed; tiles and groups the user added stay; theme, navigation, health and the like stay;
@@ -36,6 +37,7 @@
   loop: "{{ _muximux_managed.apps }}"
   loop_control:
     label: "{{ item.name }}"
+  when: muximux_repo_owns_tiles | bool
 
 - name: The repo's groups, as declared over what Muximux has stored for them
   ansible.builtin.set_fact:
@@ -43,11 +45,12 @@
   loop: "{{ _muximux_managed.groups }}"
   loop_control:
     label: "{{ item.name }}"
+  when: muximux_repo_owns_tiles | bool
 
 - name: Combine them with what the user added
   ansible.builtin.set_fact:
-    _muximux_skip_apps: "{{ ((_muximux_prev.apps | default([])) if _muximux_prev else []) + (_muximux_managed.apps | map(attribute='name') | list) }}"
-    _muximux_skip_groups: "{{ ((_muximux_prev.groups | default([])) if _muximux_prev else []) + (_muximux_managed.groups | map(attribute='name') | list) }}"
+    _muximux_skip_apps: "{{ (((_muximux_prev.apps | default([])) if _muximux_prev else []) + (_muximux_managed.apps | map(attribute='name') | list)) if muximux_repo_owns_tiles | bool else [] }}"
+    _muximux_skip_groups: "{{ (((_muximux_prev.groups | default([])) if _muximux_prev else []) + (_muximux_managed.groups | map(attribute='name') | list)) if muximux_repo_owns_tiles | bool else [] }}"
     _muximux_first: "{{ _muximux_prev is none or _muximux_cur | length == 0 }}"
 
 - name: The merged configuration
@@ -84,7 +87,7 @@
 
 - name: Remember which tiles and groups the repo manages
   ansible.builtin.copy:
-    content: "{{ {'apps': _muximux_managed.apps | map(attribute='name') | list, 'groups': _muximux_managed.groups | map(attribute='name') | list} | to_json }}\n"
+    content: "{{ {'apps': (_muximux_managed.apps | map(attribute='name') | list) if muximux_repo_owns_tiles | bool else [], 'groups': (_muximux_managed.groups | map(attribute='name') | list) if muximux_repo_owns_tiles | bool else []} | to_json }}\n"
     dest: "{{ muximux_dir }}/managed.json"
     mode: "0644"
 
