@@ -1,0 +1,25 @@
+---
+- name: Clear a start-limit failure first (a unit that crash-looped cannot be restarted until this is done)
+  ansible.builtin.command: "systemctl reset-failed {{ safe_apply_restart.name }}"
+  changed_when: false
+  failed_when: false
+  when: safe_apply_restart.kind == 'systemd'
+
+- name: Restart the unit
+  ansible.builtin.systemd:
+    name: "{{ safe_apply_restart.name }}"
+    state: restarted
+    daemon_reload: "{{ safe_apply_restart.daemon_reload | default(false) }}"
+  when: safe_apply_restart.kind == 'systemd'
+
+- name: Recreate the compose project
+  community.docker.docker_compose_v2:
+    project_src: "{{ safe_apply_restart.project_src }}"
+    state: present
+    recreate: always
+  when: safe_apply_restart.kind == 'compose'
+
+- name: Run the restart command
+  ansible.builtin.command: "sh -c {{ safe_apply_restart.restart_command | default('true') | quote }}"
+  changed_when: true
+  when: safe_apply_restart.kind == 'command'

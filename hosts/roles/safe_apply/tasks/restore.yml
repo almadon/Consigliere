@@ -1,0 +1,18 @@
+---
+- name: Put the last-good files back
+  ansible.builtin.copy:
+    src: "{{ item.dest }}.last-good"
+    dest: "{{ item.dest }}"
+    remote_src: true
+    mode: preserve
+  loop: "{{ _sa_changing | selectattr('_exists') | list }}"
+  loop_control:
+    label: "{{ item.dest }}"
+
+- name: Remove files this change created (there was nothing before them)
+  ansible.builtin.file:
+    path: "{{ item.dest }}"
+    state: absent
+  loop: "{{ _sa_changing | rejectattr('_exists') | list }}"
+  loop_control:
+    label: "{{ item.dest }}"

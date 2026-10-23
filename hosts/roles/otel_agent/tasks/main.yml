@@ -76,7 +76,7 @@
   when:
     - _otel_agent_installed.stdout != otel_agent_version
     - not ansible_check_mode
-  notify: Restart otelcol-contrib
+  register: _otel_agent_pkg
 
 - name: Let the collector read the systemd journal
   ansible.builtin.user:
@@ -84,7 +84,7 @@
     groups: systemd-journal
     append: true
   when: otel_agent_journal | bool and (not ansible_check_mode or _otel_agent_installed.stdout == otel_agent_version)
-  notify: Restart otelcol-contrib
+  register: _otel_agent_user
 
 - name: Create the collector's state directory (read offsets and the send queue survive restarts)
   ansible.builtin.file:
@@ -95,19 +95,14 @@
     mode: "0750"
   when: not ansible_check_mode or _otel_agent_installed.stdout == otel_agent_version
 
-# The collector checks the new file itself (receivers, processors and every OTTL statement) before it replaces the live one, so a
-# mistake stops this run with the reason and leaves the working configuration in place.
-- name: Write the collector's configuration
-  ansible.builtin.template:
-    src: config.yaml.j2
-    dest: /etc/otelcol-contrib/config.yaml
-    owner: root
-    group: root
-    mode: "0644"
-    validate: /usr/bin/otelcol-contrib validate --config=%s
+# The configuration and the service's limits are written, the collector restarted and checked, by safe_apply: validated by the collector itself first,
+# the running files kept as <file>.last-good, and if the collector is not healthy afterwards (not running, restarting by itself, in a start-limit) the old
+# files are put back and the run FAILS with the reason (and a notification, when fleet-notify is installed). The same content is not retried every run.
+- name: Render the collector's configuration and the service drop-in
+  ansible.builtin.set_fact:
+    _otel_agent_config_text: "{{ lookup('ansible.builtin.template', 'config.yaml.j2') }}"
+    _otel_agent_dropin_text: "{{ lookup('ansible.builtin.template', 'override.conf.j2') }}"
   when: not ansible_check_mode or _otel_agent_installed.stdout == otel_agent_version
-  notify: Restart otelcol-contrib
-  register: _otel_agent_config
 
 - name: Hardening and limits for the service
   ansible.builtin.file:
@@ -115,18 +110,17 @@
     state: directory
     mode: "0755"
 
-- name: Write the service drop-in
-  ansible.builtin.template:
-    src: override.conf.j2
-    dest: /etc/systemd/system/otelcol-contrib.service.d/consigliere.conf
-    owner: root
-    group: root
-    mode: "0644"
-  notify: Restart otelcol-contrib
-  register: _otel_agent_dropin
-
-- name: Flush handlers so the new configuration is live before the final checks
-  ansible.builtin.meta: flush_handlers
+- name: Apply the configuration safely
+  ansible.builtin.include_role:
+    name: safe_apply
+  vars:
+    safe_apply_name: otelcol-contrib
+    safe_apply_files:
+      - {dest: /etc/otelcol-contrib/config.yaml, content: "{{ _otel_agent_config_text }}", mode: "0644", validate: "/usr/bin/otelcol-contrib validate --config=%s"}
+      - {dest: /etc/systemd/system/otelcol-contrib.service.d/consigliere.conf, content: "{{ _otel_agent_dropin_text }}", mode: "0644"}
+    safe_apply_restart: {kind: systemd, name: otelcol-contrib, daemon_reload: true}
+    safe_apply_force: "{{ (_otel_agent_pkg.changed | default(false)) or (_otel_agent_user.changed | default(false)) }}"
+  when: not ansible_check_mode or _otel_agent_installed.stdout == otel_agent_version
 
 - name: Enable and start the collector
   ansible.builtin.systemd:
@@ -134,25 +128,3 @@
     enabled: true
     state: started
   when: not ansible_check_mode
-
-# A configuration the collector accepts can still fail when it starts (for example a receiver that cannot open its source). After
-# any change, make sure the service stays up and say why when it does not.
-- name: Give a changed collector a few seconds, then check it stayed up
-  when:
-    - not ansible_check_mode
-    - _otel_agent_config.changed or _otel_agent_dropin.changed or _otel_agent_deb.changed | default(false)
-  block:
-    - name: Wait for the collector to settle
-      ansible.builtin.wait_for:
-        timeout: 8
-
-    - name: Read the service state
-      ansible.builtin.systemd:
-        name: otelcol-contrib
-      register: _otel_agent_state
-
-    - name: Fail with the reason if it is not running steadily
-      ansible.builtin.command: journalctl -u otelcol-contrib --no-pager -n 12 -o cat
-      register: _otel_agent_why
-      changed_when: false
-      failed_when: _otel_agent_state.status.ActiveState != 'active' or (_otel_agent_state.status.NRestarts | int) > 0

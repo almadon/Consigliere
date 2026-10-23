@@ -1,0 +1,30 @@
+---
+# Only reached when the service is healthy now: what is running becomes the last known-good, and the one before it becomes .prev.
+- name: Is there already a last-good?
+  ansible.builtin.stat:
+    path: "{{ item.dest }}.last-good"
+  loop: "{{ _sa_changing | selectattr('_exists') | list }}"
+  loop_control:
+    label: "{{ item.dest }}"
+  register: _sa_lg
+
+- name: Shift the old last-good to .prev
+  ansible.builtin.copy:
+    src: "{{ item.item.dest }}.last-good"
+    dest: "{{ item.item.dest }}.last-good.prev"
+    remote_src: true
+    mode: preserve
+  loop: "{{ _sa_lg.results }}"
+  loop_control:
+    label: "{{ item.item.dest }}"
+  when: item.stat.exists
+
+- name: Keep what is running as the last-good
+  ansible.builtin.copy:
+    src: "{{ item.dest }}"
+    dest: "{{ item.dest }}.last-good"
+    remote_src: true
+    mode: preserve
+  loop: "{{ _sa_changing | selectattr('_exists') | list }}"
+  loop_control:
+    label: "{{ item.dest }}"

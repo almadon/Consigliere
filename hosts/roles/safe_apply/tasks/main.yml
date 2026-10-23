@@ -1,0 +1,183 @@
+---
+- name: Check what safe_apply was asked to do
+  ansible.builtin.assert:
+    that:
+      - safe_apply_files | length > 0
+      - safe_apply_restart.kind | default('') in ['systemd', 'compose', 'command']
+      - safe_apply_restart.kind != 'systemd' or safe_apply_restart.name is defined
+      - safe_apply_restart.kind != 'compose' or (safe_apply_restart.project_src is defined and safe_apply_restart.name is defined)
+      - safe_apply_files | selectattr('dest', 'defined') | list | length == safe_apply_files | length
+      - safe_apply_files | selectattr('content', 'defined') | list | length == safe_apply_files | length
+    fail_msg: >-
+      safe_apply needs safe_apply_files (each with dest and content) and safe_apply_restart with kind systemd (name), compose (project_src, name) or command.
+    quiet: true
+
+- name: Look at the files as they are now
+  ansible.builtin.stat:
+    path: "{{ item.dest }}"
+  loop: "{{ safe_apply_files }}"
+  loop_control:
+    label: "{{ item.dest }}"
+  register: _sa_stat
+
+- name: Look for revisions that already failed
+  ansible.builtin.slurp:
+    src: "{{ item.dest }}.failed-rev"
+  loop: "{{ safe_apply_files }}"
+  loop_control:
+    label: "{{ item.dest }}"
+  register: _sa_failed
+  failed_when: false
+
+- name: Work out which files change
+  ansible.builtin.set_fact:
+    _sa_changing: >-
+      {{ _sa_changing_list | default([]) }}
+  vars:
+    _sa_changing_list: >-
+      {%- set out = [] -%}
+      {%- for f in safe_apply_files -%}
+      {%- set st = _sa_stat.results[loop.index0].stat -%}
+      {%- if not st.exists or st.checksum != (f.content | hash('sha1')) -%}
+      {%- set _ = out.append(dict(f, _exists=st.exists, _sha=(f.content | hash('sha1')), _failed=((_sa_failed.results[loop.index0].content | default('') | b64decode | trim) == (f.content | hash('sha1'))))) -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {{ out }}
+
+- name: Stop if this exact content already failed here (it stays on the known-good one until the content changes)
+  ansible.builtin.fail:
+    msg: >-
+      {{ safe_apply_name }}: this configuration was tried before on this host and was unhealthy ({{ _sa_changing | selectattr('_failed') | map(attribute='dest') | join(', ') }}).
+      It was not applied again, and the service is on its previous (known-good) configuration. Change the configuration to try again, or delete the
+      .failed-rev file next to the file.
+  when: _sa_changing | selectattr('_failed') | list | length > 0 and not ansible_check_mode
+
+- name: Apply the change safely
+  when: (_sa_changing | length > 0 or safe_apply_force | bool) and not ansible_check_mode
+  block:
+    - name: Is the service healthy now? (only a healthy state is worth keeping as known-good)
+      ansible.builtin.include_tasks: probe.yml
+
+    - name: Remember it
+      ansible.builtin.set_fact:
+        _sa_before_ok: "{{ _sa_ok }}"
+
+    - name: Keep the running files as the last known-good, and the previous one as .prev
+      ansible.builtin.include_tasks: keep.yml
+      when: _sa_before_ok | bool
+
+    - name: Write the new files
+      ansible.builtin.copy:
+        content: "{{ item.content }}"
+        dest: "{{ item.dest }}"
+        mode: "{{ item.mode | default('0644') }}"
+        owner: "{{ item.owner | default('root') }}"
+        group: "{{ item.group | default('root') }}"
+        validate: "{{ item.validate | default(omit) }}"
+      loop: "{{ _sa_changing }}"
+      loop_control:
+        label: "{{ item.dest }}"
+
+    - name: Restart
+      ansible.builtin.include_tasks: restart.yml
+
+    - name: Baseline right after the restart
+      ansible.builtin.include_tasks: probe.yml
+
+    - name: Remember it
+      ansible.builtin.set_fact:
+        _sa_base_restarts: "{{ _sa_restarts }}"
+
+    - name: Give it a moment to fall over
+      ansible.builtin.pause:
+        seconds: "{{ safe_apply_health.wait | default(safe_apply_wait) }}"
+
+    - name: Check again
+      ansible.builtin.include_tasks: probe.yml
+
+    - name: Not healthy, or restarting by itself?
+      ansible.builtin.fail:
+        msg: >-
+          {{ _sa_why if _sa_why | trim | length > 0 else 'the service restarted by itself ' ~ (_sa_restarts | int - _sa_base_restarts | int) ~ ' time(s) during the check' }}
+      when: not _sa_ok | bool or (_sa_restarts | int) > (_sa_base_restarts | int)
+
+    - name: It is healthy, so forget any earlier failure of these files
+      ansible.builtin.file:
+        path: "{{ item.dest }}.failed-rev"
+        state: absent
+      loop: "{{ _sa_changing }}"
+      loop_control:
+        label: "{{ item.dest }}"
+
+  rescue:
+    - name: What went wrong
+      ansible.builtin.set_fact:
+        _sa_error: >-
+          {{ (ansible_failed_result.msg | default('unknown')) | string | truncate(300) }}
+
+    - name: Remember that this content failed, so it is not applied again every run
+      ansible.builtin.copy:
+        content: "{{ item._sha }}\n"
+        dest: "{{ item.dest }}.failed-rev"
+        mode: "0644"
+      loop: "{{ _sa_changing }}"
+      loop_control:
+        label: "{{ item.dest }}"
+      failed_when: false
+
+    - name: Put the known-good files back
+      ansible.builtin.include_tasks: restore.yml
+      when: _sa_before_ok | default(false) | bool
+
+    - name: Restart on the known-good configuration
+      ansible.builtin.include_tasks: restart.yml
+      when: _sa_before_ok | default(false) | bool
+      ignore_errors: true
+
+    - name: Wait, then check the rollback
+      ansible.builtin.pause:
+        seconds: "{{ safe_apply_health.wait | default(safe_apply_wait) }}"
+      when: _sa_before_ok | default(false) | bool
+
+    - name: Is it back?
+      ansible.builtin.include_tasks: probe.yml
+      when: _sa_before_ok | default(false) | bool
+
+    - name: The service's last log lines
+      ansible.builtin.shell: >-
+        {{ ('journalctl -u ' ~ safe_apply_restart.name ~ ' --no-pager -n 12 -o cat') if safe_apply_restart.kind == 'systemd'
+           else ('docker logs --tail 12 ' ~ safe_apply_restart.name ~ ' 2>&1') if safe_apply_restart.kind == 'compose' else 'true' }}
+      register: _sa_log
+      changed_when: false
+      failed_when: false
+
+    - name: Say what happened
+      ansible.builtin.set_fact:
+        _sa_verdict: >-
+          {{ safe_apply_name }}: the new configuration was not healthy ({{ _sa_error }}).
+          {% if _sa_before_ok | default(false) | bool %}It was rolled back to the previous known-good configuration{{ ' and the service is running again.' if _sa_ok | default(false) | bool else ', but the service is STILL not healthy: ' ~ (_sa_why | default('unknown')) }}
+          {% else %}There was no known-good state to go back to (the service was not healthy before the change either).{% endif %}
+          Last log lines: {{ (_sa_log.stdout | default('') | trim | replace('\n', ' | ')) | truncate(500) }}
+
+    - name: Record it where an operator looks (the journal)
+      ansible.builtin.command:
+        argv: [logger, -t, fleet-safe-apply, -p, user.err, "{{ _sa_verdict }}"]
+      changed_when: false
+      failed_when: false
+
+    - name: Tell someone, when a notifier is installed (fleet-notify)
+      ansible.builtin.command:
+        argv:
+          - sh
+          - -c
+          - 'command -v fleet-notify >/dev/null 2>&1 || exit 0; FLEET_NOTIFY_TAG=alert exec fleet-notify "$1" "$2"'
+          - sh
+          - "{{ safe_apply_name }}: change rolled back"
+          - "{{ _sa_verdict | truncate(800) }}"
+      changed_when: false
+      failed_when: false
+      when: safe_apply_notify | bool
+
+    - name: Fail the run (a rollback is never reported as a success)
+      ansible.builtin.fail:
+        msg: "{{ _sa_verdict }}"

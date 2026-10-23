@@ -1,0 +1,30 @@
+---
+# safe_apply: change a running service's configuration so that it can undo itself. Used by other roles with include_role:
+#
+#   - ansible.builtin.include_role:
+#       name: safe_apply
+#     vars:
+#       safe_apply_name: otelcol-contrib                       # shown in messages and notifications
+#       safe_apply_files:                                      # what to write (the caller renders the content)
+#         - {dest: /etc/otelcol-contrib/config.yaml, content: "{{ rendered }}", mode: "0644", validate: "/usr/bin/otelcol-contrib validate --config=%s"}
+#       safe_apply_restart: {kind: systemd, name: otelcol-contrib, daemon_reload: true}
+#
+# What it does, in order (design: conformIT "known-good fallback"):
+#   1. is the service healthy NOW? Only a healthy state is worth keeping as "known good".
+#   2. for each file that will change: keep the running one as <dest>.last-good (and the one before as <dest>.last-good.prev)
+#   3. write the new files (with the tool's own validate command, when given), restart, wait, then check: running, not restarted by itself since, health URL / command ok
+#   4. unhealthy: put the last-good files back, clear systemd's start-limit, restart, say so (journal + fleet-notify when installed) and FAIL the run, so it is never mistaken for success
+#   5. that same content is remembered as failed (<dest>.failed-rev) and is not applied again until it changes: no restart loop every 20 minutes
+# First install (no previous file) has nothing to go back to: a failure then just fails, with the service's last log lines.
+# Not for services that migrate their data when they start: rolling those back needs a decision of its own.
+safe_apply_name: service
+safe_apply_files: []
+# kind: systemd (name, daemon_reload) | compose (project_src, name = the container to inspect) | command (command: shell to run)
+safe_apply_restart: {}
+# wait: seconds between the restart and the check (the service must stay up and not be restarted by itself in that time)
+# url + statuses: also require this URL to answer; command: also require this shell command to succeed
+safe_apply_health: {}
+safe_apply_wait: 8
+safe_apply_notify: true
+# true: restart and check even when no file changed (a package was upgraded, a user was added to a group). Nothing to roll back then; an unhealthy result still fails the run.
+safe_apply_force: false
