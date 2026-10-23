@@ -172,6 +172,11 @@
   }
 
   // ---------------------------------------------------------------- drawer
+  // Several routes can share a hostname (a different backend or sign-in per source network): say which one this is.
+  function routeNote(r) {
+    const nets = ((r.rule || '').match(/ClientIP\(`([^`]+)`\)/g) || []).map((m) => m.slice(10, -2));
+    return r.name + (nets.length ? ' · only from ' + nets.join(', ') : (r.rule ? ' · custom rule' : ''));
+  }
   function openHost(name) {
     state.selected = name;
     const host = state.data.hosts.find((x) => x.name === name);
@@ -198,7 +203,8 @@
         kv('Certificates', (host.cert || []).join(', ') || 'none'), kv('Public ports (fw)', (host.fw || []).join(', ') || 'none (tailnet only)')),
       h('h2', null, 'Routes'),
       (host.routes || []).length ? h('table', null, host.routes.map((r) => h('tr', null,
-        h('td', null, (r.hosts || []).map((n) => h('div', null, h('a', { href: safeUrl('https://' + n), target: '_blank', rel: 'noopener noreferrer' }, n)))),
+        h('td', null, (r.hosts || []).map((n) => h('div', null, h('a', { href: safeUrl('https://' + n), target: '_blank', rel: 'noopener noreferrer' }, n))),
+          h('div', { class: 'mute note' }, routeNote(r))),
         h('td', { class: 'mute' }, r.redirect ? 'redirect → ' + r.redirect : r.backend), h('td', null, r.internal ? 'internal' : r.profile || '')))) : h('div', { class: 'empty' }, 'No routes: this host serves nothing through Traefik.'),
       h('h2', null, 'Public exposure'),
       ex.length ? h('table', null, ex.map((e) => h('tr', null, h('td', null, e.ip), h('td', null, 'open ' + ((e.open_tcp || []).join(', ') || 'nothing')),

@@ -17,7 +17,7 @@
 {%- set intern = namespace(on=(r.internal | default(false) | bool)) -%}
 {%- for hh in hs -%}{%- for d in cmdr_internal_domains -%}{%- if hh == d or hh.endswith('.' ~ d) -%}{%- set intern.on = true -%}{%- endif -%}{%- endfor -%}{%- endfor -%}
 {%- set _ = rts.append({'name': r.name | default(''), 'hosts': hs, 'backend': r.backend | default(''), 'profile': r.profile | default(''), 'internal': intern.on,
-                        'redirect': (r.redirect.to if r.redirect is defined else '')}) -%}
+                        'redirect': (r.redirect.to if r.redirect is defined else ''), 'rule': r.rule | default('')}) -%}
 {%- endfor -%}
 {%- set _ = out.append({'name': name, 'type': a.type | default(''), 'org': a.org | default(''), 'site': a.site | default(''),
                         'util': a.util | default([]), 'feat': a.feat | default([]), 'prop': a.prop | default([]), 'cert': a.cert | default([]),
