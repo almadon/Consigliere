@@ -53,10 +53,23 @@
     _muximux_skip_groups: "{{ (((_muximux_prev.groups | default([])) if _muximux_prev else []) + (_muximux_managed.groups | map(attribute='name') | list)) if muximux_repo_owns_tiles | bool else [] }}"
     _muximux_first: "{{ _muximux_prev is none or _muximux_cur | length == 0 }}"
 
+- name: Is there a copy of the settings in the fleet repo?
+  ansible.builtin.slurp:
+    src: "{{ muximux_snapshot_path }}"
+  register: _muximux_snapshot
+  failed_when: false
+  when: muximux_snapshot_path | length > 0
+
+- name: What a first run starts from (the repo's copy of the settings when there is one, else the declared tiles)
+  ansible.builtin.set_fact:
+    _muximux_first_base: >-
+      {{ ((_muximux_snapshot.content | b64decode | from_yaml | default({}, true)) | combine({'server': _muximux_managed.server, 'auth': _muximux_managed.auth}))
+         if (_muximux_snapshot.content | default('')) | length > 0 else _muximux_managed }}
+
 - name: The merged configuration
   ansible.builtin.set_fact:
     _muximux_merged: >-
-      {{ _muximux_managed if _muximux_first | bool else
+      {{ _muximux_first_base if _muximux_first | bool else
          _muximux_cur | combine({
            'server': (_muximux_cur.server | default({})) | combine({'listen': _muximux_managed.server.listen}),
            'auth': (_muximux_cur.auth | default({})) | combine(_muximux_managed.auth),

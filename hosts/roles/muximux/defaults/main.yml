@@ -16,6 +16,9 @@ muximux_user_editable: false
 # Only with muximux_user_editable: does the repo keep owning the tiles and groups it declares (true), or are they just the starting set written on the very first
 # run and the console entirely yours afterwards (false)? Sign-in settings and the listen address follow the repo either way.
 muximux_repo_owns_tiles: true
+# The fleet repo's copy of the console's own settings (saved with scripts/settings.sh pull in the fleet repo). A host that has no console configuration yet
+# (a rebuild, a new host) starts from it instead of the tiles above. Empty = none. Example: "{{ fleet_secrets_dir | realpath | dirname }}/state/ctrlzen.yaml"
+muximux_snapshot_path: ""
 # The user the container runs as after its entrypoint drops privileges (owns the editable config file).
 muximux_run_uid: "1000"
 muximux_run_gid: "1000"
