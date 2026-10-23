@@ -20,6 +20,9 @@ cmdr_admin_groups: [Muximux-Admins]
 cmdr_viewer_groups: []
 # Sites that may frame the page (the console that embeds it). 'none' = nobody.
 cmdr_frame_ancestors: []
+# SameSite attribute of the session cookie: Lax (default), Strict or None. None is needed when the page is shown in a frame of another site (a browser extension's
+# new-tab page); it is safe for cmdr because cmdr changes nothing on the fleet and its one POST needs a custom header.
+cmdr_cookie_samesite: Lax
 # Loki, for the live status (the tailnet address of the host that runs it).
 cmdr_loki_url: ""
 cmdr_status_interval: 60

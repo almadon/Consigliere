@@ -39,6 +39,7 @@ TAGS_DIRS = [d for d in (ENV("CMDR_TAGS_DIRS") or "").split(":") if d]
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 SESSION_TTL = int(ENV("CMDR_SESSION_TTL", str(8 * 3600)))
 SECURE = URL.startswith("https://")
+SAMESITE = ENV("CMDR_COOKIE_SAMESITE", "Lax") if ENV("CMDR_COOKIE_SAMESITE", "Lax") in ("Lax", "Strict", "None") else "Lax"
 REFRESH_MIN = 10
 RECAP = re.compile(r"ok=(\d+)\s+changed=(\d+)\s+unreachable=(\d+)\s+failed=(\d+)")
 
@@ -336,8 +337,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return v
         return ""
 
-    def set_cookie(self, name, value, max_age):
-        return f"{name}={value}; Path=/; Max-Age={max_age}; HttpOnly; SameSite=Lax" + ("; Secure" if SECURE else "")
+    def set_cookie(self, name, value, max_age, samesite="Lax"):
+        # SameSite=None is only honoured by browsers on Secure cookies; without https it falls back to Lax.
+        if samesite == "None" and not SECURE:
+            samesite = "Lax"
+        return f"{name}={value}; Path=/; Max-Age={max_age}; HttpOnly; SameSite={samesite}" + ("; Secure" if SECURE else "")
 
     def user(self):
         if AUTH == "none":
@@ -452,7 +456,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not role:
             return self.send(403, b"<!doctype html><meta charset=utf-8><title>No access</title><p>You are signed in but not in a group that may use this page.", "text/html; charset=utf-8")
         sess = sign({"name": name, "role": role, "exp": time.time() + SESSION_TTL})
-        self.redirect(tmp["next"], [self.set_cookie("cmdr_session", sess, SESSION_TTL), self.set_cookie("cmdr_oidc", "", 0)])
+        self.redirect(tmp["next"], [self.set_cookie("cmdr_session", sess, SESSION_TTL, SAMESITE), self.set_cookie("cmdr_oidc", "", 0)])
 
 
 class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):

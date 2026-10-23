@@ -29,6 +29,7 @@ services:
       CMDR_ADMIN_GROUPS: {{ (cmdr_admin_groups | join(',')) | to_json }}
       CMDR_VIEWER_GROUPS: {{ (cmdr_viewer_groups | join(',')) | to_json }}
       CMDR_FRAME_ANCESTORS: {{ (cmdr_frame_ancestors | join(' ') if cmdr_frame_ancestors | length > 0 else "'none'") | to_json }}
+      CMDR_COOKIE_SAMESITE: {{ cmdr_cookie_samesite | to_json }}
       CMDR_LOKI: {{ cmdr_loki_url | to_json }}
 {% if cmdr_victoria_url | length > 0 %}
       CMDR_VICTORIA: {{ cmdr_victoria_url | to_json }}
