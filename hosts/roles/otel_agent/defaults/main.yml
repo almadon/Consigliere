@@ -32,6 +32,10 @@ otel_agent_syslog_timezone: UTC
 # VictoriaMetrics as protobuf, which is all VictoriaMetrics accepts. Used for Proxmox's built-in metric server (Datacenter > Metric Server >
 # OpenTelemetry, server 127.0.0.1, port 4318, path /v1/metrics). Both empty = off.
 #   otel_agent_metrics_url: VictoriaMetrics' OTLP base, for example http://vm.ctrl.a64.one:8428/opentelemetry
-#   otel_agent_otlp_listen: address:port to listen on; keep it on 127.0.0.1 so only this host can send.
+#   otel_agent_otlp_listen: address:port to listen on; keep it on 127.0.0.1 so only this host can send. Empty = no relay (host metrics below can still be sent).
 otel_agent_metrics_url: ""
 otel_agent_otlp_listen: ""
+# This host's own CPU, memory, disk and load, scraped every otel_agent_hostmetrics_interval and sent to otel_agent_metrics_url (cmdr shows them).
+# Needs otel_agent_metrics_url. Beszel stays the deep dive; these are the at-a-glance numbers for every host.
+otel_agent_hostmetrics: false
+otel_agent_hostmetrics_interval: 60s

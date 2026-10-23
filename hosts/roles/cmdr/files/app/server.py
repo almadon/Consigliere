@@ -8,6 +8,7 @@ This page shows and links; it runs nothing on any host. The only thing it can do
 import base64
 import hashlib
 import hmac
+import html
 import http.server
 import json
 import os
@@ -32,6 +33,7 @@ PROXY_SECRET = ENV("CMDR_PROXY_SECRET", "")
 FRAME_ANCESTORS = ENV("CMDR_FRAME_ANCESTORS", "'none'")
 INVENTORY = ENV("CMDR_INVENTORY", "/data/inventory.json")
 LOKI = (ENV("CMDR_LOKI") or "").rstrip("/")
+VICTORIA = (ENV("CMDR_VICTORIA") or "").rstrip("/")
 INTERVAL = int(ENV("CMDR_STATUS_INTERVAL", "60"))
 TAGS_DIRS = [d for d in (ENV("CMDR_TAGS_DIRS") or "").split(":") if d]
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
@@ -115,7 +117,7 @@ def load_tag_descriptions():
     return out
 
 
-STATUS = {"updated": 0, "ok": False, "error": "not collected yet", "alive": {}, "reconcile": {}, "exposure": {}}
+STATUS = {"updated": 0, "ok": False, "error": "not collected yet", "alive": {}, "reconcile": {}, "exposure": {}, "stats": {}}
 LOCK = threading.Lock()
 
 
@@ -144,6 +146,89 @@ def parse_event(line):
     return d if "event" in d else None
 
 
+# ---------------------------------------------------------------- host stats (VictoriaMetrics, from the otel_agent's hostmetrics)
+HOST_LABELS = ("host.name", "host_name", "host", "instance")
+METRIC = {  # OTLP names, then the Prometheus-style spellings a store may have converted them to
+    "cpu": ["system.cpu.utilization", "system_cpu_utilization_ratio", "system_cpu_utilization"],
+    "mem": ["system.memory.utilization", "system_memory_utilization_ratio", "system_memory_utilization"],
+    "disk": ["system.filesystem.utilization", "system_filesystem_utilization_ratio", "system_filesystem_utilization"],
+    "load": ["system.cpu.load_average.1m", "system_cpu_load_average_1m"],
+}
+
+
+def vm(path, **params):
+    return http_json(VICTORIA + path + "?" + urllib.parse.urlencode(params))
+
+
+def vm_instant(kind, matcher=""):
+    """The series for one kind of metric, trying each spelling of its name; returns (name, [(labels, value)])."""
+    for name in METRIC[kind]:
+        r = vm("/api/v1/query", query='{__name__="%s"%s}' % (name, matcher))
+        res = r.get("data", {}).get("result", [])
+        if res:
+            return name, [(x["metric"], float(x["value"][1])) for x in res]
+    return None, []
+
+
+def label_of(metric):
+    for k in HOST_LABELS:
+        if metric.get(k):
+            return k, metric[k].lower()
+    return None, None
+
+
+def collect_stats():
+    out, label = {}, None
+    cpu_by, mem_by, disk_by, load_by = {}, {}, {}, {}
+    _, cpu = vm_instant("cpu", ',state="idle"')
+    for m, v in cpu:
+        label, host = label_of(m)
+        if host:
+            cpu_by.setdefault(host, []).append(v)
+    _, mem = vm_instant("mem", ',state="used"')
+    for m, v in mem:
+        label, host = label_of(m)
+        if host:
+            mem_by[host] = v
+    _, disk = vm_instant("disk")
+    for m, v in disk:
+        label, host = label_of(m)
+        if host:
+            # the root filesystem if there is one, else the fullest
+            if m.get("mountpoint") == "/" or host not in disk_by or (disk_by[host][0] != "/" and v > disk_by[host][1]):
+                disk_by[host] = (m.get("mountpoint", ""), v)
+    _, load = vm_instant("load")
+    for m, v in load:
+        label, host = label_of(m)
+        if host:
+            load_by[host] = v
+    now = int(time.time())
+    for host in set(cpu_by) | set(mem_by) | set(disk_by):
+        out[host] = {"cpu": (1 - sum(cpu_by[host]) / len(cpu_by[host])) if host in cpu_by else None, "cores": len(cpu_by.get(host, [])) or None,
+                     "mem": mem_by.get(host), "disk": disk_by[host][1] if host in disk_by else None, "load": load_by.get(host), "ts": now}
+    return out, label
+
+
+def stats_history(host):
+    """Six hours of cpu and memory for one host, 5-minute steps, as lists of [timestamp, 0..1]."""
+    label = STATS_LABEL
+    if not VICTORIA or not label or not re.fullmatch(r"[a-z0-9._-]+", host):
+        return {}
+    end = int(time.time())
+    out = {}
+    for kind, tmpl in (("cpu", '1 - avg({__name__="%s",state="idle",%s="%s"})'), ("mem", 'avg({__name__="%s",state="used",%s="%s"})')):
+        for name in METRIC[kind]:
+            q = tmpl % (name, label, host)
+            res = vm("/api/v1/query_range", query=q, start=end - 6 * 3600, end=end, step=300).get("data", {}).get("result", [])
+            if res:
+                out[kind] = [[int(t), float(v)] for t, v in res[0]["values"]]
+                break
+    return out
+
+
+STATS_LABEL = None
+
+
 def collect():
     alive, recon, expo, errors = {}, {}, {}, []
     try:
@@ -153,7 +238,7 @@ def collect():
     except Exception as e:  # noqa: BLE001
         errors.append("alive: " + type(e).__name__)
     try:
-        for stream, ts, line in loki_lines('{unit="fleet-reconcile.service"} |~ "ok=[0-9]+ +changed="', 24, 2000):
+        for stream, ts, line in loki_lines('{unit=~"fleet-reconcile(.service)?"} |~ "ok=[0-9]+ +changed="', 24, 2000):
             m = RECAP.search(line)
             host = (stream.get("host_name") or "").lower()
             if m and host and (host not in recon or ts > recon[host]["ts"]):
@@ -161,7 +246,7 @@ def collect():
     except Exception as e:  # noqa: BLE001
         errors.append("reconcile: " + type(e).__name__)
     try:
-        for stream, ts, line in loki_lines('{unit="fleet-exposure-watch.service"} |= "\\"event\\""', 72, 2000):
+        for stream, ts, line in loki_lines('{unit=~"fleet-exposure-watch(.service)?"} |= "\\"event\\""', 72, 2000):
             d = parse_event(line)
             if d and d.get("event") == "scanned":
                 key = d.get("target", "") + "|" + d.get("ip", "")
@@ -169,8 +254,18 @@ def collect():
                     expo[key] = {"ts": ts, "target": d.get("target"), "ip": d.get("ip"), "open_tcp": d.get("open_tcp", []), "findings": d.get("finding_list", [])}
     except Exception as e:  # noqa: BLE001
         errors.append("exposure: " + type(e).__name__)
+    stats = None
+    if VICTORIA:
+        global STATS_LABEL
+        try:
+            stats, label = collect_stats()
+            STATS_LABEL = label or STATS_LABEL
+        except Exception as e:  # noqa: BLE001
+            errors.append("stats: " + type(e).__name__)
     with LOCK:
         STATUS.update({"updated": int(time.time()), "ok": not errors, "error": "; ".join(errors), "alive": alive, "reconcile": recon, "exposure": expo})
+        if stats is not None:
+            STATUS["stats"] = stats
 
 
 WAKE = threading.Event()
@@ -195,9 +290,10 @@ def fleet_view(user):
     for h in inv.get("hosts", []):
         n = h["name"].lower()
         rec = st["reconcile"].get(n)
-        hosts.append(dict(h, status={"alive": (st["alive"].get(n, 0) > 0) if st["alive"] else None, "reconcile": rec}))
+        hosts.append(dict(h, status={"alive": (st["alive"].get(n, 0) > 0) if st["alive"] else None, "reconcile": rec, "stats": st.get("stats", {}).get(n)}))
     return {"user": user, "generated": inv.get("generated", 0), "hosts": hosts, "tools": inv.get("tools", []), "host_links": inv.get("host_links", []),
-            "host_commands": inv.get("host_commands", []), "commands": inv.get("commands", []),
+            "host_commands": inv.get("host_commands", []), "commands": inv.get("commands", []), "tag_kinds": inv.get("tag_kinds", {}), "tag_overrides": inv.get("tag_overrides", {}),
+            "idp_name": inv.get("idp_name", ""), "stats_on": bool(VICTORIA),
             "tags": load_tag_descriptions(), "exposure": sorted(st["exposure"].values(), key=lambda e: (e["target"] or "", e["ip"] or "")),
             "status": {"updated": st["updated"], "ok": st["ok"], "error": st["error"]}}
 
@@ -275,10 +371,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self.static(path.lstrip("/")[len("static/"):])
             if self.headers.get("Sec-Fetch-Dest") == "iframe":
                 # The identity provider refuses to be framed, so signing in cannot happen here: ask for it in a real tab; this frame reloads when the cookie exists.
-                return self.static("signin.html")
+                return self.signin()
             return self.redirect("/auth/login?next=" + urllib.parse.quote(self.path if self.path.startswith("/") and not self.path.startswith("//") else "/"))
         if path == "/api/fleet":
             return self.send(200, json.dumps(fleet_view(u)).encode(), "application/json")
+        if path == "/api/stats":
+            try:
+                return self.send(200, json.dumps(stats_history(q.get("host", [""])[0].lower())).encode(), "application/json")
+            except Exception:  # noqa: BLE001
+                return self.send(200, b"{}", "application/json")
         if path == "/api/me":
             return self.send(200, json.dumps(u).encode(), "application/json")
         name = "index.html" if path == "/" else path.lstrip("/")
@@ -300,6 +401,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
             STATUS["refresh_asked"] = now
         WAKE.set()
         return self.send(202, b'{"ok":true}', "application/json")
+
+    def signin(self):
+        name = html.escape(str(load_inventory().get("idp_name") or "").strip())
+        with open(os.path.join(STATIC, "signin.html"), encoding="utf-8") as fh:
+            page = fh.read().replace("__WITH__", f" with {name}" if name else "").replace("__WHO__", name or "Your identity provider")
+        return self.send(200, page.encode(), "text/html; charset=utf-8")
 
     def static(self, name):
         full = os.path.normpath(os.path.join(STATIC, name))

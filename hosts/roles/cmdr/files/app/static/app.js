@@ -107,19 +107,67 @@
       h('button', { class: 'b', type: 'button', onclick: () => openHost(host.name) }, 'more…'));
   }
 
+  // ---------------------------------------------------------------- tags, stats
+  function tagInfo(kind, tag) {
+    const k = (state.data.tag_kinds || {})[kind] || {};
+    const ov = (state.data.tag_overrides || {});
+    const o = ov[kind + '/' + tag] || ov[tag] || {};
+    return { label: o.label || tag, desc: o.desc || (state.data.tags[kind] || {})[tag] || k.desc || '', color: o.color || k.color || '' };
+  }
+  function tagEl(kind, tag) {
+    const i = tagInfo(kind, tag);
+    const el = h('span', { class: 'tag', title: i.desc ? `${i.label}: ${i.desc}` : i.label }, i.label);
+    if (i.color) el.style.setProperty('--k', i.color);
+    return el;
+  }
+  const specificDesc = (kind, tag) => { const o = (state.data.tag_overrides || {}); const ov = o[kind + '/' + tag] || o[tag] || {}; return ov.desc || (state.data.tags[kind] || {})[tag] || ''; };
+  const kindLabel = (kind) => ((state.data.tag_kinds || {})[kind] || {}).label || kind;
+  function section(label, kind, body) {
+    const sl = h('span', { class: 'sl' }, label);
+    if (kind) { const c = ((state.data.tag_kinds || {})[kind] || {}).color; if (c) sl.style.setProperty('--k', c); }
+    return h('div', { class: 'sec' }, sl, h('div', { class: 'sc' }, body));
+  }
+  const level = (v) => (v >= 0.9 ? 'bad' : v >= 0.75 ? 'warn' : 'ok');
+  function meter(label, v, title) {
+    if (v === null || v === undefined) return null;
+    const fillEl = h('span', { class: 'fill ' + level(v) });
+    fillEl.style.width = Math.max(2, Math.min(100, Math.round(v * 100))) + '%';
+    return h('div', { class: 'm', title: title || label }, h('span', { class: 'ml' }, label), h('span', { class: 'track' }, fillEl), h('span', { class: 'mv' }, Math.round(v * 100) + '%'));
+  }
+  function meters(host) {
+    const st = (host.status || {}).stats;
+    if (!st) return null;
+    const stale = Date.now() / 1000 - st.ts > 900;
+    return h('div', { class: 'meters' + (stale ? ' stale' : '') }, meter('CPU', st.cpu, st.cores ? `${st.cores} cores, now` : 'now'), meter('MEM', st.mem), meter('DISK', st.disk, 'root filesystem'));
+  }
+  function spark(points, color) {
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg'); svg.setAttribute('viewBox', '0 0 200 40'); svg.setAttribute('class', 'spark'); svg.setAttribute('preserveAspectRatio', 'none');
+    if (points.length < 2) return svg;
+    const t0 = points[0][0], t1 = points[points.length - 1][0] || t0 + 1;
+    const xy = points.map(([t, v]) => `${(((t - t0) / (t1 - t0 || 1)) * 200).toFixed(1)},${(38 - Math.max(0, Math.min(1, v)) * 36).toFixed(1)}`);
+    const area = document.createElementNS(NS, 'polygon'); area.setAttribute('points', `0,40 ${xy.join(' ')} 200,40`); area.setAttribute('class', 'sa');
+    const line = document.createElementNS(NS, 'polyline'); line.setAttribute('points', xy.join(' ')); line.setAttribute('class', 'sl2');
+    svg.append(area, line);
+    return svg;
+  }
+
   // ---------------------------------------------------------------- cards
   function card(host) {
     const hh = hostHealth(host);
-    const tags = [...(host.util || []).map((t) => ['util', t]), ...(host.feat || []).map((t) => ['feat', t]), ...(host.prop || []).map((t) => ['prop', t])];
     const routes = routeNames(host);
+    const kinds = [['util', host.util], ['feat', host.feat], ['prop', host.prop]].filter(([, l]) => (l || []).length);
     return h('div', { class: `card s-${hh.level}`, tabindex: '0', role: 'button', 'aria-label': 'Details for ' + host.name, onclick: () => openHost(host.name),
       onkeydown: (e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openHost(host.name); } } },
-      h('div', { class: 'row' }, h('span', { class: 'dot ' + hh.dot, title: hh.dot === 'ok' ? 'sending logs' : hh.dot === 'bad' ? 'no logs in 10 minutes' : 'unknown' }),
+      h('div', { class: 'row head' }, h('span', { class: 'dot ' + hh.dot, title: hh.dot === 'ok' ? 'sending logs' : hh.dot === 'bad' ? 'no logs in 10 minutes' : 'unknown' }),
         h('span', { class: 'name' }, host.name), h('span', { class: 'type' }, host.type || '?')),
       h('div', { class: 'stat' }, h('span', { class: 'dot ' + hh.rec.cls }), h('span', null, hh.rec.text)),
-      tags.length ? h('div', { class: 'row' }, tags.map(([k, t]) => h('span', { class: 'tag ' + k, title: (state.data.tags[k] || {})[t] || '' }, t))) : null,
-      routes.length ? h('div', { class: 'routes' }, routes.map((r) =>
-        h('a', { class: 'route' + (r.internal ? ' int' : ''), href: safeUrl('https://' + r.name), target: '_blank', rel: 'noopener noreferrer', onclick: (e) => e.stopPropagation(), title: r.internal ? 'tailnet / LAN only' : '' }, r.name))) : null,
+      meters(host),
+      kinds.length || routes.length ? h('div', { class: 'secs' },
+        kinds.map(([k, list]) => section(kindLabel(k), k, list.map((t) => tagEl(k, t)))),
+        routes.length ? section('Serves', null, routes.map((r) =>
+          h('a', { class: 'route' + (r.internal ? ' int' : ''), href: safeUrl('https://' + r.name), target: '_blank', rel: 'noopener noreferrer', onclick: (e) => e.stopPropagation(),
+            title: r.internal ? 'Open (reachable from the LAN or tailnet only)' : 'Open' }, r.name, r.internal ? h('i', { class: 'lock', 'aria-label': 'tailnet only' }, 'tailnet') : null))) : null) : null,
       quick(host));
   }
 
@@ -130,7 +178,7 @@
     if (!host) return;
     const hh = hostHealth(host);
     const kv = (k, v) => h('tr', null, h('th', null, k), h('td', null, v));
-    const tags = (list, kind) => (list || []).length ? h('span', null, list.map((t) => h('span', { class: 'tag ' + kind, title: (state.data.tags[kind] || {})[t] || '' }, t + ' '))) : h('span', { class: 'mute' }, 'none');
+    const tags = (list, kind) => (list || []).length ? h('span', { class: 'sc' }, list.map((t) => tagEl(kind, t))) : h('span', { class: 'mute' }, 'none');
     const ex = exposureFor(name);
     const cmds = [{ name: 'Shell', cmd: 'ssh root@{host}' }, ...hostCmds()];
     const d = $('drawer');
@@ -138,6 +186,7 @@
       h('div', { class: 'row' }, h('span', { class: 'dot ' + hh.dot }), h('h3', null, host.name), h('button', { class: 'b x', type: 'button', onclick: closeHost }, 'close ✕')),
       h('div', { class: 'stat' }, h('span', null, hh.dot === 'ok' ? 'sending logs' : hh.dot === 'bad' ? 'silent for 10 minutes' : hh.ships ? 'status unknown' : 'not set up to ship logs'), h('span', null, '· ' + hh.rec.text)),
       h('div', { class: 'btns' }, h('a', { class: 'b go', href: 'ssh://root@' + encodeURIComponent(host.name) }, 'open ssh ↗'), hostLinks(host)),
+      statsBlock(host),
       h('h2', null, 'Commands'),
       h('div', { class: 'cmds' }, cmds.map((c) => { const full = fill(c.cmd, host.name);
         return h('div', { class: 'cmd' }, h('b', null, c.name), h('code', null, full), h('button', { class: 'b', type: 'button', onclick: (e) => copy(full, e.currentTarget) }, 'copy')); })),
@@ -145,7 +194,7 @@
       h('h2', null, 'Details'),
       h('table', null,
         kv('Type', host.type || '?'), kv('Organisation', host.org || ''), kv('Site', host.site || ''),
-        kv('Provides (util)', tags(host.util, 'util')), kv('Runs (feat)', tags(host.feat, 'feat')), kv('Properties', tags(host.prop, 'prop')),
+        kv(kindLabel('util'), tags(host.util, 'util')), kv(kindLabel('feat'), tags(host.feat, 'feat')), kv(kindLabel('prop'), tags(host.prop, 'prop')),
         kv('Certificates', (host.cert || []).join(', ') || 'none'), kv('Public ports (fw)', (host.fw || []).join(', ') || 'none (tailnet only)')),
       h('h2', null, 'Routes'),
       (host.routes || []).length ? h('table', null, host.routes.map((r) => h('tr', null,
@@ -157,6 +206,18 @@
         h('div', { class: 'empty' }, 'No scan result seen for this host yet.'));
     d.hidden = false; $('scrim').hidden = false;
     d.setAttribute('tabindex', '-1'); d.focus();
+  }
+  function statsBlock(host) {
+    const st = (host.status || {}).stats;
+    if (!state.data.stats_on) return null;
+    if (!st) return h('div', { class: 'note' }, 'No CPU, memory or disk numbers for this host yet (it needs the metrics agent: otel_agent_hostmetrics).');
+    const box = h('div', { class: 'statbox' }, h('h2', null, 'Stats'), meters(host),
+      h('div', { class: 'note' }, (st.load !== null && st.load !== undefined ? `load ${st.load.toFixed(2)}` : '') + (st.cores ? ` · ${st.cores} cores` : '') + ' · updated ' + ago(st.ts)));
+    const sparks = h('div', { class: 'sparks' }); box.append(sparks);
+    fetch('/api/stats?host=' + encodeURIComponent(host.name), { credentials: 'same-origin' }).then((r) => r.json()).then((d) => {
+      for (const [k, label] of [['cpu', 'CPU, 6 h'], ['mem', 'Memory, 6 h']]) if (d[k] && d[k].length > 1) sparks.append(h('div', { class: 'sp' }, h('span', { class: 'ml' }, label), spark(d[k])));
+    }).catch(() => {});
+    return box;
   }
   function closeHost() { $('drawer').hidden = true; $('scrim').hidden = true; state.selected = null; }
 
@@ -189,6 +250,20 @@
           h('span', null, h('b', null, t.name), t.desc ? h('small', null, t.desc) : null), t.tailnet ? h('span', { class: 'tn', title: 'reachable from the LAN or tailnet only' }, 'tailnet') : null);
       })))));
   }
+  function renderKey() {
+    const d = state.data; const kinds = d.tag_kinds || {};
+    const used = (kind) => [...new Set(d.hosts.flatMap((x) => x[kind] || []))].sort();
+    const col = (kind) => h('div', { class: 'kcol' }, h('h4', null, ((kinds[kind] || {}).label || kind)), h('p', null, (kinds[kind] || {}).desc || ''),
+      h('dl', null, used(kind).flatMap((t) => [h('dt', null, tagEl(kind, t)), h('dd', null, specificDesc(kind, t))])));
+    $('keybody').replaceChildren(
+      h('div', { class: 'kcols' }, ['util', 'feat', 'prop'].map(col)),
+      h('div', { class: 'kcols' },
+        h('div', { class: 'kcol' }, h('h4', null, 'Status'), h('p', null,
+          'Top dot: sending logs (green) or silent for 10 minutes (red). Second line: the last reconcile run: in sync, changed something, failed, or not seen in 24 hours. The bar on the left edge takes the worst of these.')),
+        h('div', { class: 'kcol' }, h('h4', null, 'Serves'), h('p', null, 'The hostnames Traefik serves for this host. Dashed with a "tailnet" label = only reachable from the LAN or tailnet.')),
+        h('div', { class: 'kcol' }, h('h4', null, 'CPU, MEM, DISK'), h('p', null, 'Right now, from the host\'s metrics agent. Amber from 75%, red from 90%. DISK is the root filesystem. Hosts without the agent show no bars.'))),
+      h('p', { class: 'note' }, 'Names and colours of the kinds, and any single tag, are set in the fleet repo (cmdr_tag_kinds, cmdr_tag_overrides); a tag\'s description comes from its manifest.'));
+  }
   function renderChips() {
     const types = [...new Set(state.data.hosts.map((x) => x.type || '?'))].sort();
     $('chips').replaceChildren(...types.map((t) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(state.types.has(t)), onclick: () => { state.types.has(t) ? state.types.delete(t) : state.types.add(t); render(); } }, t)),
@@ -205,7 +280,7 @@
   }
   function render() {
     const d = state.data;
-    renderStrip(); renderTools(); renderChips(); renderExposure();
+    renderStrip(); renderTools(); renderChips(); renderKey(); renderExposure();
     const list = sorted(d.hosts.filter(matches));
     const g = $('hosts');
     g.className = 'grid' + (state.view === 'list' ? ' list' : '');

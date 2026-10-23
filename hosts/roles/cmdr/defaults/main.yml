@@ -23,6 +23,10 @@ cmdr_frame_ancestors: []
 # Loki, for the live status (the tailnet address of the host that runs it).
 cmdr_loki_url: ""
 cmdr_status_interval: 60
+# VictoriaMetrics, for the host stats (CPU, memory, disk, load: sent by the otel_agent with otel_agent_hostmetrics). Empty = no stats on the page.
+cmdr_victoria_url: ""
+# What to call the identity provider on the sign-in panel ("Sign in with <name>"). Empty = just "Sign in".
+cmdr_idp_name: ""
 # Where the fleet repo's config directory is on this host (the reconciler's checkout). Derived from the secrets directory it links.
 cmdr_conf_dir: "{{ fleet_secrets_dir | realpath | dirname }}"
 # Domains whose routes are only served to the LAN and tailnet (shown with a dashed border).
@@ -44,3 +48,13 @@ cmdr_commands:
   - {name: Reconcile every host, cmd: "scripts/reconcile-now.sh all"}
   - {name: Preview changes on every host, cmd: "scripts/reconcile-now.sh all --check"}
   - {name: Run the exposure scan now, cmd: "scripts/exposure.sh run"}
+
+# The host cards group a host's tags by KIND, each with its own colour. This explains and styles the kinds (shown in the page's key):
+#   label: heading on the card; desc: one line of meaning; color: any CSS colour
+cmdr_tag_kinds:
+  util: {label: Provides, color: "#dcb053", desc: "A service this host provides to the fleet (its util tags): what the machine is for."}
+  feat: {label: Runs, color: "#3fbb7c", desc: "An agent or feature running on this host (its feat tags): how it takes part in the fleet."}
+  prop: {label: Settings, color: "#8b9bff", desc: "A property that changes how this host is configured (its prop tags)."}
+# Per-tag overrides, keyed by tag name (or kind/name to be exact). Anything left out keeps the kind's colour and the manifest's own description:
+#   otel: {label: logs, desc: "Ships its journal and Docker logs to Loki.", color: "#4aa8ff"}
+cmdr_tag_overrides: {}

@@ -41,3 +41,8 @@ browser against the real fleet repo; not yet on the fleet.
   status from Loki now; it is the only thing the page can do.
 - **Sign-in in a frame:** the identity provider cannot be framed, so the frame shows a branded panel; sign-in opens in a small window that tells the frame
   at once (BroadcastChannel; polling is the fallback) and closes itself after 3 seconds.
+- **Host cards** are segmented: the status line, CPU / MEM / DISK bars (with `cmdr_victoria_url` and hosts running `otel_agent_hostmetrics`), then the tags grouped by kind
+  (**Provides** = util, **Runs** = feat, **Settings** = prop), then **Serves** (the hostnames, as links; dashed = LAN and tailnet only). The page's "How to read a host
+  card" key explains it. Kind names, meanings and colours are `cmdr_tag_kinds`; any single tag can be renamed, described or recoloured in `cmdr_tag_overrides`.
+  The host drawer adds 6-hour CPU and memory charts.
+- `cmdr_idp_name` names the identity provider on the sign-in panel ("Sign in with Inti").

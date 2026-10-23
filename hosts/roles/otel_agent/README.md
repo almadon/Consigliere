@@ -37,6 +37,8 @@ Every line carries `host_name` (`otel_agent_host_name`, the fleet's short name).
   the host (Proxmox's built-in metric server, pointed at `127.0.0.1:4318`, path `/v1/metrics`) and forwards them to
   [VictoriaMetrics](../victoria_server/README.md) as protobuf, with the same on-disk queue. Proxmox may send JSON, which VictoriaMetrics rejects;
   the collector accepts both. Host metrics and Docker stats are not collected (Beszel does that).
+- **Host metrics (optional, `otel_agent_hostmetrics`):** the collector scrapes this host's CPU, memory, root-and-data filesystem use and load every minute
+  (`otel_agent_hostmetrics_interval`) and sends them to `otel_agent_metrics_url`; cmdr shows them on the host cards. Container, tmpfs and pseudo filesystems are left out.
 - No secret is needed: Loki and VictoriaMetrics take data only from the tailnet.
 - Unraid hosts are not supported by this role (no systemd, no apt).
 

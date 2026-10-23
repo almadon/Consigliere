@@ -40,7 +40,28 @@ receivers:
       - type: remove
         field: attributes.container_id
 {% endif %}
-{% if _otel_agent_metrics %}
+{% if otel_agent_hostmetrics | bool %}
+  hostmetrics:
+    collection_interval: {{ otel_agent_hostmetrics_interval }}
+    scrapers:
+      cpu:
+        metrics:
+          system.cpu.utilization: {enabled: true}
+      memory:
+        metrics:
+          system.memory.utilization: {enabled: true}
+      load: {}
+      filesystem:
+        metrics:
+          system.filesystem.utilization: {enabled: true}
+        exclude_fs_types:
+          match_type: strict
+          fs_types: [autofs, binfmt_misc, bpf, cgroup, cgroup2, configfs, debugfs, devpts, devtmpfs, fusectl, hugetlbfs, mqueue, nsfs, overlay, proc, procfs, pstore, rpc_pipefs, securityfs, selinuxfs, squashfs, sysfs, tmpfs, tracefs]
+        exclude_mount_points:
+          match_type: regexp
+          mount_points: ["/var/lib/docker/.*", "/run/.*", "/snap/.*", "/sys/.*", "/proc/.*", "/dev/.*", "/var/lib/containers/.*"]
+{% endif %}
+{% if _otel_agent_relay %}
   otlp/metrics:
     protocols:
       http:
@@ -149,9 +170,15 @@ service:
       processors: [memory_limiter, batch]
       exporters: [otlp_http/loki]
 {% endif %}
-{% if _otel_agent_metrics %}
+{% if _otel_agent_relay %}
     metrics/relay:
       receivers: [otlp/metrics]
+      processors: [memory_limiter, resource, batch]
+      exporters: [otlp_http/victoria]
+{% endif %}
+{% if otel_agent_hostmetrics | bool %}
+    metrics/host:
+      receivers: [hostmetrics]
       processors: [memory_limiter, resource, batch]
       exporters: [otlp_http/victoria]
 {% endif %}
