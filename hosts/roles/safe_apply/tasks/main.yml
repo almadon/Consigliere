@@ -130,6 +130,7 @@
       when: safe_apply_before_ok | default(false) | bool
 
     - name: Restart on the known-good configuration
+      when: safe_apply_before_ok | default(false) | bool
       block:
         - name: Restart on the known-good configuration
           ansible.builtin.include_tasks: restart.yml
@@ -138,7 +139,6 @@
           ansible.builtin.set_fact:
             safe_apply_rollback_restart_error: >-
               {{ ansible_failed_result.msg | default('restart failed') | string | truncate(300) }}
-      when: safe_apply_before_ok | default(false) | bool
 
     - name: Wait, then check the rollback
       ansible.builtin.pause:
