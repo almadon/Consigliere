@@ -130,9 +130,15 @@
       when: safe_apply_before_ok | default(false) | bool
 
     - name: Restart on the known-good configuration
-      ansible.builtin.include_tasks: restart.yml
+      block:
+        - name: Restart on the known-good configuration
+          ansible.builtin.include_tasks: restart.yml
+      rescue:
+        - name: Record rollback restart failure
+          ansible.builtin.set_fact:
+            safe_apply_rollback_restart_error: >-
+              {{ ansible_failed_result.msg | default('restart failed') | string | truncate(300) }}
       when: safe_apply_before_ok | default(false) | bool
-      ignore_errors: true
 
     - name: Wait, then check the rollback
       ansible.builtin.pause:
@@ -144,9 +150,13 @@
       when: safe_apply_before_ok | default(false) | bool
 
     - name: The service's last log lines
-      ansible.builtin.shell: >-
-        {{ ('journalctl -u ' ~ safe_apply_restart.name ~ ' --no-pager -n 12 -o cat') if safe_apply_restart.kind == 'systemd'
-           else ('docker logs --tail 12 ' ~ safe_apply_restart.name ~ ' 2>&1') if safe_apply_restart.kind == 'compose' else 'true' }}
+      ansible.builtin.command:
+        argv: >-
+          {{ ['journalctl', '-u', safe_apply_restart.name, '--no-pager', '-n', '12', '-o', 'cat']
+             if safe_apply_restart.kind == 'systemd'
+             else ['docker', 'logs', '--tail', '12', safe_apply_restart.name]
+             if safe_apply_restart.kind == 'compose'
+             else ['true'] }}
       register: safe_apply_log
       changed_when: false
       failed_when: false
@@ -155,9 +165,9 @@
       ansible.builtin.set_fact:
         safe_apply_verdict: >-
           {{ safe_apply_name }}: the new configuration was not healthy ({{ safe_apply_error }}).
-          {% if safe_apply_before_ok | default(false) | bool %}It was rolled back to the previous known-good configuration{{ ' and the service is running again.' if safe_apply_ok | default(false) | bool else ', but the service is STILL not healthy: ' ~ (safe_apply_why | default('unknown')) }}
+          {% if safe_apply_before_ok | default(false) | bool %}It was rolled back to the previous known-good configuration{{ ' and the service is running again.' if safe_apply_ok | default(false) | bool else ', but the service is STILL not healthy: ' ~ (safe_apply_why | default('unknown')) }}{% if safe_apply_rollback_restart_error is defined %} Rollback restart also failed: {{ safe_apply_rollback_restart_error }}.{% endif %}
           {% else %}There was no known-good state to go back to (the service was not healthy before the change either).{% endif %}
-          Last log lines: {{ (safe_apply_log.stdout | default('') | trim | replace('\n', ' | ')) | truncate(500) }}
+          Last log lines: {{ ((safe_apply_log.stdout | default('')) ~ ' ' ~ (safe_apply_log.stderr | default('')) | trim | replace('\n', ' | ')) | truncate(500) }}
 
     - name: Record it where an operator looks (the journal)
       ansible.builtin.command:
