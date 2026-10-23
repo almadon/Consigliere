@@ -5,7 +5,7 @@
     dest: "{{ item.dest }}"
     remote_src: true
     mode: preserve
-  loop: "{{ _sa_changing | selectattr('_exists') | list }}"
+  loop: "{{ safe_apply_changing | selectattr('_exists') | list }}"
   loop_control:
     label: "{{ item.dest }}"
 
@@ -13,6 +13,6 @@
   ansible.builtin.file:
     path: "{{ item.dest }}"
     state: absent
-  loop: "{{ _sa_changing | rejectattr('_exists') | list }}"
+  loop: "{{ safe_apply_changing | rejectattr('_exists') | list }}"
   loop_control:
     label: "{{ item.dest }}"

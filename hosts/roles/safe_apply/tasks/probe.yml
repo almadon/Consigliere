@@ -1,29 +1,29 @@
 ---
-# Sets _sa_ok (is the service up) and _sa_restarts (how often it restarted by itself), and _sa_why in words.
+# Sets safe_apply_ok (is the service up) and safe_apply_restarts (how often it restarted by itself), and safe_apply_why in words.
 - name: Probe a systemd unit
   ansible.builtin.systemd:
     name: "{{ safe_apply_restart.name }}"
-  register: _sa_unit
+  register: safe_apply_unit
   failed_when: false
   when: safe_apply_restart.kind == 'systemd'
 
 - name: Probe a container
   community.docker.docker_container_info:
     name: "{{ safe_apply_restart.name }}"
-  register: _sa_ctr
+  register: safe_apply_ctr
   failed_when: false
   when: safe_apply_restart.kind == 'compose'
 
 - name: Probe with a command
   ansible.builtin.command: "sh -c {{ safe_apply_restart.command | default('true') | quote }}"
-  register: _sa_cmd
+  register: safe_apply_cmd
   changed_when: false
   failed_when: false
   when: safe_apply_restart.kind == 'command'
 
 - name: Probe the health command
   ansible.builtin.command: "sh -c {{ safe_apply_health.command | quote }}"
-  register: _sa_hcmd
+  register: safe_apply_hcmd
   changed_when: false
   failed_when: false
   when: safe_apply_health.command is defined
@@ -33,24 +33,24 @@
     url: "{{ safe_apply_health.url }}"
     status_code: "{{ safe_apply_health.statuses | default([200]) }}"
     timeout: 5
-  register: _sa_url
+  register: safe_apply_url
   failed_when: false
   when: safe_apply_health.url is defined
 
 - name: Work out the verdict
   ansible.builtin.set_fact:
-    _sa_restarts: >-
-      {{ (_sa_unit.status.NRestarts | default(0) | int) if safe_apply_restart.kind == 'systemd'
-         else ((_sa_ctr.container.RestartCount | default(0) | int) if safe_apply_restart.kind == 'compose' else 0) }}
-    _sa_why: >-
-      {{ (('the unit is ' ~ (_sa_unit.status.ActiveState | default('unknown')) ~ '/' ~ (_sa_unit.status.SubState | default('unknown')))
-          if safe_apply_restart.kind == 'systemd' and not (_sa_unit.status.ActiveState | default('') == 'active' and _sa_unit.status.SubState | default('') == 'running') else '')
-         ~ (('the container is not running' if not (_sa_ctr.container.State.Running | default(false)) else 'the container is restarting' if (_sa_ctr.container.State.Restarting | default(false)) else '')
-            if safe_apply_restart.kind == 'compose' and (not (_sa_ctr.container.State.Running | default(false)) or (_sa_ctr.container.State.Restarting | default(false))) else '')
-         ~ ('the check command failed' if safe_apply_restart.kind == 'command' and (_sa_cmd.rc | default(0)) != 0 else '')
-         ~ ('the health command failed' if safe_apply_health.command is defined and (_sa_hcmd.rc | default(0)) != 0 else '')
-         ~ ('the health URL answered ' ~ (_sa_url.status | default('nothing')) if safe_apply_health.url is defined and (_sa_url.status | default(0)) not in (safe_apply_health.statuses | default([200])) else '') }}
+    safe_apply_restarts: >-
+      {{ (safe_apply_unit.status.NRestarts | default(0) | int) if safe_apply_restart.kind == 'systemd'
+         else ((safe_apply_ctr.container.RestartCount | default(0) | int) if safe_apply_restart.kind == 'compose' else 0) }}
+    safe_apply_why: >-
+      {{ (('the unit is ' ~ (safe_apply_unit.status.ActiveState | default('unknown')) ~ '/' ~ (safe_apply_unit.status.SubState | default('unknown')))
+          if safe_apply_restart.kind == 'systemd' and not (safe_apply_unit.status.ActiveState | default('') == 'active' and safe_apply_unit.status.SubState | default('') == 'running') else '')
+         ~ (('the container is not running' if not (safe_apply_ctr.container.State.Running | default(false)) else 'the container is restarting' if (safe_apply_ctr.container.State.Restarting | default(false)) else '')
+            if safe_apply_restart.kind == 'compose' and (not (safe_apply_ctr.container.State.Running | default(false)) or (safe_apply_ctr.container.State.Restarting | default(false))) else '')
+         ~ ('the check command failed' if safe_apply_restart.kind == 'command' and (safe_apply_cmd.rc | default(0)) != 0 else '')
+         ~ ('the health command failed' if safe_apply_health.command is defined and (safe_apply_hcmd.rc | default(0)) != 0 else '')
+         ~ ('the health URL answered ' ~ (safe_apply_url.status | default('nothing')) if safe_apply_health.url is defined and (safe_apply_url.status | default(0)) not in (safe_apply_health.statuses | default([200])) else '') }}
 
 - name: The verdict
   ansible.builtin.set_fact:
-    _sa_ok: "{{ _sa_why | trim | length == 0 }}"
+    safe_apply_ok: "{{ safe_apply_why | trim | length == 0 }}"

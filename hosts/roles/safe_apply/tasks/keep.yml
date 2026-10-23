@@ -3,10 +3,10 @@
 - name: Is there already a last-good?
   ansible.builtin.stat:
     path: "{{ item.dest }}.last-good"
-  loop: "{{ _sa_changing | selectattr('_exists') | list }}"
+  loop: "{{ safe_apply_changing | selectattr('_exists') | list }}"
   loop_control:
     label: "{{ item.dest }}"
-  register: _sa_lg
+  register: safe_apply_lg
 
 - name: Shift the old last-good to .prev
   ansible.builtin.copy:
@@ -14,7 +14,7 @@
     dest: "{{ item.item.dest }}.last-good.prev"
     remote_src: true
     mode: preserve
-  loop: "{{ _sa_lg.results }}"
+  loop: "{{ safe_apply_lg.results }}"
   loop_control:
     label: "{{ item.item.dest }}"
   when: item.stat.exists
@@ -25,6 +25,6 @@
     dest: "{{ item.dest }}.last-good"
     remote_src: true
     mode: preserve
-  loop: "{{ _sa_changing | selectattr('_exists') | list }}"
+  loop: "{{ safe_apply_changing | selectattr('_exists') | list }}"
   loop_control:
     label: "{{ item.dest }}"
