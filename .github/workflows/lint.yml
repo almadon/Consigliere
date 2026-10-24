@@ -15,11 +15,27 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements-ci.txt
 
       - name: Install linters
-        run: pip install ansible-lint yamllint
+        run: pip install -r requirements-ci.txt
+
+      # The collections are the slow part (about 20 s of downloads). They are cached by the content of hosts/requirements.yml, and the key also carries the ISO
+      # week so the cache is rebuilt weekly: new collection releases (which can change what ansible-lint says) are picked up within a week, not never.
+      - name: Work out the cache week
+        id: week
+        run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Ansible collections
+        id: collections
+        uses: actions/cache@v6
+        with:
+          path: ~/.ansible/collections
+          key: ansible-collections-${{ steps.week.outputs.week }}-${{ hashFiles('hosts/requirements.yml') }}
 
       - name: Install required collections
+        if: steps.collections.outputs.cache-hit != 'true'
         run: ansible-galaxy collection install -r hosts/requirements.yml
 
       - name: yamllint

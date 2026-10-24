@@ -26,8 +26,17 @@ services:
       MUXIMUX_OIDC_CLIENT_ID: {{ muximux_oidc_client_id | to_json }}
       MUXIMUX_OIDC_CLIENT_SECRET: {{ muximux_oidc_client_secret | to_json }}
       MUXIMUX_OIDC_REDIRECT_URL: {{ (muximux_url | trim('/') ~ '/api/auth/oidc/callback') | to_json }}
-      MUXIMUX_OIDC_SCOPES: "openid,profile,email,groups"
-      MUXIMUX_OIDC_GROUPS_CLAIM: groups
+      MUXIMUX_OIDC_SCOPES: {{ (['openid', 'profile', 'email', 'groups'] + muximux_oidc_scopes_extra) | unique | join(',') | to_json }}
+      MUXIMUX_OIDC_GROUPS_CLAIM: {{ muximux_oidc_groups_claim | to_json }}
+{% if muximux_oidc_username_claim | length > 0 %}
+      MUXIMUX_OIDC_USERNAME_CLAIM: {{ muximux_oidc_username_claim | to_json }}
+{% endif %}
+{% if muximux_oidc_email_claim | length > 0 %}
+      MUXIMUX_OIDC_EMAIL_CLAIM: {{ muximux_oidc_email_claim | to_json }}
+{% endif %}
+{% if muximux_oidc_display_name_claim | length > 0 %}
+      MUXIMUX_OIDC_DISPLAY_NAME_CLAIM: {{ muximux_oidc_display_name_claim | to_json }}
+{% endif %}
       MUXIMUX_OIDC_ADMIN_GROUPS: {{ (muximux_oidc_admin_groups | join(',')) | to_json }}
 {% endif %}
     volumes:

@@ -301,7 +301,8 @@
     const b = $('banner');
     if (!d.status.ok) { b.hidden = false; b.textContent = 'Live status is incomplete: ' + (d.status.error || 'not collected yet') + '. Inventory and links below are from the fleet repo and still correct.'; } else b.hidden = true;
     const initials = (d.user.name || '?').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
-    $('user').replaceChildren(h('span', { class: 'avatar', 'aria-hidden': 'true' }, initials), h('span', { class: 'hide-s' }, d.user.name + ' · ' + d.user.role), h('a', { href: '/auth/logout' }, 'sign out'));
+    const pic = d.user.picture ? h('img', { class: 'avatar', src: d.user.picture, alt: '', referrerpolicy: 'no-referrer', onerror: (e) => e.currentTarget.replaceWith(h('span', { class: 'avatar', 'aria-hidden': 'true' }, initials)) }) : null;
+    $('user').replaceChildren(pic || h('span', { class: 'avatar', 'aria-hidden': 'true' }, initials), h('span', { class: 'hide-s' }, d.user.name + ' · ' + d.user.role), h('a', { href: '/auth/logout' }, 'sign out'));
     $('foot').textContent = 'inventory generated ' + (d.generated ? ago(d.generated) : 'never') + ' · status updated ' + (d.status.updated ? ago(d.status.updated) : 'never');
     if (state.selected) openHost(state.selected);
   }

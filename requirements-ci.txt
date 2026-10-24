@@ -1,0 +1,3 @@
+# What the lint workflow installs (.github/workflows/lint.yml). Unpinned on purpose: the lint should notice new rules; the pip cache is keyed on this file.
+ansible-lint
+yamllint

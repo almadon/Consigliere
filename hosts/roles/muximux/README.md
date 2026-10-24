@@ -14,3 +14,14 @@ The fleet console: a [Muximux](https://github.com/mescon/Muximux) dashboard whos
 - Health dots come from Muximux's own checks (`health_url` when the public address is not what should be checked).
 - `muximux_auth: none` is refused unless `muximux_allow_no_auth: true`.
 - The container drops all capabilities except `CHOWN`, `SETUID` and `SETGID`, which its entrypoint needs to start as root and then run as uid 1000. Verified: anonymous requests to `/api/apps` get 401.
+
+## Sign-in settings and what they become
+
+| Variable | Muximux setting | Default |
+|---|---|---|
+| `muximux_oidc_admin_groups` | `MUXIMUX_OIDC_ADMIN_GROUPS` | `[Muximux-Admins]` |
+| `muximux_oidc_groups_claim` | `MUXIMUX_OIDC_GROUPS_CLAIM` | `groups` |
+| `muximux_oidc_scopes_extra` | added to `MUXIMUX_OIDC_SCOPES` (`openid,profile,email,groups` is always sent) | `[]` |
+| `muximux_oidc_username_claim`, `_email_claim`, `_display_name_claim` | `MUXIMUX_OIDC_USERNAME_CLAIM`, `..._EMAIL_CLAIM`, `..._DISPLAY_NAME_CLAIM` | empty = Muximux's own defaults |
+
+Muximux has no profile-picture support, so none is shown or imported. Settings that come from the environment are locked in Muximux's own settings page.

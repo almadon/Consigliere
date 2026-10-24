@@ -20,6 +20,7 @@ grafana_server_admin_group: root
 # Sign-in (OIDC). The issuer's well-known address lists these; the defaults fit Pocket ID.
 grafana_server_oidc_issuer_url: ""
 grafana_server_oidc_name: "Pocket ID"
+# openid, profile, email and groups are always requested whatever this says (the groups claim decides who is admin and editor); add more here.
 grafana_server_oidc_scopes: "openid profile email groups"
 grafana_server_oidc_auth_url: "{{ grafana_server_oidc_issuer_url | trim('/') }}/authorize"
 grafana_server_oidc_token_url: "{{ grafana_server_oidc_issuer_url | trim('/') }}/api/oidc/token"

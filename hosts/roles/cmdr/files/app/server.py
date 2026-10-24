@@ -39,6 +39,7 @@ TAGS_DIRS = [d for d in (ENV("CMDR_TAGS_DIRS") or "").split(":") if d]
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 SESSION_TTL = int(ENV("CMDR_SESSION_TTL", str(8 * 3600)))
 SECURE = URL.startswith("https://")
+ISSUER_ORIGIN = (lambda u: f"{u.scheme}://{u.netloc}" if u.scheme == "https" and u.netloc else "")(urllib.parse.urlsplit(ISSUER))
 SAMESITE = ENV("CMDR_COOKIE_SAMESITE", "Lax") if ENV("CMDR_COOKIE_SAMESITE", "Lax") in ("Lax", "Strict", "None") else "Lax"
 REFRESH_MIN = 10
 RECAP = re.compile(r"ok=(\d+)\s+changed=(\d+)\s+unreachable=(\d+)\s+failed=(\d+)")
@@ -82,6 +83,18 @@ def discovery():
     if not _disc["d"] or time.time() - _disc["t"] > 3600:
         _disc["d"], _disc["t"] = http_json(ISSUER + "/.well-known/openid-configuration"), time.time()
     return _disc["d"]
+
+
+def safe_picture(url):
+    """The profile picture URL the identity provider sent, only if it is https and hosted by the identity provider itself (no third-party image requests)."""
+    try:
+        u = urllib.parse.urlsplit(str(url or ""))
+        i = urllib.parse.urlsplit(ISSUER)
+    except ValueError:
+        return ""
+    if u.scheme == "https" and u.netloc and u.netloc == i.netloc and len(url) < 400:
+        return url
+    return ""
 
 
 def role_for(groups):
@@ -318,7 +331,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "same-origin")
-        self.send_header("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; "
+        self.send_header("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:" + (" " + ISSUER_ORIGIN if ISSUER_ORIGIN else "") + "; connect-src 'self'; "
                          f"base-uri 'none'; form-action 'self'; frame-ancestors {FRAME_ANCESTORS}")
         if ctype.startswith("application/json"):
             self.send_header("Cache-Control", "no-store")
@@ -350,7 +363,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             role = role_for([g.strip() for g in (self.headers.get("Remote-Groups") or "").split(",") if g.strip()])
             return {"name": self.headers.get("Remote-Name") or self.headers.get("Remote-User"), "role": role} if role else None
         s = verify(self.cookie("cmdr_session"))
-        return {"name": s["name"], "role": s["role"]} if s else None
+        return {"name": s["name"], "role": s["role"], "picture": s.get("picture", "")} if s else None
 
     def do_GET(self):  # noqa: N802
         p = urllib.parse.urlsplit(self.path)
@@ -455,7 +468,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         print(json.dumps({"event": "login", "user": name, "role": role or "denied"}), flush=True)
         if not role:
             return self.send(403, b"<!doctype html><meta charset=utf-8><title>No access</title><p>You are signed in but not in a group that may use this page.", "text/html; charset=utf-8")
-        sess = sign({"name": name, "role": role, "exp": time.time() + SESSION_TTL})
+        picture = safe_picture(info.get("picture") or idt.get("picture"))
+        sess = sign({"name": name, "role": role, "picture": picture, "exp": time.time() + SESSION_TTL})
         self.redirect(tmp["next"], [self.set_cookie("cmdr_session", sess, SESSION_TTL, SAMESITE), self.set_cookie("cmdr_oidc", "", 0)])
 
 

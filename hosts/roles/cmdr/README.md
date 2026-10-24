@@ -46,3 +46,4 @@ browser against the real fleet repo; not yet on the fleet.
   card" key explains it. Kind names, meanings and colours are `cmdr_tag_kinds`; any single tag can be renamed, described or recoloured in `cmdr_tag_overrides`.
   The host drawer adds 6-hour CPU and memory charts.
 - `cmdr_idp_name` names the identity provider on the sign-in panel ("Sign in with Inti").
+- **Profile picture:** the `picture` claim from the identity provider is shown as your avatar in the header. It is read at every sign-in (the session is rebuilt then), so a changed picture appears the next time you sign in. Only an https URL on the identity provider's own host is accepted, and the page's CSP allows images from that host only.

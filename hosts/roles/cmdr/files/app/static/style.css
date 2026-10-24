@@ -225,3 +225,5 @@ button.b.done{border-color:var(--ok);color:var(--ok)}
 
 .mg{--k:var(--mute);display:inline-block;margin-top:3px;font:600 9px var(--mono);letter-spacing:.08em;text-transform:uppercase;padding:0 6px;border-radius:99px;border:1px solid color-mix(in srgb,var(--k) 55%,var(--line));color:color-mix(in srgb,var(--k) 75%,var(--ink))}
 .kcol p .mg{margin:0}
+
+img.avatar{object-fit:cover;display:block;background:var(--panel2)}

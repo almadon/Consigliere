@@ -36,7 +36,17 @@ muximux_bind_address: "{{ tailscale_ipv4 | default('127.0.0.1', true) }}"
 muximux_auth: oidc
 muximux_allow_no_auth: false
 muximux_oidc_issuer_url: ""
+# Members of any of these groups (as the identity provider sends them in the groups claim) become Muximux admins. Env MUXIMUX_OIDC_ADMIN_GROUPS.
 muximux_oidc_admin_groups: [Muximux-Admins]
+# Scopes are always openid, profile, email AND groups (the groups claim is how admin_groups works); list any more here. Env MUXIMUX_OIDC_SCOPES.
+muximux_oidc_scopes_extra: []
+# Which claim carries the groups. Env MUXIMUX_OIDC_GROUPS_CLAIM.
+muximux_oidc_groups_claim: groups
+# Other claims Muximux reads (empty = leave Muximux's own default: preferred_username, email, name). Env MUXIMUX_OIDC_{USERNAME,EMAIL,DISPLAY_NAME}_CLAIM.
+muximux_oidc_username_claim: ""
+muximux_oidc_email_claim: ""
+muximux_oidc_display_name_claim: ""
+# Muximux has no profile-picture support, so there is no setting for one.
 muximux_session_max_age: 24h
 muximux_theme_family: default
 muximux_theme_variant: system
