@@ -1,0 +1,33 @@
+#cloud-config
+# Brings a brand-new Debian 13 machine into the fleet on its first boot: installs git, runs hosts/bootstrap/bootstrap.sh, and the host's own reconcile timer takes over.
+# Works wherever cloud-init runs: a Proxmox VM with a cloud-init drive (qm set --cicustom "user=<storage>:snippets/<this file>"), a cloud provider's user-data field,
+# or an LXC image that ships cloud-init. (Proxmox's own containers have no cloud-init support: see runbooks/zwave-and-xenia.md in the fleet repo for the container route.)
+#
+# Copy this file, fill in the values marked CHANGE, and do NOT commit the copy: it carries two short-lived tokens.
+#   - TAILSCALE_AUTHKEY: make it single-use, pre-approved, expiring in an hour, and tagged (so it can only create this one kind of node).
+#   - FLEET_CONFIG_REGISTER_TOKEN: a fine-grained GitHub token that may only manage deploy keys on the PRIVATE fleet repo, expiring in a day. The bootstrap uses it once to
+#     register the host's own read-only deploy key and never stores it. (Or leave it out and add the key it prints by hand.)
+# The host makes its own sops age key; afterwards, on your admin machine: scripts/node.sh key <name> (grants it its secrets), then it reconciles by itself.
+hostname: CHANGE-zwave          # the name in config/inventory/hosts.yml (the bootstrap also sets it from NODE_NAME)
+manage_etc_hosts: true
+ssh_authorized_keys:
+  - CHANGE ssh-ed25519 AAAA... admin key (root login: the fleet's scripts reach hosts as root over the tailnet)
+package_update: true
+packages: [git, curl, ca-certificates, qemu-guest-agent]   # qemu-guest-agent matters on a Proxmox VM; harmless elsewhere
+write_files:
+  - path: /root/.fleet-bootstrap.env
+    permissions: "0600"
+    owner: root:root
+    content: |
+      NODE_NAME=CHANGE-zwave
+      FRAMEWORK_REPO_URL=https://github.com/almadon/Consigliere.git
+      FLEET_CONFIG_REPO_URL=git@github.com:CHANGE/fleet.git
+      TAILSCALE_AUTHKEY=CHANGE
+      FLEET_CONFIG_REGISTER_TOKEN=CHANGE
+      BOOTSTRAP_APPLY=yes
+runcmd:
+  - [systemctl, enable, --now, qemu-guest-agent]
+  - [sh, -c, "set -a; . /root/.fleet-bootstrap.env; set +a; git clone --depth 1 \"$FRAMEWORK_REPO_URL\" /root/consigliere-bootstrap && bash /root/consigliere-bootstrap/hosts/bootstrap/bootstrap.sh"]
+  # The tokens are only needed once: remove them from the guest. (cloud-init keeps its own copy of this file under /var/lib/cloud, readable by root only: run
+  # `cloud-init clean` afterwards, and on Proxmox delete the snippet and `qm set <id> --delete cicustom` so the tokens do not stay in the host's files either.)
+  - [sh, -c, "rm -f /root/.fleet-bootstrap.env; rm -rf /root/consigliere-bootstrap"]

@@ -1,0 +1,4 @@
+---
+description: "Z-Wave JS UI: the Z-Wave controller as a server (web UI and a websocket for Home Assistant), the stick passed in by its by-id path"
+order: 58
+roles: [zwave_js_ui]

@@ -1,0 +1,20 @@
+# Managed by Ansible (hosts/roles/zwave_js_ui) -- edits here get overwritten on the next reconciliation run.
+services:
+  zwave-js-ui:
+    image: zwavejs/zwave-js-ui:{{ zwave_js_ui_version }}
+    container_name: zwave-js-ui
+    restart: unless-stopped
+    tty: true
+    stop_signal: SIGINT
+    mem_limit: {{ zwave_js_ui_memory_limit }}
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      TZ: {{ zwave_js_ui_timezone | to_json }}
+    devices:
+      - "{{ zwave_js_ui_device }}:/dev/zwave"
+    ports:
+      - "{{ zwave_js_ui_bind_address }}:{{ zwave_js_ui_ui_port }}:8091"
+      - "{{ zwave_js_ui_bind_address }}:{{ zwave_js_ui_ws_port }}:3000"
+    volumes:
+      - {{ zwave_js_ui_dir }}/store:/usr/src/app/store

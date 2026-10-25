@@ -1,0 +1,62 @@
+---
+- name: Check the settings
+  ansible.builtin.assert:
+    that:
+      - zwave_js_ui_device is match('^/dev/')
+      - zwave_js_ui_memory_limit is match('^[0-9]+[kKmMgG]$')
+      - zwave_js_ui_bind_address | length > 0
+    fail_msg: >-
+      Set zwave_js_ui_device to the stick's stable path (the /dev/serial/by-id/... entry, config/vars/group/util_zwave.yml or the host file), and
+      zwave_js_ui_memory_limit looks like 512m.
+    quiet: true
+
+# Compose would create a missing device path as a directory and the container would then fail in a loop: stop here and say why instead.
+- name: Is the stick there?
+  ansible.builtin.stat:
+    path: "{{ zwave_js_ui_device }}"
+  register: _zwave_js_ui_stick
+
+- name: Stop with instructions if it is not
+  ansible.builtin.fail:
+    msg: >-
+      {{ zwave_js_ui_device }} does not exist on this host. The stick is not attached to it yet (Proxmox: the USB device or `pct set --dev0`; a USB switch: flip it),
+      or the by-id name differs: look in /dev/serial/by-id/.
+  when: not _zwave_js_ui_stick.stat.exists and not ansible_check_mode
+
+- name: Create the service and store directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0750"
+  loop:
+    - "{{ zwave_js_ui_dir }}"
+    - "{{ zwave_js_ui_dir }}/store"
+
+- name: Check that the container name is free
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: guard_containers
+  vars:
+    docker_guard_containers: [zwave-js-ui]
+    docker_guard_dir: "{{ zwave_js_ui_dir }}"
+
+- name: Render the compose file
+  ansible.builtin.set_fact:
+    _zwave_js_ui_compose: "{{ lookup('ansible.builtin.template', 'docker-compose.yml.j2') }}"
+
+# A change to the compose file is applied through safe_apply: the old file is kept, and if the container is not running steadily afterwards the old one is put back.
+- name: Apply the compose file safely
+  ansible.builtin.include_role:
+    name: safe_apply
+  vars:
+    safe_apply_name: zwave-js-ui
+    safe_apply_files:
+      - {dest: "{{ zwave_js_ui_dir }}/docker-compose.yml", content: "{{ _zwave_js_ui_compose }}", mode: "0640"}
+    safe_apply_restart: {kind: compose, project_src: "{{ zwave_js_ui_dir }}", name: zwave-js-ui}
+  when: not ansible_check_mode
+
+- name: Make sure it is running (a no-op when it already is)
+  community.docker.docker_compose_v2:
+    project_src: "{{ zwave_js_ui_dir }}"
+    state: present
+  when: not ansible_check_mode

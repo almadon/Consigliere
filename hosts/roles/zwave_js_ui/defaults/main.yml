@@ -1,0 +1,15 @@
+---
+# Z-Wave JS UI (https://github.com/zwave-js/zwave-js-ui): the Z-Wave controller as a server, so Home Assistant holds no Z-Wave state. Home Assistant's Z-Wave
+# integration connects to its websocket server (ws://<this host>:3000) instead of running Z-Wave JS itself. The stick, its network keys and the node list live here.
+# Its settings (serial port, keys, MQTT, the websocket server) are made in its own web UI (port 8091) and kept in <dir>/store: back that directory up, it holds the keys.
+zwave_js_ui_version: "11.25.1"
+zwave_js_ui_dir: /opt/zwave-js-ui
+# The stick, as the container sees it, REQUIRED: the stable by-id path, e.g. /dev/serial/by-id/usb-Zooz_800_Z-Wave_Stick_...-if00. (ls -l /dev/serial/by-id/ on this host.)
+zwave_js_ui_device: ""
+# Where the web UI (8091) and the Home Assistant websocket server (3000) listen. Neither has a password of its own until you switch authentication on in the UI, and the
+# websocket server never has one, so keep them on the LAN address of the VLAN Home Assistant is on, never a public one.
+zwave_js_ui_bind_address: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+zwave_js_ui_ui_port: 8091
+zwave_js_ui_ws_port: 3000
+zwave_js_ui_memory_limit: 512m
+zwave_js_ui_timezone: "{{ timezone_name | default('UTC', true) }}"
