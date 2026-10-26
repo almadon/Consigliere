@@ -51,6 +51,8 @@
   loop_control:
     label: "{{ item.name }}"
   notify: Restart cmdr
+  # In a dry run the directory above is not really created yet, and copy refuses a destination folder that does not exist.
+  when: not ansible_check_mode
 
 - name: Install the page's code (restarts it when it changes)
   ansible.builtin.copy:

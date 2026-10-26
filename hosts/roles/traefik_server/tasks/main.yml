@@ -169,6 +169,8 @@
       loop: "{{ traefik_server_static_sites | selectattr('files', 'defined') | subelements('files') }}"
       loop_control:
         label: "{{ item.0.name }}/{{ item.1.name }}"
+      # In a dry run the folder above is not really created yet, and copy refuses a destination folder that does not exist.
+      when: not ansible_check_mode
 
     # Same mode as certwarden_agent (which owns this directory): two roles setting different modes
     # would change it back and forth on every run.
