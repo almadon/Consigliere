@@ -1,8 +1,9 @@
 #cloud-config
 # Brings a brand-new Debian 13 machine into the fleet on its first boot: installs git, runs hosts/bootstrap/bootstrap.sh, and the host's own reconcile timer takes over.
-# Works wherever cloud-init runs: a Proxmox VM with a cloud-init drive (qm set --cicustom "user=<storage>:snippets/<this file>"), a cloud provider's user-data field,
+# Works wherever cloud-init runs: a Proxmox VM with a cloud-init drive (qm set --cicustom "user=<storage>:snippets/<your filled-in copy>"), a cloud provider's user-data field,
 # or an LXC image that ships cloud-init. (Proxmox's own containers have no cloud-init support: see runbooks/zwave-and-xenia.md in the fleet repo for the container route.)
 #
+# (This file has no .yml extension on purpose: cloud-init requires the first line to be exactly "#cloud-config", which the YAML linters reject, and it is a template, not a config the repo uses.)
 # Copy this file, fill in the values marked CHANGE, and do NOT commit the copy: it carries two short-lived tokens.
 #   - TAILSCALE_AUTHKEY: make it single-use, pre-approved, expiring in an hour, and tagged (so it can only create this one kind of node).
 #   - FLEET_CONFIG_REGISTER_TOKEN: a fine-grained GitHub token that may only manage deploy keys on the PRIVATE fleet repo, expiring in a day. The bootstrap uses it once to
