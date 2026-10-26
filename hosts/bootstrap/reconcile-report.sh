@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Reports the outcome of a reconcile run through fleet-notify (the apprise role), when it is installed. Sourced by
+# Reports the outcome of a reconcile run: as a syslog line when RECONCILE_SYSLOG is set (hosts with no journal, i.e. Unraid), and through fleet-notify (the apprise role), when it is installed. Sourced by
 # reconcile.sh; every function is best-effort and never changes the run's exit status.
 #
 #   FAILED run     -> a notification (tag alert) naming the failing task. The same failure is reported again only after
@@ -13,8 +13,43 @@ _notify() {  # _notify <tag> <title> <body>
   FLEET_NOTIFY_TAG="$1" timeout 30 fleet-notify "$2" "$(printf '%s' "$3" | cut -c1-900)" >/dev/null 2>&1 || true
 }
 
+# Where to send the run summary as syslog (host:port, TCP), for hosts with no journal for the log collector to read (Unraid): RECONCILE_SYSLOG in the environment, or
+# a line RECONCILE_SYSLOG=10.0.1.3:1514 in the host's reconcile.env (re-read at every run, so changing it needs no container restart). Empty = nothing is sent.
+_syslog_target() {
+  local t="${RECONCILE_SYSLOG:-}" f
+  if [ -z "$t" ]; then
+    for f in "${CRED_DIR:+$(dirname "$CRED_DIR")/reconcile.env}" /etc/fleet-reconcile/reconcile.env; do
+      [ -n "$f" ] && [ -r "$f" ] || continue
+      t="$(sed -n 's/^RECONCILE_SYSLOG=//p' "$f" | tail -1 | tr -d "\"'")"
+      [ -n "$t" ] && break
+    done
+  fi
+  printf '%s' "$t"
+}
+
+# The run's "PLAY RECAP" line as one RFC 3164 syslog message, program fleet-reconcile, host name = this host's own (--uts host gives the Unraid container the server's name):
+# in Loki it is {host_name="spire", unit="fleet-reconcile"}, which is what cmdr's reconcile status reads. A run that died before any recap is sent as failed=1.
+syslog_recap() {  # syslog_recap <exit status>
+  local rc="$1" log="${RUN_LOG:-}" t host line sev
+  [ "${RECONCILE_MODE:-apply}" = check ] && return 0
+  t="$(_syslog_target)"; [ -n "$t" ] || return 0
+  host="$(hostname -s 2>/dev/null | tr '[:upper:]' '[:lower:]')"; [ -n "$host" ] || return 0
+  line=""
+  [ -f "$log" ] && line="$(sed 's/\x1b\[[0-9;]*m//g' "$log" | grep -E 'ok=[0-9]+ +changed=[0-9]+ +unreachable=[0-9]+ +failed=[0-9]+' | tail -1)"
+  sev=14
+  if [ "$rc" -ne 0 ]; then
+    sev=11
+    [ -n "$line" ] || line="$host : ok=0 changed=0 unreachable=0 failed=1 (no recap, exit status $rc)"
+  fi
+  [ -n "$line" ] || return 0
+  local sh_timeout=(); command -v timeout >/dev/null 2>&1 && sh_timeout=(timeout 8)
+  "${sh_timeout[@]}" bash -c 'exec 3<>"/dev/tcp/$0/$1" && printf "%s\n" "$2" >&3' "${t%:*}" "${t##*:}" \
+    "<$sev>$(date '+%b %e %H:%M:%S') $host fleet-reconcile: $line" >/dev/null 2>&1 || true
+}
+
 report_run() {  # report_run <exit status>
   local rc="$1" log="${RUN_LOG:-}" state="${RECONCILE_STATE_DIR:-${WORKDIR:-/tmp}}/notify-state"
+  syslog_recap "$rc" || true
   command -v fleet-notify >/dev/null 2>&1 || return 0
   local now sig prev_sig prev_ts detail changed names
   now="$(date +%s)"

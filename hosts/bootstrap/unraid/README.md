@@ -60,3 +60,9 @@ Host-only settings go in `/mnt/user/appdata/consigliere/vars.yml` (directories f
 - A container with a name a role wants (for example an old `arkeep-agent`) blocks the first run with
   instructions; `docker_adopt_existing: true` in the host's vars removes it (its volumes are kept).
 - Untested on Unraid 8. The design depends only on Docker, the Tailscale CLI/socket and a persistent folder.
+
+## Run summaries to the log collector
+
+Unraid has no journal for the log collector to read, so the end-of-run reporter (`hosts/bootstrap/reconcile-report.sh`) can send each run's `PLAY RECAP` line as one syslog message (TCP, RFC 3164, program `fleet-reconcile`, host name = the server's own name, which the container shares through `--uts host`).
+Turn it on with one line in the host's `reconcile.env` (next to the work directory): `RECONCILE_SYSLOG=<collector host>:<port>`, for example `RECONCILE_SYSLOG=10.0.1.3:1514` (Liaison's Unraid syslog listener). The file is re-read at every run, so no container restart is needed.
+A run that dies before any recap is sent as `failed=1` with the exit status; check-only runs send nothing; with no setting nothing is sent. In Loki it is `{host_name="spire", unit="fleet-reconcile"}`, the same label pair the systemd hosts produce, so cmdr shows the host's last run.
