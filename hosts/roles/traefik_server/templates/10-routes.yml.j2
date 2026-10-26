@@ -7,7 +7,9 @@
 {% endfor %}
 {% endfor %}
 {% for st in traefik_server_static_sites %}
-{% set ns.all = ns.all + [{'name': st.name, 'host': st.host, 'backend': 'http://traefik-static:8080', '_src': 'traefik_server_static_sites'}] %}
+{% set sh = [st.host] if st.host is string else st.host %}
+{% set srule = ({'rule': '(' ~ (sh | map('regex_replace', '^(.*)$', 'Host(`\\1`)') | join(' || ')) ~ ') && (' ~ (st.paths | map('regex_replace', '^(.*)$', 'Path(`\\1`)') | join(' || ')) ~ ')'} if st.paths is defined else {}) %}
+{% set ns.all = ns.all + [dict({'name': st.name, 'host': st.host, 'backend': 'http://traefik-static:8080', '_src': 'traefik_server_static_sites'}, **srule)] %}
 {% endfor %}
 {% if ns.all | length == 0 %}
 {}

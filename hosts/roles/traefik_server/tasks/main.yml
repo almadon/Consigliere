@@ -151,6 +151,25 @@
         mode: "0644"
       when: traefik_server_static_sites | length > 0
 
+    - name: Create the directories of static sites that bring their own files
+      ansible.builtin.file:
+        path: "{{ item.root }}"
+        state: directory
+        mode: "0755"
+      loop: "{{ traefik_server_static_sites | selectattr('files', 'defined') | list }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Copy those files in (files already on this host, for example from the fleet repo's checkout)
+      ansible.builtin.copy:
+        src: "{{ item.1.src }}"
+        dest: "{{ item.0.root }}/{{ item.1.name }}"
+        remote_src: true
+        mode: "0644"
+      loop: "{{ traefik_server_static_sites | selectattr('files', 'defined') | subelements('files') }}"
+      loop_control:
+        label: "{{ item.0.name }}/{{ item.1.name }}"
+
     # Same mode as certwarden_agent (which owns this directory): two roles setting different modes
     # would change it back and forth on every run.
     - name: Make sure the certificates directory exists
