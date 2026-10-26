@@ -38,7 +38,19 @@
     - "{{ cmdr_dir }}"
     - "{{ cmdr_dir }}/app"
     - "{{ cmdr_dir }}/app/static"
+    - "{{ cmdr_dir }}/app/static/icons"
     - "{{ cmdr_dir }}/data"
+
+- name: Copy the tool icons (files on this host, for example from the fleet repo's checkout)
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ cmdr_dir }}/app/static/icons/{{ item.name }}"
+    remote_src: true
+    mode: "0644"
+  loop: "{{ cmdr_icons }}"
+  loop_control:
+    label: "{{ item.name }}"
+  notify: Restart cmdr
 
 - name: Install the page's code (restarts it when it changes)
   ansible.builtin.copy:

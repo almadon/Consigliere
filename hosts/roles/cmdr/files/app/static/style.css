@@ -227,3 +227,5 @@ button.b.done{border-color:var(--ok);color:var(--ok)}
 .kcol p .mg{margin:0}
 
 img.avatar{object-fit:cover;display:block;background:var(--panel2)}
+
+img.ic.img{object-fit:cover;background:none;border-radius:9px}

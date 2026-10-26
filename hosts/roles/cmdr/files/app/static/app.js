@@ -250,8 +250,9 @@
     for (const t of state.data.tools || []) { const g = t.group || 'Tools'; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(t); }
     $('tools').replaceChildren(...[...groups].map(([g, items]) => h('div', { class: 'tgroup' }, h('span', { class: 'gl' }, g),
       h('div', { class: 'tiles' }, items.map((t) => {
-        const ic = h('span', { class: 'ic', 'aria-hidden': 'true' }, t.name.trim().slice(0, 2));
-        ic.style.background = `hsl(${hue(t.name)} 38% 34%)`;
+        const okIcon = t.icon && /^[A-Za-z0-9._-]+$/.test(t.icon);
+        const ic = okIcon ? h('img', { class: 'ic img', src: '/static/icons/' + t.icon, alt: '' }) : h('span', { class: 'ic', 'aria-hidden': 'true' }, t.name.trim().slice(0, 2));
+        if (!okIcon) ic.style.background = `hsl(${hue(t.name)} 38% 34%)`;
         const mk = (state.data.mgmt_kinds || {})[t.mgmt];
         const badge = mk ? h('span', { class: 'mg', title: `${mk.label}: ${mk.desc}` }, mk.label) : null;
         if (badge && mk.color) badge.style.setProperty('--k', mk.color);

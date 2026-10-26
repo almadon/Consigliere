@@ -67,3 +67,7 @@ cmdr_mgmt_kinds:
   repo: {label: repo-managed, color: "#8b9bff", desc: "Its settings come from the fleet repo; anything changed in the app itself is put back at the next run."}
   mixed: {label: shared, color: "#dcb053", desc: "The repo sets part of it (tiles, data sources, jobs); the rest is yours and is kept."}
   ui: {label: your settings, color: "#3fbb7c", desc: "Only the deployment is managed. Its settings live inside the app: back them up (Arkeep) rather than expect them in git."}
+
+# Icons for Launchpad tiles: files already on this host, copied next to the page; a tool then says  icon: ctrlzen.png  (the name below). Without an icon a tile shows its initials.
+#   cmdr_icons: [{src: "{{ cmdr_conf_dir }}/../assets/brand/ctrlzen-180.png", name: ctrlzen.png}]
+cmdr_icons: []
