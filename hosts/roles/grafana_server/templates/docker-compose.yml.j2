@@ -16,6 +16,7 @@ services:
       GF_SERVER_ENFORCE_DOMAIN: "false"
       GF_LIVE_ALLOWED_ORIGINS: {{ (grafana_server_url | trim('/')) | to_json }}
       GF_SECURITY_COOKIE_SECURE: "true"
+      GF_SECURITY_ALLOW_EMBEDDING: {{ grafana_server_allow_embedding | bool | lower | to_json }}
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: {{ grafana_server_admin_password | to_json }}
       GF_USERS_ALLOW_SIGN_UP: "false"

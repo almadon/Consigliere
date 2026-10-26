@@ -38,3 +38,7 @@ grafana_server_datasources_extra: []
 # Dashboards as inline JSON, written to {{ grafana_server_dir }}/dashboards: [{name: fleet-overview, json: {...}}]
 # (dashboards saved in the UI live in Grafana's database and are not touched).
 grafana_server_dashboards: []
+
+# Grafana itself refuses to be shown in a frame (it sends X-Frame-Options: deny) unless this is true. Turn it on only together with a proxy rule that says WHICH sites may frame it
+# (traefik_server route frame_ancestors): on its own it would let any site frame Grafana.
+grafana_server_allow_embedding: false
