@@ -61,6 +61,18 @@ receivers:
           match_type: regexp
           mount_points: ["/var/lib/docker/.*", "/run/.*", "/snap/.*", "/sys/.*", "/proc/.*", "/dev/.*", "/var/lib/containers/.*"]
 {% endif %}
+{% if _otel_agent_docker_stats %}
+  docker_stats:
+    endpoint: tcp://127.0.0.1:{{ otel_agent_docker_proxy_port }}
+    collection_interval: {{ otel_agent_docker_stats_interval }}
+    timeout: 20s
+    container_labels_to_metric_labels:
+      com.docker.compose.project: compose.project
+      com.docker.compose.service: compose.service
+    metrics:
+      container.restarts: {enabled: true}
+      container.uptime: {enabled: true}
+{% endif %}
 {% if _otel_agent_relay %}
   otlp/metrics:
     protocols:
@@ -179,6 +191,12 @@ service:
 {% if otel_agent_hostmetrics | bool %}
     metrics/host:
       receivers: [hostmetrics]
+      processors: [memory_limiter, resource, batch]
+      exporters: [otlp_http/victoria]
+{% endif %}
+{% if _otel_agent_docker_stats %}
+    metrics/docker:
+      receivers: [docker_stats]
       processors: [memory_limiter, resource, batch]
       exporters: [otlp_http/victoria]
 {% endif %}

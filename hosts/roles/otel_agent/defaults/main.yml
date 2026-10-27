@@ -39,3 +39,12 @@ otel_agent_otlp_listen: ""
 # Needs otel_agent_metrics_url. Beszel stays the deep dive; these are the at-a-glance numbers for every host.
 otel_agent_hostmetrics: false
 otel_agent_hostmetrics_interval: 60s
+
+# Per-container metrics (docker_stats receiver): CPU, memory, network, block I/O, restarts and uptime of every container on this host, sent to
+# otel_agent_metrics_url (VictoriaMetrics). Needs Docker and otel_agent_metrics_url. The collector never touches Docker's socket itself: the role runs a
+# read-only socket proxy (tecnativa/docker-socket-proxy: containers, events and ping only, no writes) that listens on 127.0.0.1 only.
+otel_agent_docker_stats: false
+otel_agent_docker_stats_interval: 30s
+otel_agent_docker_proxy_version: "v0.5.0"
+otel_agent_docker_proxy_port: 2375
+otel_agent_docker_proxy_dir: "{{ common_dir | default('/opt/common') }}/otel-docker-proxy"

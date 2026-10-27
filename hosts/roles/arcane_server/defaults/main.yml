@@ -30,3 +30,7 @@ arcane_server_port: 3552
 # this node (see hosts/roles/arkeep_server/README.md -- same pattern
 # applies here). Leave empty to expose Arcane's port directly instead.
 arcane_server_network: ""
+
+# Arcane's own OpenTelemetry metrics (API traffic and latency, Docker inventory, background jobs, edge agents), sent as OTLP/protobuf to this URL, for example
+# http://vm.ctrl.a64.one:8428/opentelemetry/v1/metrics (VictoriaMetrics). Empty = off. Traces and logs are not exported (the container's logs already reach Loki).
+arcane_server_otlp_metrics_url: ""

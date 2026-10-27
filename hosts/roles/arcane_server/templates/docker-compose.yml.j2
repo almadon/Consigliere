@@ -55,6 +55,15 @@ services:
     environment:
       - ENCRYPTION_KEY={{ arcane_server_encryption_key }}
       - DOCKER_HOST=tcp://docker-socket-proxy:2375
+{% if arcane_server_otlp_metrics_url %}
+      - OTEL_SERVICE_NAME=arcane
+      - OTEL_RESOURCE_ATTRIBUTES=host.name={{ inventory_hostname }}
+      - OTEL_METRICS_EXPORTER=otlp
+      - OTEL_TRACES_EXPORTER=none
+      - OTEL_LOGS_EXPORTER=none
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT={{ arcane_server_otlp_metrics_url }}
+{% endif %}
     depends_on:
       - docker-socket-proxy
     healthcheck:

@@ -19,6 +19,9 @@ Every line carries `host_name` (`otel_agent_host_name`, the fleet's short name).
 - **Limits:** a soft memory limit (`otel_agent_memory_limit_mib`, 128) in the collector, `GOMEMLIMIT`, and `MemoryMax` (256M). Measured on
   the fleet's nine hosts: 67-94 MB of heap per agent (`RssAnon`; the cgroup shows 68-173 MiB including evictable file cache). `ps` reports 240-265 MB
   resident because it also counts the shared file pages of the large executable; those are reclaimable and not extra pressure. Startup spikes higher for a moment. The installed binary is large (~370 MB on disk).
+- **Per-container metrics (optional, `otel_agent_docker_stats: true`, needs `otel_agent_metrics_url`):** CPU, memory, network, block I/O, restarts and uptime of every container, every
+  `otel_agent_docker_stats_interval` (30s), labelled `host.name`, `container.name`, `container.image.name` and the Compose project and service. The collector does **not** get Docker's socket: the role runs a
+  read-only [docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy) (containers, events and ping; no writes) bound to `127.0.0.1:2375`. The fleet's "Containers" Grafana dashboard reads these.
 - **Syslog relay (optional, `otel_agent_syslog_listeners`):** the same collector can also receive syslog from devices that cannot run it (Unraid,
   UniFi access points and switches, other network gear) and forward it to Loki. Each message is stored under the sender's own name
   (`host_name`, lower-cased from the syslog header) and program (`unit`), with the severity taken from the syslog priority and the listener's
