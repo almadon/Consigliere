@@ -108,6 +108,8 @@ traefik_server_extra_middlewares: {}
 # Static pages Traefik can't serve itself: one small nginx container (non-root, read-only) with a
 # site per entry:  - {name: landing, host: example.com, root: /opt/static/landing}
 # `root` is a directory on the host; a missing file falls back to index.html.
+# A site may also carry `profile`, `csp_extra` and `frame_ancestors`, as a route does (below): a store page that loads a payment widget can add that vendor's script host
+# to its own CSP without loosening any other site.
 # `files: [{src: /path/on/this/host, name: favicon.ico}]` copies files from the host into `root` on every run (the directory is created).
 # With `paths: [/favicon.ico, ...]` the site answers ONLY those exact paths of its host (the route rule gets && Path(...), which outranks a plain Host route of the same name,
 # and a missing file is a 404 instead of index.html): use it to overlay a few files (a favicon) onto an app served by another route on the same host.

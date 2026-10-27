@@ -64,7 +64,7 @@ http:
     sec-framed:
 {{ headers('', true) | indent(2, true) }}
 {# one security middleware of its own for each route that adds to its CSP or may be embedded by other sites #}
-{% for r in _traefik_server_routes if (r.csp_extra is defined or r.frame_ancestors is defined) and r.redirect is not defined %}
+{% for r in (_traefik_server_routes + (traefik_server_static_sites | default([]))) if (r.csp_extra is defined or r.frame_ancestors is defined) and r.redirect is not defined %}
 {% set prof = r.profile | default(traefik_server_default_profile) %}
 {% set base = traefik_server_csp_app if prof == 'app' else (traefik_server_csp_strict if prof == 'strict' else '') %}
     sec-{{ r.name }}:
