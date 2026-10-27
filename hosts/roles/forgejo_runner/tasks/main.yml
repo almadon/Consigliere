@@ -1,0 +1,73 @@
+---
+# Applied to hosts tagged feat:forgejo_runner. See defaults/main.yml.
+- name: Load this role's secrets
+  ansible.builtin.include_role:
+    name: load_secrets
+  vars:
+    load_secrets_scopes: [forgejo.runner]
+
+- name: Check the settings
+  ansible.builtin.assert:
+    that:
+      - forgejo_runner_server_url is match('^https?://')
+      - forgejo_runner_labels | length > 0
+      - forgejo_runner_uuid is defined and forgejo_runner_token is defined
+    fail_msg: >-
+      Set forgejo_runner_server_url (the Forgejo instance, https://...) and forgejo_runner_labels (for example "node:docker://node:22-bookworm@sha256:...") in the host file
+      under config/vars/host/, and keep the registration credential in the secret forgejo.runner (forgejo_runner_uuid, forgejo_runner_token).
+    quiet: true
+
+- name: Name the container
+  ansible.builtin.set_fact:
+    forgejo_runner_container: "runner-{{ forgejo_runner_name }}"
+
+- name: Create the runner directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0750"
+  loop:
+    - "{{ forgejo_runner_dir }}"
+    - "{{ forgejo_runner_dir }}/data"
+
+- name: Check that the container name is free
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: guard_containers
+  vars:
+    docker_guard_containers: ["{{ forgejo_runner_container }}"]
+    docker_guard_dir: "{{ forgejo_runner_dir }}"
+
+- name: Render the compose file and config
+  ansible.builtin.set_fact:
+    _forgejo_runner_compose: "{{ lookup('ansible.builtin.template', 'docker-compose.yml.j2') }}"
+    _forgejo_runner_config: "{{ lookup('ansible.builtin.template', 'config.yml.j2') }}"
+  no_log: true
+
+# Restarting the runner kills the job it is running. Wait for a quiet moment: the next reconciliation run applies the change.
+- name: Is a job running?
+  ansible.builtin.command: docker ps --filter name=FORGEJO-ACTIONS-TASK --format {% raw %}"{{.Names}}"{% endraw %}
+  register: _forgejo_runner_jobs
+  changed_when: false
+  check_mode: false
+
+- name: Leave a change for a quieter moment
+  ansible.builtin.debug:
+    msg: "A Forgejo Actions job is running on {{ inventory_hostname }}: the runner is not restarted now; the next run applies any change."
+  when: _forgejo_runner_jobs.stdout | trim | length > 0
+
+- name: Apply the compose file and config safely
+  ansible.builtin.include_role:
+    name: safe_apply
+  vars:
+    safe_apply_name: "{{ forgejo_runner_container }}"
+    safe_apply_files:
+      - {dest: "{{ forgejo_runner_dir }}/docker-compose.yml", content: "{{ _forgejo_runner_compose }}", mode: "0640"}
+      - {dest: "{{ forgejo_runner_dir }}/config.yml", content: "{{ _forgejo_runner_config }}", mode: "0600"}
+    safe_apply_restart: {kind: compose, project_src: "{{ forgejo_runner_dir }}", name: "{{ forgejo_runner_container }}"}
+  when: not ansible_check_mode and (_forgejo_runner_jobs.stdout | trim | length == 0)
+
+- name: Make sure it is running (a no-op when it already is)
+  community.docker.docker_compose_v2:
+    project_src: "{{ forgejo_runner_dir }}"
+  when: not ansible_check_mode

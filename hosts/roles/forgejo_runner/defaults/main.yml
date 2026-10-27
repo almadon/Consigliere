@@ -1,0 +1,23 @@
+---
+# Forgejo Actions runner in Docker. Applied to hosts tagged feat:forgejo_runner.
+#
+# The runner is registered once by hand (forgejo-runner register); this role takes it over from there and owns its compose file and config.yml.
+# The registration credential (the connection's uuid and token) is the secret forgejo.runner (config/secrets/forgejo/runner.yml):
+#   forgejo_runner_uuid: <uuid>
+#   forgejo_runner_token: <token>
+forgejo_runner_name: runner
+forgejo_runner_dir: "{{ forgejo_runner_base_dir | default('/opt/forgejo/runner') }}/{{ forgejo_runner_name }}"
+forgejo_runner_server_url: ""        # e.g. https://git.example.com/  (required)
+
+# The runner's own image. Pin it by digest (`...:12@sha256:...`) so a moved tag cannot change it behind your back; let Renovate (or you) bump the digest.
+forgejo_runner_image: "data.forgejo.org/forgejo/runner:12"
+
+# What `runs-on:` values resolve to: "<label>:docker://<image>". Pin each image by digest after the cooldown period of your dependency policy, for example
+#   - "node:docker://node:22-bookworm@sha256:63538dfe..."
+forgejo_runner_labels: []
+
+forgejo_runner_capacity: 1
+forgejo_runner_timeout: 3h
+forgejo_runner_log_level: info
+# false: a job image already present is used as is, so a digest-pinned label never moves. A tag-only label would then never refresh: pin by digest.
+forgejo_runner_force_pull: false

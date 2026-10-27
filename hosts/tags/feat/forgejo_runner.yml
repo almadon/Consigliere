@@ -1,0 +1,5 @@
+---
+description: "Forgejo Actions runner (job and runner images pinned by digest)"
+order: 60
+roles: [forgejo_runner]
+secrets: [forgejo.runner]

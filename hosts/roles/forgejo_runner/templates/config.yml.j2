@@ -1,0 +1,25 @@
+# Managed by Ansible (hosts/roles/forgejo_runner) -- edits here get overwritten on the next reconciliation run.
+log:
+  level: {{ forgejo_runner_log_level }}
+runner:
+  file: /data/.runner
+  capacity: {{ forgejo_runner_capacity }}
+  timeout: {{ forgejo_runner_timeout }}
+  insecure: false
+  labels:
+{% for label in forgejo_runner_labels %}
+    - "{{ label }}"
+{% endfor %}
+cache:
+  enabled: true
+container:
+  network: ""
+  privileged: false
+  docker_host: ""
+  force_pull: {{ forgejo_runner_force_pull | lower }}
+server:
+  connections:
+    forgejo:
+      url: {{ forgejo_runner_server_url }}
+      uuid: {{ forgejo_runner_uuid }}
+      token: {{ forgejo_runner_token }}

@@ -1,0 +1,14 @@
+# Managed by Ansible (hosts/roles/forgejo_runner) -- edits here get overwritten on the next reconciliation run.
+services:
+  runner:
+    image: {{ forgejo_runner_image }}
+    container_name: {{ forgejo_runner_container }}
+    restart: unless-stopped
+    command: ["forgejo-runner", "daemon", "--config", "/etc/forgejo-runner/config.yml"]
+    user: "0:0"
+    volumes:
+      - ./config.yml:/etc/forgejo-runner/config.yml:ro
+      # Persists the registration credential (data/.runner) across container recreation, so `up -d` never re-registers.
+      - ./data:/data
+      # Docker-outside-of-Docker: the runner asks the HOST's Docker daemon to start the ephemeral container each job runs in.
+      - /var/run/docker.sock:/var/run/docker.sock
