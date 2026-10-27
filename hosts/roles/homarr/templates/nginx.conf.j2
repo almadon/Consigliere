@@ -1,0 +1,27 @@
+# Managed by Ansible (hosts/roles/homarr) -- adds the pop-up sign-in script to Homarr's pages.
+map $http_upgrade $connection_upgrade {
+  default upgrade;
+  ''      close;
+}
+server {
+  listen 8080;
+  location = /__popup.js {
+    alias /usr/share/nginx/popup/popup.js;
+    default_type application/javascript;
+    add_header Cache-Control "no-store";
+  }
+  location / {
+    proxy_pass http://homarr:7575;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+    proxy_read_timeout 1h;
+    # sub_filter needs the page uncompressed.
+    proxy_set_header Accept-Encoding "";
+    sub_filter '</head>' '<script src="/__popup.js" defer></script></head>';
+    sub_filter_once on;
+  }
+}

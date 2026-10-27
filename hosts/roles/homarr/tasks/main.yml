@@ -1,0 +1,78 @@
+---
+- name: Check the dashboard's settings
+  ansible.builtin.assert:
+    that:
+      - homarr_url | length > 0
+      - homarr_oidc_issuer_url | length > 0
+      - homarr_network | length > 0
+    fail_msg: Set homarr_url (the public https URL), homarr_oidc_issuer_url and homarr_network.
+    quiet: true
+
+- name: Load the sign-in client (secret homarr.server)
+  ansible.builtin.include_role:
+    name: load_secrets
+  vars:
+    load_secrets_scopes: [homarr.server]
+
+- name: Require a real client and encryption key
+  ansible.builtin.assert:
+    that:
+      - homarr_oidc_client_id is defined
+      - homarr_oidc_client_secret is defined
+      - homarr_secret_encryption_key is defined
+      - "'CHANGEME' not in homarr_oidc_client_id"
+      - "'CHANGEME' not in homarr_oidc_client_secret"
+      - homarr_secret_encryption_key | length == 64
+    fail_msg: >-
+      The identity-provider client is not set up. Create a confidential client for {{ homarr_url }} (callback
+      {{ homarr_url | trim('/') }}/api/auth/callback/oidc) and put its id and secret in homarr.server (scripts/secrets.sh edit homarr.server).
+    quiet: true
+  no_log: true
+
+- name: Create the directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ homarr_dir }}"
+    - "{{ homarr_dir }}/appdata"
+    - "{{ homarr_dir }}/gate"
+
+- name: Write the pop-up sign-in files
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ homarr_dir }}/gate/{{ item.dest }}"
+    mode: "0644"
+  loop:
+    - {src: nginx.conf.j2, dest: default.conf}
+    - {src: popup.js.j2, dest: popup.js}
+  notify: Recreate homarr
+  when: homarr_popup_login | bool
+
+- name: Write the compose file (it holds the sign-in client secret)
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ homarr_dir }}/docker-compose.yml"
+    mode: "0600"
+  no_log: true
+  register: _homarr_compose
+
+- name: Create the shared proxy network
+  community.docker.docker_network:
+    name: "{{ homarr_network }}"
+
+- name: Check that no container this role needs is already taken by something else
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: guard_containers
+  vars:
+    docker_guard_containers: "{{ ['homarr'] + (['homarr-gate'] if homarr_popup_login | bool else []) }}"
+    docker_guard_dir: "{{ homarr_dir }}"
+
+- name: Start the dashboard
+  community.docker.docker_compose_v2:
+    project_src: "{{ homarr_dir }}"
+    state: present
+    pull: "{{ 'always' if _homarr_compose.changed else 'missing' }}"
+  when: not ansible_check_mode or not _homarr_compose.changed

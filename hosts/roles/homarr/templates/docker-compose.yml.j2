@@ -1,0 +1,42 @@
+# Managed by Ansible (hosts/roles/homarr) -- edits here get overwritten on the next reconciliation run.
+services:
+  homarr:
+    image: {{ homarr_image }}
+    container_name: homarr
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      SECRET_ENCRYPTION_KEY: {{ homarr_secret_encryption_key | to_json }}
+      AUTH_PROVIDERS: {{ homarr_auth_providers | to_json }}
+      AUTH_OIDC_ISSUER: {{ homarr_oidc_issuer_url | to_json }}
+      AUTH_OIDC_CLIENT_ID: {{ homarr_oidc_client_id | to_json }}
+      AUTH_OIDC_CLIENT_SECRET: {{ homarr_oidc_client_secret | to_json }}
+      AUTH_OIDC_CLIENT_NAME: {{ homarr_oidc_client_name | to_json }}
+      AUTH_OIDC_SCOPE_OVERWRITE: "openid profile email groups"
+      AUTH_OIDC_AUTO_LOGIN: "false"
+{% if homarr_admin_group | length > 0 %}
+      ADMIN_GROUP: {{ homarr_admin_group | to_json }}
+{% endif %}
+    volumes:
+      - {{ homarr_dir }}/appdata:/appdata
+    networks:
+      - {{ homarr_network }}
+{% if homarr_popup_login | bool %}
+
+  homarr-gate:
+    image: {{ homarr_gate_image }}
+    container_name: homarr-gate
+    restart: unless-stopped
+    depends_on:
+      - homarr
+    volumes:
+      - {{ homarr_dir }}/gate/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - {{ homarr_dir }}/gate/popup.js:/usr/share/nginx/popup/popup.js:ro
+    networks:
+      - {{ homarr_network }}
+{% endif %}
+
+networks:
+  {{ homarr_network }}:
+    external: true

@@ -1,0 +1,24 @@
+---
+# A Homarr dashboard (https://homarr.dev), signed in through the identity provider (OIDC), optionally with a pop-up sign-in so it can be framed.
+# The OIDC client id and secret and Homarr's encryption key come from the secret homarr.server (config/secrets/homarr/server.yml):
+#   homarr_oidc_client_id, homarr_oidc_client_secret, homarr_secret_encryption_key (64 hex characters: openssl rand -hex 32)
+# In the identity provider: a confidential client whose callback URL is  <homarr_url>/api/auth/callback/oidc  (the groups claim allowed).
+# Homarr has no trusted-proxy-header sign-in; OIDC is its single sign-on.
+# Pin by digest (see the forgejo_runner role): ghcr.io/homarr-labs/homarr@sha256:...
+homarr_image: "ghcr.io/homarr-labs/homarr:latest"
+homarr_dir: /opt/homarr
+# The public https URL (required).
+homarr_url: ""
+homarr_oidc_issuer_url: ""
+homarr_oidc_client_name: "Inti"
+# Members of this group are Homarr admins.
+homarr_admin_group: ""
+# Keep the username/password form next to the OIDC button (a break-glass admin). "oidc" alone removes it.
+homarr_auth_providers: "oidc,credentials"
+# Join this shared Docker network (e.g. proxynet) so Traefik reaches the dashboard by name and nothing is published on the host.
+homarr_network: proxynet
+# Pop-up sign-in for use inside a frame (CtrlZen). The identity provider refuses to be framed, so a small nginx in front of Homarr (container
+# homarr-gate, the Traefik backend: http://homarr-gate:8080) adds a script that opens the sign-in in a window of its own and reloads the frame
+# once that finishes. false = Traefik talks to Homarr (http://homarr:7575) directly.
+homarr_popup_login: true
+homarr_gate_image: "nginx:1.28-alpine"

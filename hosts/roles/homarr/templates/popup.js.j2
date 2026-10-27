@@ -1,0 +1,40 @@
+(() => {
+  'use strict';
+  // Managed by Ansible (hosts/roles/homarr). The identity provider refuses to be framed, so inside a frame the sign-in button opens a window of
+  // its own; that window signs in, announces itself on a BroadcastChannel and closes, and the frame reloads once the session works.
+  const NAME = 'homarr-signin';
+  const isLogin = () => location.pathname.startsWith('/auth/login');
+  const button = () => [...document.querySelectorAll('button, a')].find((e) => /{{ homarr_oidc_client_name | regex_escape }}/i.test(e.textContent || ''));
+  const framed = window.top !== window.self;
+
+  if (window.name === NAME && !framed) {
+    // The sign-in window: press the button once, and close when we are back on a page of the dashboard.
+    if (isLogin()) {
+      const t = setInterval(() => { const b = button(); if (b) { clearInterval(t); b.click(); } }, 300);
+    } else {
+      try { new BroadcastChannel('homarr-auth').postMessage('done'); } catch (e) { /* the polling in the frame covers it */ }
+      window.close();
+    }
+    return;
+  }
+  if (!framed || !isLogin()) return;
+
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('button, a');
+    if (!b || b !== button()) return;
+    e.preventDefault();
+    e.stopPropagation();
+    // Opened by script, so the window may close itself afterwards.
+    try { window.open('/auth/login', NAME, 'popup,width=560,height=760'); } catch (err) { /* blocked: nothing else to do */ }
+  }, true);
+  const check = async () => {
+    try {
+      const r = await fetch('/api/auth/session', { credentials: 'same-origin', cache: 'no-store' });
+      const s = r.ok ? await r.json() : null;
+      if (s && s.user) location.href = '/';
+    } catch (e) { /* offline or restarting: try again */ }
+  };
+  try { new BroadcastChannel('homarr-auth').onmessage = check; } catch (e) { /* polling below */ }
+  setInterval(check, 2000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+})();

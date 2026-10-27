@@ -1,0 +1,5 @@
+---
+description: "A Homarr dashboard signed in through the identity provider, with an optional pop-up sign-in for framing"
+order: 85
+roles: [homarr]
+secrets: [homarr.server]
