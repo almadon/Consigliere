@@ -108,6 +108,25 @@ fi
 sync_repo "$FLEET_CONFIG_REPO_URL" "$FLEET_CONFIG_REPO_BRANCH" "$FLEET_CONFIG_DIR"
 unset GIT_SSH_COMMAND
 
+# Skip a run that has nothing to do: both repos are at the commits the last successful apply used, and that was less than RECONCILE_FULL_EVERY_SECS ago (0 or unset =
+# never skip; the baseline role sets it on systemd hosts). A full run still happens at that interval, so drift is corrected, and whenever $WORKDIR/force-run exists
+# (scripts/reconcile-now.sh creates it). A check run is never skipped. The state is written after a successful apply only, so a failed run is retried at once.
+STATE_FILE="$WORKDIR/last-applied"
+FINGERPRINT="$(git -C "$FRAMEWORK_DIR" rev-parse HEAD)-$(git -C "$FLEET_CONFIG_DIR" rev-parse HEAD)"
+FORCED=0
+if [ -e "$WORKDIR/force-run" ]; then FORCED=1; rm -f "$WORKDIR/force-run"; fi
+FULL_EVERY="${RECONCILE_FULL_EVERY_SECS:-0}"
+if [ "${RECONCILE_MODE:-apply}" = apply ] && [ "$FORCED" = 0 ] && [ "$FULL_EVERY" -gt 0 ] && [ -f "$STATE_FILE" ]; then
+  prev_fp=""; prev_ts=0
+  read -r prev_fp prev_ts <"$STATE_FILE" || true
+  if [ "$prev_fp" = "$FINGERPRINT" ] && [ $(($(date +%s) - ${prev_ts:-0})) -lt "$FULL_EVERY" ]; then
+    echo "==> Nothing new in either repo since the last successful apply ($(( ($(date +%s) - prev_ts) / 60 )) min ago); skipping (a full run is forced every $((FULL_EVERY / 60)) min)"
+    # A recap line so the run still shows up where the recap is read (cmdr, Loki).
+    echo "$(hostname -s) : ok=0 changed=0 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0 (unchanged, run skipped)"
+    exit 0
+  fi
+fi
+
 CONF="$FLEET_CONFIG_DIR/$FLEET_CONFIG_SUBDIR"
 fail() { echo "ERROR: $1 (see consigliere-fleet-template/)" >&2; exit 1; }
 [ -f "$CONF/inventory/hosts.yml" ] || fail "$CONF/inventory/hosts.yml not found -- the host table is required, otherwise no role beyond the baseline would ever match"
@@ -230,6 +249,7 @@ case "${RECONCILE_MODE:-apply}" in
     fi
     echo "==> Applying"
     run_playbook
+    printf '%s %s\n' "$FINGERPRINT" "$(date +%s)" >"$STATE_FILE"
     ;;
   *) echo "ERROR: RECONCILE_MODE must be check or apply" >&2; exit 2 ;;
 esac

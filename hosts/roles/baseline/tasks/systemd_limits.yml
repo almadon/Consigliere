@@ -1,0 +1,67 @@
+---
+- name: Is the reconciliation timer installed here?
+  ansible.builtin.stat:
+    path: /etc/systemd/system/fleet-reconcile.service
+  register: _baseline_reconcile_unit
+
+- name: Give the reconciliation run a low priority (and let unchanged runs be skipped)
+  when: baseline_reconcile_low_priority | bool and _baseline_reconcile_unit.stat.exists
+  block:
+    - name: Create the drop-in directory
+      ansible.builtin.file:
+        path: /etc/systemd/system/fleet-reconcile.service.d
+        state: directory
+        mode: "0755"
+
+    - name: Write the drop-in
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/fleet-reconcile.service.d/10-consigliere.conf
+        content: |
+          # Managed by Ansible (hosts/roles/baseline)
+          [Service]
+          Nice=19
+          CPUWeight=20
+          IOSchedulingClass=idle
+          Environment=RECONCILE_FULL_EVERY_SECS={{ baseline_reconcile_full_every_secs }}
+        owner: root
+        group: root
+        mode: "0644"
+      register: _baseline_reconcile_dropin
+
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+      when: _baseline_reconcile_dropin is changed and not ansible_check_mode
+
+- name: Cap the journal's size
+  when: baseline_journald_max_use | length > 0 or baseline_journald_runtime_max_use | length > 0
+  block:
+    - name: Create the journald drop-in directory
+      ansible.builtin.file:
+        path: /etc/systemd/journald.conf.d
+        state: directory
+        mode: "0755"
+
+    - name: Write the journald drop-in
+      ansible.builtin.copy:
+        dest: /etc/systemd/journald.conf.d/10-consigliere.conf
+        content: |
+          # Managed by Ansible (hosts/roles/baseline)
+          [Journal]
+          {% if baseline_journald_max_use | length > 0 %}
+          SystemMaxUse={{ baseline_journald_max_use }}
+          {% endif %}
+          {% if baseline_journald_runtime_max_use | length > 0 %}
+          RuntimeMaxUse={{ baseline_journald_runtime_max_use }}
+          {% endif %}
+        owner: root
+        group: root
+        mode: "0644"
+      register: _baseline_journald_dropin
+
+    - name: Restart journald and trim the journal to the new size
+      ansible.builtin.shell: |
+        systemctl restart systemd-journald
+        journalctl --vacuum-size={{ baseline_journald_max_use }}
+      changed_when: true
+      when: _baseline_journald_dropin is changed and not ansible_check_mode and baseline_journald_max_use | length > 0

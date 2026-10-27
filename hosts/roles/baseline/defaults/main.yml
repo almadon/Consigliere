@@ -84,3 +84,14 @@ baseline_bastion_ssh_keys: []
 # removing a CA from the list revokes everything it signed at the next run. Your admin keys keep working either way (the break-glass path).
 baseline_ssh_user_ca_keys: []
 baseline_ssh_ca_principals: [fleet-admin]
+
+# The reconciliation run (fleet-reconcile.service, two ansible passes) is heavy on a small host: about 2m40s of CPU every 20 minutes on a 1 vCPU VPS. A drop-in gives it a low
+# priority so the services on the host win whenever they need the CPU, and lets a run that has nothing to do be skipped: when neither the framework nor the fleet repo has a
+# new commit since the last successful apply, the run only fetches, and a full run is still forced every baseline_reconcile_full_every_secs (drift correction). `reconcile-now`
+# and any host's first run always do the full work. 0 = never skip. Only on hosts that have fleet-reconcile.service.
+baseline_reconcile_low_priority: true
+baseline_reconcile_full_every_secs: 21600
+
+# Cap the systemd journal (it is shipped to Loki by the otel role, so the local copy is only for the last days). "" leaves journald's own limits alone.
+baseline_journald_max_use: "200M"
+baseline_journald_runtime_max_use: "64M"
