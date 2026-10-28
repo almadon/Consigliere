@@ -1,4 +1,4 @@
-// Best-effort live reachability lookup — if TAILSCALE_API_KEY isn't set,
+// Best-effort live reachability lookup - if TAILSCALE_API_KEY isn't set,
 // callers just get an empty map back and tiles render without a status dot
 // rather than the dashboard failing to load.
 
@@ -27,7 +27,7 @@ export async function getTailscaleStatusByHostname(): Promise<Map<string, Tailsc
       byHostname.set(d.hostname.toLowerCase(), d);
     }
   } catch {
-    // Network hiccup or API shape drift — degrade gracefully, see note above.
+    // Network hiccup or API shape drift - degrade gracefully, see note above.
   }
 
   return byHostname;

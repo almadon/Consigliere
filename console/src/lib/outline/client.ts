@@ -3,7 +3,7 @@
 //
 // NOTE: field names below (collectionId, parentDocumentId, doc.text, etc.)
 // are written from general knowledge of Outline's API shape and have not
-// been verified against a live instance yet — check response shapes on
+// been verified against a live instance yet - check response shapes on
 // first real run against OUTLINE_API_URL and adjust getDocumentText /
 // listCollectionDocuments if anything doesn't line up.
 

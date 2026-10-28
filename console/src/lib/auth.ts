@@ -6,7 +6,7 @@ import type { NextAuthOptions } from "next-auth";
 //
 // The `groups` scope/claim gates access -- see lib/authz.ts.
 // NOTE: `profile()` below assumes standard OIDC claims (sub/name/email/
-// picture) — verify against what Pocket ID's userinfo endpoint actually
+// picture) - verify against what Pocket ID's userinfo endpoint actually
 // returns on first login and adjust if needed.
 export const authOptions: NextAuthOptions = {
   providers: [

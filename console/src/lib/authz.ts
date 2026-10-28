@@ -1,6 +1,6 @@
 /**
  * Authorization. This file is the entire access-control story -- review it
- * before anything else in the console. Pattern ported from novak-konzol.
+ * before anything else in the console.
  *
  * Rules:
  *   1. Being signed in is NOT enough. Every page and API route must call

@@ -54,7 +54,7 @@ export function parseMachineDoc(id: string, sourceUrl: string, text: string): Ma
   };
 }
 
-/** "Label|https://url, Label2|https://url2" — label falls back to the URL host if omitted. */
+/** "Label|https://url, Label2|https://url2" - label falls back to the URL host if omitted. */
 function parseLinks(value?: string): DashboardLink[] {
   if (!value) return [];
   return value

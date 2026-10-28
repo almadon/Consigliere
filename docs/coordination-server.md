@@ -2,7 +2,7 @@
 
 One host runs: Arkeep server, Arcane manager, Semaphore, the console, and
 (from the separate geotraefik repo) Traefik. Nothing here has run on a real
-host yet — expect to fix things. What *has* been tested: the console
+host yet - expect to fix things. What *has* been tested: the console
 (mock Outline, forged session; see commit 441d837), shell syntax, template
 rendering, lint. **Not** tested: real Outline/Pocket ID/Tailscale, the
 Docker image build, any role on a real host.
@@ -47,10 +47,10 @@ first reconcile is check-only; you approve the apply and the timer. Watch
 `journalctl -u fleet-reconcile -f`; expect the first failures here.
 
 ## 2. Verify each service (over Tailscale, not the public IP)
-- Arcane   http://<tailscale-ip>:3552 — create the admin account.
-- Arkeep   http://<tailscale-ip>:8080 — create the admin account; note the
+- Arcane   http://<tailscale-ip>:3552 - create the admin account.
+- Arkeep   http://<tailscale-ip>:8080 - create the admin account; note the
   gRPC address <tailscale-ip>:9090 for agents.
-- Semaphore http://<tailscale-ip>:3000 — log in with the `semaphore.server` admin password.
+- Semaphore http://<tailscale-ip>:3000 - log in with the `semaphore.server` admin password.
 - Heartbeat check turns green after a successful reconcile.
 
 ## 3. Deploy the console (manual for now)
@@ -70,7 +70,7 @@ render → "Edit in Outline" links open the right doc → Sync overview works.
 Likely failure points: Pocket ID claim names (flagged in auth.ts) and
 Outline response shapes (flagged in outline/client.ts).
 
-## 4. Traefik (geotraefik repo) — last
+## 4. Traefik (geotraefik repo) - last
 Only after 2–3 work. Then wire Arkeep/Arcane/console through it per
 hosts/roles/arkeep_server/README.md and close the direct ports.
 

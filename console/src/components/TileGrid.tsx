@@ -9,7 +9,7 @@ export function TileGrid({
   onlineByHostname: Map<string, boolean>;
 }) {
   if (machines.length === 0) {
-    return <p className="empty-state">No machines found — check MACHINE_PROVIDER config.</p>;
+    return <p className="empty-state">No machines found - check MACHINE_PROVIDER config.</p>;
   }
 
   return (

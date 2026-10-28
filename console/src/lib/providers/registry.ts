@@ -9,7 +9,7 @@ export function getProvider(): MachineProvider {
       return new OutlineProvider();
     default:
       throw new Error(
-        `Unknown MACHINE_PROVIDER "${kind}" — only "outline" is implemented today.`
+        `Unknown MACHINE_PROVIDER "${kind}" - only "outline" is implemented today.`
       );
   }
 }

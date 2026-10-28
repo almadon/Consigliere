@@ -1,5 +1,5 @@
 ---
-# Applied to hosts tagged util:arkeep (one host — the central backup console).
+# Applied to hosts tagged util:arkeep (one host - the central backup console).
 # Reproduces github.com/arkeep-io/arkeep's deploy/docker/docker-compose.yml
 # as a template (verified against that file 2026-10-01) rather than
 # vendoring it as a submodule -- it's small and stable, unlike Wazuh's

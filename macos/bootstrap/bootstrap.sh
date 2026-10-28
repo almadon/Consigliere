@@ -2,7 +2,7 @@
 # One-time setup for a new Mac: clones this (public) framework repo,
 # installs Ansible via Homebrew if needed, runs one immediate apply, then
 # installs the launchd agent so future runs happen on schedule (macOS has
-# no systemd — this is the closest equivalent, see com.fleet.reconcile.plist).
+# no systemd - this is the closest equivalent, see com.fleet.reconcile.plist).
 #
 # No private fleet-config repo is wired in on macOS yet -- the `baseline`
 # role doesn't need secrets or site-specific vars today. If that changes,
@@ -16,7 +16,7 @@ set -euo pipefail
 FRAMEWORK_REPO_DIR="${FRAMEWORK_REPO_DIR:-$HOME/.fleet-framework}"
 
 if ! command -v brew &>/dev/null; then
-  echo "==> Homebrew not found — install it first: https://brew.sh"
+  echo "==> Homebrew not found - install it first: https://brew.sh"
   exit 1
 fi
 

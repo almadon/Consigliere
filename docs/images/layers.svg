@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640" role="img" aria-labelledby="t d">
+<title id="t">Consigliere layers</title><desc id="d">Six layers from git at the top to applications at the bottom, with the Tailscale network on the left and drift checking on the right.</desc>
+<style>
+:root{--bg:#ffffff;--ink:#16202b;--mute:#566474;--card:#ffffff;--line:#c9d2dc;
+--b:#e8f0fd;--bs:#2f6fdb;--g:#e6f5ec;--gs:#1f8a4c;--p:#f1eafb;--ps:#7a45c9;--a:#fdf1e0;--as:#c27410;--t:#e3f4f6;--ts:#16808f;--r:#fbe9ec;--rs:#c8374f}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1620;--ink:#e6edf5;--mute:#98a6b6;--card:#18222e;--line:#2c3a4a;
+--b:#15233b;--bs:#6aa2ff;--g:#12291d;--gs:#4cc27f;--p:#231a37;--ps:#b18cf0;--a:#33250f;--as:#f0a947;--t:#10292e;--ts:#4dc1d1;--r:#35161c;--rs:#ff7a8e}}
+text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;fill:var(--ink)}
+.h{font-size:15px;font-weight:700}.s{font-size:11.5px;fill:var(--mute)}.c{font-size:12.5px;font-weight:600}.cs{font-size:10.5px;fill:var(--mute)}
+.rail{font-size:11px;font-weight:700;letter-spacing:.14em}
+</style>
+<rect width="960" height="640" rx="14" fill="var(--bg)"/>
+<rect x="96" y="16" width="768" height="92" rx="12" fill="var(--b)" stroke="var(--bs)" stroke-width="1.5"/>
+<text class="h" x="112" y="42">1  Declare</text>
+<text class="s" x="112" y="62">Git is the source of truth.</text>
+<text class="s" x="112" y="76">Nothing is applied by hand.</text>
+<rect x="306.0" y="40.0" width="175.3" height="44" rx="8" fill="var(--card)" stroke="var(--bs)" stroke-opacity=".55"/>
+<text class="c" x="318.0" y="59.0">Framework repo</text>
+<text class="cs" x="318.0" y="75.0">public · roles, scripts, Cmdr</text>
+<rect x="491.3" y="40.0" width="175.3" height="44" rx="8" fill="var(--card)" stroke="var(--bs)" stroke-opacity=".55"/>
+<text class="c" x="503.3" y="59.0">Fleet repo</text>
+<text class="cs" x="503.3" y="75.0">private · host table, vars, routes</text>
+<rect x="676.7" y="40.0" width="175.3" height="44" rx="8" fill="var(--card)" stroke="var(--bs)" stroke-opacity=".55"/>
+<text class="c" x="688.7" y="59.0">Secrets</text>
+<text class="cs" x="688.7" y="75.0">sops + age · one key per host</text>
+<rect x="96" y="120" width="768" height="76" rx="12" fill="var(--g)" stroke="var(--gs)" stroke-width="1.5"/>
+<text class="h" x="112" y="146">2  Reconcile</text>
+<text class="s" x="112" y="166">Every host pulls and applies</text>
+<text class="s" x="112" y="180">its own config on a timer.</text>
+<rect x="306.0" y="136.0" width="175.3" height="44" rx="8" fill="var(--card)" stroke="var(--gs)" stroke-opacity=".55"/>
+<text class="c" x="318.0" y="155.0">sync both repos</text>
+<text class="cs" x="318.0" y="171.0">git, read-only deploy key</text>
+<rect x="491.3" y="136.0" width="175.3" height="44" rx="8" fill="var(--card)" stroke="var(--gs)" stroke-opacity=".55"/>
+<text class="c" x="503.3" y="155.0">check</text>
+<text class="cs" x="503.3" y="171.0">drift report, nothing changed</text>
+<rect x="676.7" y="136.0" width="175.3" height="44" rx="8" fill="var(--card)" stroke="var(--gs)" stroke-opacity=".55"/>
+<text class="c" x="688.7" y="155.0">apply</text>
+<text class="cs" x="688.7" y="171.0">skipped when nothing is new</text>
+<rect x="96" y="208" width="768" height="76" rx="12" fill="var(--p)" stroke="var(--ps)" stroke-width="1.5"/>
+<text class="h" x="112" y="234">3  Configure</text>
+<text class="s" x="112" y="254">Tags in the host table pick</text>
+<text class="s" x="112" y="268">the roles.</text>
+<rect x="306.0" y="224.0" width="175.3" height="44" rx="8" fill="var(--card)" stroke="var(--ps)" stroke-opacity=".55"/>
+<text class="c" x="318.0" y="243.0">host table</text>
+<text class="cs" x="318.0" y="259.0">util · feat · prop · fw · cert</text>
+<rect x="491.3" y="224.0" width="175.3" height="44" rx="8" fill="var(--card)" stroke="var(--ps)" stroke-opacity=".55"/>
+<text class="c" x="503.3" y="243.0">tag manifests</text>
+<text class="cs" x="503.3" y="259.0">tag → roles, in order</text>
+<rect x="676.7" y="224.0" width="175.3" height="44" rx="8" fill="var(--card)" stroke="var(--ps)" stroke-opacity=".55"/>
+<text class="c" x="688.7" y="243.0">roles</text>
+<text class="cs" x="688.7" y="259.0">Ansible, idempotent</text>
+<rect x="96" y="296" width="768" height="76" rx="12" fill="var(--a)" stroke="var(--as)" stroke-width="1.5"/>
+<text class="h" x="112" y="322">4  Host</text>
+<text class="s" x="112" y="342">The machine itself, kept the</text>
+<text class="s" x="112" y="356">same everywhere.</text>
+<rect x="306.0" y="312.0" width="175.3" height="44" rx="8" fill="var(--card)" stroke="var(--as)" stroke-opacity=".55"/>
+<text class="c" x="318.0" y="331.0">baseline</text>
+<text class="cs" x="318.0" y="347.0">users, ssh, sysctl, updates</text>
+<rect x="491.3" y="312.0" width="175.3" height="44" rx="8" fill="var(--card)" stroke="var(--as)" stroke-opacity=".55"/>
+<text class="c" x="503.3" y="331.0">firewall</text>
+<text class="cs" x="503.3" y="347.0">ufw, tailnet-first</text>
+<rect x="676.7" y="312.0" width="175.3" height="44" rx="8" fill="var(--card)" stroke="var(--as)" stroke-opacity=".55"/>
+<text class="c" x="688.7" y="331.0">Docker engine</text>
+<text class="cs" x="688.7" y="347.0">+ Tailscale, sops, timers</text>
+<rect x="96" y="384" width="768" height="150" rx="12" fill="var(--t)" stroke="var(--ts)" stroke-width="1.5"/>
+<text class="h" x="112" y="410">5  Platform services</text>
+<text class="s" x="112" y="430">Shared services that other</text>
+<text class="s" x="112" y="444">things depend on.</text>
+<rect x="306.0" y="402.0" width="175.3" height="52" rx="8" fill="var(--card)" stroke="var(--ts)" stroke-opacity=".55"/>
+<text class="c" x="318.0" y="421.0">Edge</text>
+<text class="cs" x="318.0" y="437.0">Traefik · Cert Warden</text>
+<rect x="491.3" y="402.0" width="175.3" height="52" rx="8" fill="var(--card)" stroke="var(--ts)" stroke-opacity=".55"/>
+<text class="c" x="503.3" y="421.0">Observe</text>
+<text class="cs" x="503.3" y="437.0">otel · Loki · Victoria · Grafana</text>
+<rect x="676.7" y="402.0" width="175.3" height="52" rx="8" fill="var(--card)" stroke="var(--ts)" stroke-opacity=".55"/>
+<text class="c" x="688.7" y="421.0">Protect</text>
+<text class="cs" x="688.7" y="437.0">Arkeep · restic · Wazuh</text>
+<rect x="306.0" y="464.0" width="175.3" height="52" rx="8" fill="var(--card)" stroke="var(--ts)" stroke-opacity=".55"/>
+<text class="c" x="318.0" y="483.0">Console</text>
+<text class="cs" x="318.0" y="499.0">Cmdr · Muximux · Homarr</text>
+<rect x="491.3" y="464.0" width="175.3" height="52" rx="8" fill="var(--card)" stroke="var(--ts)" stroke-opacity=".55"/>
+<text class="c" x="503.3" y="483.0">Data</text>
+<text class="cs" x="503.3" y="499.0">Garage S3 · data disks</text>
+<rect x="676.7" y="464.0" width="175.3" height="52" rx="8" fill="var(--card)" stroke="var(--ts)" stroke-opacity=".55"/>
+<text class="c" x="688.7" y="483.0">Notify</text>
+<text class="cs" x="688.7" y="499.0">Apprise · run reports</text>
+<rect x="96" y="546" width="768" height="76" rx="12" fill="var(--r)" stroke="var(--rs)" stroke-width="1.5"/>
+<text class="h" x="112" y="572">6  Applications</text>
+<text class="s" x="112" y="592">Compose stacks. Arcane owns</text>
+<text class="s" x="112" y="606">them, Ansible does not.</text>
+<rect x="306.0" y="562.0" width="175.3" height="44" rx="8" fill="var(--card)" stroke="var(--rs)" stroke-opacity=".55"/>
+<text class="c" x="318.0" y="581.0">Arcane</text>
+<text class="cs" x="318.0" y="597.0">syncs stacks/ from git</text>
+<rect x="491.3" y="562.0" width="175.3" height="44" rx="8" fill="var(--card)" stroke="var(--rs)" stroke-opacity=".55"/>
+<text class="c" x="503.3" y="581.0">Your apps</text>
+<text class="cs" x="503.3" y="597.0">containers on any host</text>
+<rect x="676.7" y="562.0" width="175.3" height="44" rx="8" fill="var(--card)" stroke="var(--rs)" stroke-opacity=".55"/>
+<text class="c" x="688.7" y="581.0">Updates</text>
+<text class="cs" x="688.7" y="597.0">apt + compose, scheduled</text>
+<path d="M480 109 v7 m-5 -5 l5 5 l5 -5" fill="none" stroke="var(--mute)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M480 197 v7 m-5 -5 l5 5 l5 -5" fill="none" stroke="var(--mute)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M480 285 v7 m-5 -5 l5 5 l5 -5" fill="none" stroke="var(--mute)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M480 373 v7 m-5 -5 l5 5 l5 -5" fill="none" stroke="var(--mute)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M480 535 v7 m-5 -5 l5 5 l5 -5" fill="none" stroke="var(--mute)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="24" y="16" width="56" height="606" rx="12" fill="var(--t)" stroke="var(--ts)" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text class="rail" transform="translate(46 319) rotate(-90)" text-anchor="middle" style="fill:var(--ts)">TAILSCALE</text>
+<text class="s" transform="translate(64 319) rotate(-90)" text-anchor="middle">every layer talks over the tailnet; SSH is closed to the world</text>
+<rect x="880" y="16" width="56" height="606" rx="12" fill="var(--g)" stroke="var(--gs)" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text class="rail" transform="translate(902 319) rotate(-90)" text-anchor="middle" style="fill:var(--gs)">DRIFT CHECK</text>
+<text class="s" transform="translate(920 319) rotate(-90)" text-anchor="middle">Cmdr, Grafana and exposure watch read what is actually true</text>
+</svg>

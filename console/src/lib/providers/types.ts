@@ -1,7 +1,7 @@
 // The data-source abstraction: today only OutlineProvider implements this,
 // but keeping it as an interface is what lets a future backend (NetBox,
 // flat YAML, whatever) slot in later without touching the UI or the widget
-// layer — see registry.ts for how the active provider is chosen.
+// layer - see registry.ts for how the active provider is chosen.
 
 export interface DashboardLink {
   label: string;

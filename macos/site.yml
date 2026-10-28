@@ -1,6 +1,6 @@
 ---
 # macOS entry point, run locally by the launchd agent (see bootstrap/).
-# Deliberately separate from hosts/site.yml — different package manager,
+# Deliberately separate from hosts/site.yml - different package manager,
 # different service manager, and no security-posture role yet.
 
 - name: Fleet macOS baseline

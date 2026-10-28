@@ -1,6 +1,6 @@
 ---
 # Wazuh agent enrollment -- replaces the earlier Lynis + Linux Malware
-# Detect approach (see VISION.md: "Security posture / malware detection —
+# Detect approach (see VISION.md: "Security posture / malware detection -
 # moving to Wazuh"). Wazuh gives fleet-wide FIM/rootkit/malware detection
 # with a real single-pane dashboard instead of two separate CLI tools and
 # no aggregation; the manager/indexer/dashboard stack lives in

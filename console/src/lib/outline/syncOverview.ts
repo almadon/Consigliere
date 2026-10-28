@@ -7,7 +7,7 @@ const END = "<!-- consigliere:overview:end -->";
 
 /**
  * Regenerates the table between the `consigliere:overview` markers in the
- * configured overview doc from every machine doc's own fields — this is
+ * configured overview doc from every machine doc's own fields - this is
  * what replaces hand-copying data into a separate overview page. The rest
  * of the doc (anything outside the markers) is left untouched.
  *
@@ -30,7 +30,7 @@ export async function syncOverview(): Promise<{ machineCount: number }> {
 
   if (startIdx === -1 || endIdx === -1 || endIdx < startIdx) {
     throw new Error(
-      `Overview doc is missing the ${START} / ${END} markers — add them once, ` +
+      `Overview doc is missing the ${START} / ${END} markers - add them once, ` +
         "anywhere in the doc, and re-run sync."
     );
   }
@@ -47,12 +47,12 @@ function renderTable(machines: Machine[]): string {
   const header = "| Hostname | Role | Tailscale | KVM | Dashboards |";
   const sep = "|---|---|---|---|---|";
   const rows = machines.map((m) => {
-    const addrs = m.tailscaleAddrs.join(", ") || "—";
-    const kvm = m.kvmUrl ? `[link](${m.kvmUrl})` : "—";
+    const addrs = m.tailscaleAddrs.join(", ") || "-";
+    const kvm = m.kvmUrl ? `[link](${m.kvmUrl})` : "-";
     const dashboards =
-      m.dashboardLinks.map((l) => `[${l.label}](${l.url})`).join(", ") || "—";
+      m.dashboardLinks.map((l) => `[${l.label}](${l.url})`).join(", ") || "-";
     const source = m.sourceUrl ? `[${m.hostname}](${m.sourceUrl})` : m.hostname;
-    return `| ${source} | ${m.role ?? "—"} | ${addrs} | ${kvm} | ${dashboards} |`;
+    return `| ${source} | ${m.role ?? "-"} | ${addrs} | ${kvm} | ${dashboards} |`;
   });
   return [header, sep, ...rows].join("\n");
 }

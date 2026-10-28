@@ -1,7 +1,7 @@
 ---
 # NOTE: this only handles the simple two-shape case (init the first
 # manager, join everyone else as a worker). Multi-manager HA and manager
-# promotion aren't modeled yet — come back to this once there's more than
+# promotion aren't modeled yet - come back to this once there's more than
 # one manager host in the tailnet.
 
 - name: Init swarm on the manager

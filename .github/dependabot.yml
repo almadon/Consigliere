@@ -1,0 +1,20 @@
+# Updates are proposed, never merged automatically. The cooldown holds a new release back for a week (two weeks for a major version) so a compromised
+# or yanked release is usually caught before it arrives; security updates are exempt from it. Ansible collections are not covered by Dependabot.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: {interval: weekly}
+    cooldown: {default-days: 7, semver-major-days: 14}
+  - package-ecosystem: npm
+    directory: /console
+    schedule: {interval: weekly}
+    cooldown: {default-days: 7, semver-major-days: 14}
+  - package-ecosystem: docker
+    directory: /console
+    schedule: {interval: weekly}
+    cooldown: {default-days: 7, semver-major-days: 14}
+  - package-ecosystem: pip
+    directory: /
+    schedule: {interval: weekly}
+    cooldown: {default-days: 7, semver-major-days: 14}

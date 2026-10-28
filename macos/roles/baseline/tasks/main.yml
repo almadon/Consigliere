@@ -1,5 +1,5 @@
 ---
-# NOTE: unlike hosts/roles/tailscale, this doesn't install/join Tailscale —
+# NOTE: unlike hosts/roles/tailscale, this doesn't install/join Tailscale -
 # assumes it's already set up via the Mac App Store app or a prior manual
 # step. Folding Tailscale join into this role is a reasonable next step
 # once there's more than one Mac in the fleet to justify automating it.

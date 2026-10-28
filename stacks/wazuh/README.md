@@ -1,8 +1,8 @@
-# Wazuh — fleet security monitoring
+# Wazuh - fleet security monitoring
 
 Manager + indexer + dashboard, for the fleet-wide malware/rootkit
 detection and file-integrity monitoring described in
-[VISION.md](../../VISION.md) ("Security posture / malware detection —
+[VISION.md](../../VISION.md) ("Security posture / malware detection -
 moving to Wazuh"). Agents are enrolled separately by
 `hosts/roles/wazuh_agent/` on every other host in the fleet.
 
@@ -10,7 +10,7 @@ moving to Wazuh"). Agents are enrolled separately by
 
 `vendor/` is the official [wazuh/wazuh-docker](https://github.com/wazuh/wazuh-docker)
 repo, added as a **git submodule pinned to `v4.14.7`** (the current stable
-tag as of 2026-08-21 — verify this is still current before deploying;
+tag as of 2026-08-21 - verify this is still current before deploying;
 `main` was already tracking an unreleased 5.x line when this was pinned).
 It's vendored rather than hand-transcribed here deliberately: this compose
 setup involves TLS cert generation and several tightly version-coupled
@@ -18,11 +18,11 @@ config files (`config/wazuh_indexer/`, `config/wazuh_cluster/`), and
 copying it by hand risks drifting from something upstream actively
 maintains. Consigliere points at `vendor/single-node/` as-is rather than forcing
 it into the `stacks/<service>/docker-compose.yml` convention the rest of
-`stacks/` uses — see the exception noted in [stacks/README.md](../README.md).
+`stacks/` uses - see the exception noted in [stacks/README.md](../README.md).
 
 ## Deploying
 
-Run all of this **on the host tagged the `wazuh_server` group** — that tag is
+Run all of this **on the host tagged the `wazuh_server` group** - that tag is
 what makes `hosts/roles/wazuh_server` apply the `vm.max_map_count=262144`
 sysctl the indexer requires (OpenSearch needs more virtual memory areas
 than Linux's default 65530 allows). Tag the host in Tailscale first, run
@@ -46,7 +46,7 @@ reachable at `https://<manager-tailscale-addr>` once it's healthy.
 
 The vendored compose file ships Wazuh's documented **default** credentials
 in plaintext (`admin` / `SecretPassword` for the indexer/dashboard,
-`wazuh-wui` / `MyS3cr37P450r.*-` for the manager API) — fine for a first
+`wazuh-wui` / `MyS3cr37P450r.*-` for the manager API) - fine for a first
 boot to confirm it works, not fine to leave running. As of 2026-08-21,
 Wazuh's documented procedure (single-node, [changing-default-password.html](https://documentation.wazuh.com/current/deployment-options/docker/changing-default-password.html)):
 
@@ -62,7 +62,7 @@ Wazuh's documented procedure (single-node, [changing-default-password.html](http
    for the relevant user.
 5. `docker compose down && docker compose up -d`, then apply the security
    config from inside the indexer container via `securityadmin.sh` (see
-   the linked doc for the exact invocation — it takes cert paths that are
+   the linked doc for the exact invocation - it takes cert paths that are
    worth copying precisely rather than retyped from memory).
 6. For the manager API (`wazuh-wui`) password specifically: also update
    `config/wazuh_dashboard/wazuh.yml`'s API password to match.
@@ -72,7 +72,7 @@ number, one symbol.
 
 ## Wiring it into the console
 
-No code changes needed — add the dashboard URL as one of the `Dashboards`
+No code changes needed - add the dashboard URL as one of the `Dashboards`
 entries in this machine's Outline doc (see
 [console/README.md](../../console/README.md)'s table convention) and it
 shows up as a tile link like anything else. This is a nice small proof

@@ -9,7 +9,7 @@ export class OutlineProvider implements MachineProvider {
 
     const summaries = await listCollectionDocuments(collectionId);
 
-    // Fetched in parallel — fine at homelab fleet sizes; revisit with
+    // Fetched in parallel - fine at homelab fleet sizes; revisit with
     // batching/pagination if this collection ever grows into the hundreds.
     return Promise.all(
       summaries.map(async (doc) => {
