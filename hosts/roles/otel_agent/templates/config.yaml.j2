@@ -120,6 +120,9 @@ processors:
   resource:
     attributes:
       - {key: host.name, value: {{ otel_agent_host_name | to_json }}, action: upsert}
+{% for k, v in {'site': otel_agent_site, 'location': otel_agent_location, 'org': otel_agent_org}.items() if v | string | length > 0 %}
+      - {key: {{ k | to_json }}, value: {{ v | to_json }}, action: upsert}
+{% endfor %}
 {% for k, v in otel_agent_attributes.items() %}
       - {key: {{ k | to_json }}, value: {{ v | to_json }}, action: upsert}
 {% endfor %}

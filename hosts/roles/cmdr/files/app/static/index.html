@@ -22,6 +22,7 @@
 <main>
   <section class="strip" id="strip" aria-label="Fleet at a glance"></section>
   <section aria-label="Needs attention" id="attention" hidden></section>
+  <section aria-label="Map" id="mapsec"><div class="bar"><h2>Map</h2><span class="note">Where the hosts are. Hover for status, click to open a host, drag and scroll to explore.</span></div><div class="mapbox" id="map"></div></section>
   <section aria-label="Launchpad"><div class="bar"><h2>Launchpad</h2></div><div class="pad" id="tools"></div></section>
   <section aria-label="Hosts">
     <div class="bar">
@@ -49,6 +50,8 @@
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <footer class="foot" id="foot"></footer>
+<script src="/static/world.js"></script>
+<script src="/static/map.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

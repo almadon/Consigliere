@@ -34,6 +34,9 @@ browser against the real fleet repo; not yet on the fleet.
 ## The page
 
 - **Look:** charcoal and brass, mono type for anything you could type; follows the system light/dark setting (button in the header overrides, remembered per browser).
+- **Map:** hosts with `geo: [latitude, longitude]` in the host table appear on a world map (offline outline, no tile server), coloured by status; hosts at the same place share a marker. Hover for the
+  hosts, click to open one, drag and scroll to explore. Optional arcs show where telemetry (otel agents to the Loki host) and backups (Arkeep agents to the server) flow. A host's `location` and `site` also show on its card.
+- **Cards:** one route per line, each marked `public` (answers from the internet) or `tailnet` (LAN or tailnet only); a long card scrolls inside itself instead of growing.
 - **Status strip:** hosts, who is reporting, last reconciles, public exposure; the red tiles filter the host list to the problems.
 - **Launchpad:** `cmdr_tools`. **Hosts:** cards or rows, sorted by what needs attention, filterable.
 - **Command palette** (Ctrl/Cmd+K, `/` filters hosts): hosts, services, tools and commands. **Command buttons** copy a ready-to-paste command

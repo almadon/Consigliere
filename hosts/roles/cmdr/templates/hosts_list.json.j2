@@ -19,7 +19,7 @@
 {%- set _ = rts.append({'name': r.name | default(''), 'hosts': hs, 'backend': r.backend | default(''), 'profile': r.profile | default(''), 'internal': intern.on,
                         'redirect': (r.redirect.to if r.redirect is defined else ''), 'rule': r.rule | default('')}) -%}
 {%- endfor -%}
-{%- set _ = out.append({'name': name, 'type': a.type | default(''), 'org': a.org | default(''), 'site': a.site | default(''),
+{%- set _ = out.append({'name': name, 'type': a.type | default(''), 'org': a.org | default(''), 'site': a.site | default(''), 'location': a.location | default(''), 'geo': a.geo | default([]),
                         'util': a.util | default([]), 'feat': a.feat | default([]), 'prop': a.prop | default([]), 'cert': a.cert | default([]),
                         'fw': a.fw | default([]), 'routes': rts}) -%}
 {%- endfor -%}

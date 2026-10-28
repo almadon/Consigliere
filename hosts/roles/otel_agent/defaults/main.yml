@@ -17,6 +17,11 @@ otel_agent_memory_limit_mib: 128
 otel_agent_memory_max: 256M
 # Extra resource attributes on everything this host sends, for example {environment: lab}.
 otel_agent_attributes: {}
+# Where the host is, from the fleet's host table (its site: the provider or place, location: a city label, org), sent as the resource attributes site, location and org so dashboards
+# can group and filter by them. In VictoriaMetrics they are labels on every series; in Loki they are structured metadata ({host_name="x"} | site="netcup"). Empty = not sent.
+otel_agent_site: "{{ site | default('') }}"
+otel_agent_location: "{{ location | default('') }}"
+otel_agent_org: "{{ org | default('') }}"
 
 # Syslog listeners: this host also RECEIVES syslog from devices that cannot run the collector (Unraid, UniFi gear, switches) and forwards it to
 # Loki, labelled with the sender's own host name (host_name) and program (unit). Empty = none. Each entry:
