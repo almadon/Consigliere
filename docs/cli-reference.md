@@ -35,7 +35,8 @@ directory, runs **check first**, and applies only if the check succeeded. Everyt
 | Variable | Meaning |
 |---|---|
 | `RECONCILE_MODE` | `apply` (default: check, then apply) or `check` (report drift only, change nothing) |
-| `RECONCILE_PRECHECK=0` | Skip the check pass (bootstrap does, after you approved the first check by hand) |
+| `RECONCILE_PRECHECK` | When the check pass runs before an apply: `auto` (default; only when a repo changed since the last successful apply), `1` (always), `0` (never; bootstrap does, after you approved the first check by hand) |
+| `RECONCILE_PROFILE=1` | Print per-task timings, to find slow tasks |
 | `RECONCILE_WORKDIR` | Work directory (default `/opt/fleet-reconcile`) |
 | `RECONCILE_CRED_DIR` | Host credentials: deploy key, age key (default `/etc/fleet-reconcile`) |
 | `RECONCILE_PLAYBOOK` | Entry playbook (default `site.yml`; Unraid uses `site-unraid.yml`) |

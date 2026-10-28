@@ -115,6 +115,12 @@ STATE_FILE="$WORKDIR/last-applied"
 FINGERPRINT="$(git -C "$FRAMEWORK_DIR" rev-parse HEAD)-$(git -C "$FLEET_CONFIG_DIR" rev-parse HEAD)"
 FORCED=0
 if [ -e "$WORKDIR/force-run" ]; then FORCED=1; rm -f "$WORKDIR/force-run"; fi
+# Did either repo move since the last successful apply? (Used below: a pass over the same commits that were already checked and applied needs no second check.)
+REPOS_CHANGED=1
+if [ -f "$STATE_FILE" ]; then
+  read -r _fp _ <"$STATE_FILE" || true
+  [ "${_fp:-}" = "$FINGERPRINT" ] && REPOS_CHANGED=0
+fi
 FULL_EVERY="${RECONCILE_FULL_EVERY_SECS:-0}"
 if [ "${RECONCILE_MODE:-apply}" = apply ] && [ "$FORCED" = 0 ] && [ "$FULL_EVERY" -gt 0 ] && [ -f "$STATE_FILE" ]; then
   prev_fp=""; prev_ts=0
@@ -201,6 +207,10 @@ else
   cp "$FRAMEWORK_DIR/hosts/$PLAYBOOK_FILE" "$RUN_DIR/site.yml"
 fi
 
+if [ "${RECONCILE_PROFILE:-0}" = 1 ]; then
+  export ANSIBLE_CALLBACKS_ENABLED="${ANSIBLE_CALLBACKS_ENABLED:+$ANSIBLE_CALLBACKS_ENABLED,}profile_tasks,timer"
+fi
+
 # Framework roles first; the fleet's own roles (if any) are also available.
 export ANSIBLE_ROLES_PATH="$FRAMEWORK_DIR/hosts/roles${CONF:+:$CONF/roles}"
 export ANSIBLE_CONFIG="$FRAMEWORK_DIR/hosts/ansible.cfg"
@@ -238,12 +248,25 @@ run_playbook() {
 
 # RECONCILE_MODE=check  report drift only (--check --diff), change nothing.
 # RECONCILE_MODE=apply  (default) check first, and only if that pass succeeds,
-#                       apply. RECONCILE_PRECHECK=0 skips the check pass (bootstrap
-#                       does, after you approved the first check by hand).
+#                       apply. RECONCILE_PRECHECK picks when the check pass runs:
+#                         auto (default) only when a repo moved since the last successful
+#                                        apply (new commits are what could break); a
+#                                        scheduled drift-correction pass over the same
+#                                        commits goes straight to apply, which halves its time
+#                         1              always
+#                         0              never (bootstrap does, after you approved the
+#                                        first check by hand)
+# RECONCILE_PROFILE=1   print per-task timings (ansible's profile_tasks and timer) to find slow tasks.
 case "${RECONCILE_MODE:-apply}" in
   check) echo "==> Check only"; run_playbook --check --diff ;;
   apply)
-    if [ "${RECONCILE_PRECHECK:-1}" = 1 ]; then
+    case "${RECONCILE_PRECHECK:-auto}" in
+      1) DO_PRECHECK=1 ;;
+      0) DO_PRECHECK=0 ;;
+      auto) DO_PRECHECK=$REPOS_CHANGED ;;
+      *) echo "ERROR: RECONCILE_PRECHECK must be auto, 1 or 0" >&2; exit 2 ;;
+    esac
+    if [ "$DO_PRECHECK" = 1 ]; then
       echo "==> Pre-check (nothing is changed)"
       run_playbook --check --diff || { echo "ERROR: the pre-check failed; not applying" >&2; exit 1; }
     fi

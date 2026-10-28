@@ -1,6 +1,6 @@
 ---
 # Entry point for both reconcile.sh (scheduled, on every host) and Semaphore
-# (on-demand / webhook-triggered). Keep this file boring — real logic lives
+# (on-demand / webhook-triggered). Keep this file boring - real logic lives
 # in the roles.
 
 - name: Fleet baseline + maintenance
@@ -31,6 +31,8 @@
 - name: Roles and tasks selected by tag manifests
   hosts: all
   become: true
+  # Facts from the first play stay available for the rest of the run; gathering them again costs a second or two per pass.
+  gather_facts: false
   tasks:
     - name: Run what this host's tags select
       ansible.builtin.include_role:
