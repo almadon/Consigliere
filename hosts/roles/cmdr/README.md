@@ -34,6 +34,7 @@ browser against the real fleet repo; not yet on the fleet.
 ## The page
 
 - **Look:** charcoal and brass, mono type for anything you could type; follows the system light/dark setting (button in the header overrides, remembered per browser).
+- **Runs on:** an `lxc` or `vm` host with `node: <host name>` shows "on <node>" on its card (a link when the node is itself in the host table) and in its details.
 - **Map:** hosts with `geo: [latitude, longitude]` in the host table appear on a world map (offline outline, no tile server), coloured by status; hosts at the same place share a marker. Hover for the
   hosts, click to open one, drag and scroll to explore. Optional arcs show where telemetry (otel agents to the Loki host) and backups (Arkeep agents to the server) flow. A host's `location` and `site` also show on its card.
 - **Cards:** one route per line, each marked `public` (answers from the internet) or `tailnet` (LAN or tailnet only); a long card scrolls inside itself instead of growing.

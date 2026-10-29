@@ -81,7 +81,7 @@
       if (!hh.attention && !alertsFor(host.name) && hh.rec.cls !== 'warn') return false;
     }
     if (!state.q) return true;
-    const hay = [host.name, host.type, host.org, host.site, host.location, ...(host.util || []), ...(host.feat || []), ...(host.prop || []), ...(host.cert || []),
+    const hay = [host.name, host.type, host.org, host.site, host.location, ...(host.util || []), ...(host.feat || []), host.node, ...(host.prop || []), ...(host.cert || []),
       ...(host.routes || []).flatMap((r) => r.hosts || [])].join(' ').toLowerCase();
     return state.q.toLowerCase().split(/\s+/).every((w) => hay.includes(w));
   }
@@ -154,6 +154,7 @@
 
   // ---------------------------------------------------------------- cards
   // Where a host sits: "Frankfurt, DE · hostbrr" (either part may be missing).
+  const nodeOf = (host) => (host.type === 'lxc' || host.type === 'vm') && host.node ? host.node : '';
   const placeText = (host) => [host.location, host.site].filter(Boolean).join(' · ');
   function exposureBadge(internal) {
     return internal
@@ -177,6 +178,8 @@
       h('div', { class: 'row head' }, h('span', { class: 'dot ' + hh.dot, title: hh.dot === 'ok' ? 'Sending logs to Loki' : hh.dot === 'bad' ? 'No logs for 10 minutes' : 'Status unknown' }),
         h('span', { class: 'name' }, host.name), h('span', { class: 'type', title: 'Host type: vps, lxc, vm, metal (a physical machine) or unraid' }, host.type || '?')),
       place ? h('div', { class: 'place', title: 'Location and provider (site) from the host table' }, h('span', { class: 'pin', 'aria-hidden': 'true' }, '⌖'), place) : null,
+      nodeOf(host) ? h('div', { class: 'place on', title: 'The Proxmox node this guest runs on (node: in the host table)' }, h('span', { class: 'pin', 'aria-hidden': 'true' }, '⤷'), 'on ',
+        state.data.hosts.some((x) => x.name === host.node) ? h('a', { href: '#', onclick: (e) => { e.preventDefault(); e.stopPropagation(); openHost(host.node); } }, host.node) : host.node) : null,
       h('div', { class: 'stat', title: 'The last reconcile run: the host applying the fleet repo to itself' }, h('span', { class: 'dot ' + hh.rec.cls }), h('span', null, hh.rec.text)),
       meters(host),
       body ? h('div', { class: 'cbody' }, body) : null,
@@ -210,7 +213,7 @@
       h('div', { class: 'note' }, 'Paste into a terminal in the fleet repo checkout. cmdr itself never runs anything on a host.'),
       h('h2', null, 'Details'),
       h('table', null,
-        kv('Type', host.type || '?'), kv('Organisation', host.org || ''), kv('Site (provider)', host.site || ''), kv('Location', host.location || ''),
+        kv('Type', host.type || '?'), kv('Organisation', host.org || ''), kv('Site (provider)', host.site || ''), kv('Location', host.location || ''), nodeOf(host) ? kv('Runs on (Proxmox node)', host.node) : null,
         kv(kindLabel('util'), tags(host.util, 'util')), kv(kindLabel('feat'), tags(host.feat, 'feat')), kv(kindLabel('prop'), tags(host.prop, 'prop')),
         kv('Certificates', (host.cert || []).join(', ') || 'none'), kv('Public ports (fw)', (host.fw || []).join(', ') || 'none (tailnet only)')),
       h('h2', null, 'Routes'),
