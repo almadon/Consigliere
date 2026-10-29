@@ -5,7 +5,7 @@
     get(k, d) { try { return localStorage.getItem('cmdr.' + k) || d; } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem('cmdr.' + k, v); } catch (e) { /* private mode: not remembered */ } },
   };
-  const state = { data: null, q: '', types: new Set(), problems: false, selected: null, view: store.get('view', 'grid'), sort: store.get('sort', 'status'), pal: { items: [], at: 0 }, mapLayers: new Set(['telemetry']), mapView: { x: 0, y: 0, w: 1000, h: 500 } };
+  const state = { data: null, q: '', attr: null, types: new Set(), problems: false, selected: null, view: store.get('view', 'grid'), sort: store.get('sort', 'status'), pal: { items: [], at: 0 }, mapLayers: new Set(['telemetry']), mapView: { x: 0, y: 0, w: 1000, h: 500 } };
 
   // DOM helper: text only, never HTML, so nothing from the data can inject markup.
   function h(tag, props, ...kids) {
@@ -30,6 +30,34 @@
   const safeUrl = (u) => (/^https?:\/\//i.test(u) ? u : '#');
   const fill = (tpl, host) => tpl.replaceAll('{host_q}', encodeURIComponent(host)).replaceAll('{host}', host);
   const hue = (s) => { let x = 7; for (const c of s) x = (x * 31 + c.charCodeAt(0)) % 360; return x; };
+
+  // One look per attribute value everywhere it appears (card, drawer, filter): the same site, place, org or Proxmox node is the same colour, so
+  // relationships show without reading. Hovering one lights every other card that shares it; clicking filters the host list to it.
+  const ATTR = { site: 'site', location: 'place', org: 'org', node: 'on' };
+  const attrKey = (kind, value) => kind + ':' + value;
+  function relate(key, on) {
+    for (const el of document.querySelectorAll('.attr')) if (el.dataset.attr === key) { el.classList.toggle('hl', on); const c = el.closest('.card'); if (c) c.classList.toggle('rel', on); }
+  }
+  function attr(kind, value) {
+    if (!value) return null;
+    const key = attrKey(kind, value);
+    const el = h('button', { class: 'attr a-' + kind, type: 'button', 'data-attr': key, title: 'Show only hosts with ' + ATTR[kind] + ' ' + value + ' (click again to clear)',
+      onclick: (e) => { e.stopPropagation(); const same = state.attr && state.attr.kind === kind && state.attr.value === value; state.attr = same ? null : { kind, value }; relate(key, false); render(); },
+      onmouseenter: () => relate(key, true), onmouseleave: () => relate(key, false), onfocus: () => relate(key, true), onblur: () => relate(key, false) },
+      h('i', null, ATTR[kind]), value);
+    el.style.setProperty('--k', `hsl(${hue(key)} 62% 58%)`);
+    return el;
+  }
+  // "managed by: User" style label: a quiet key and a coloured value, shared by the Launchpad and exposure badges.
+  const pair = (cls, key, value, color, title) => { const el = h('span', { class: 'pair ' + cls, title }, h('i', null, key), value); if (color) el.style.setProperty('--k', color); return el; };
+  // The fade at the foot of a card's body only appears while there is more to scroll to.
+  function markMore() {
+    for (const el of document.querySelectorAll('.cbody')) {
+      const upd = () => el.classList.toggle('more', el.scrollHeight > el.clientHeight + 2 && el.scrollTop + el.clientHeight < el.scrollHeight - 2);
+      if (!el.dataset.fade) { el.dataset.fade = '1'; el.addEventListener('scroll', upd, { passive: true }); }
+      upd();
+    }
+  }
 
   // ---------------------------------------------------------------- feedback
   let toastTimer = 0;
@@ -80,6 +108,7 @@
       const hh = hostHealth(host);
       if (!hh.attention && !alertsFor(host.name) && hh.rec.cls !== 'warn') return false;
     }
+    if (state.attr && !(host[state.attr.kind] === state.attr.value || (state.attr.kind === 'node' && host.name === state.attr.value))) return false;
     if (!state.q) return true;
     const hay = [host.name, host.type, host.org, host.site, host.location, ...(host.util || []), ...(host.feat || []), host.node, ...(host.prop || []), ...(host.cert || []),
       ...(host.routes || []).flatMap((r) => r.hosts || [])].join(' ').toLowerCase();
@@ -158,9 +187,10 @@
   const placeText = (host) => [host.location, host.site].filter(Boolean).join(' · ');
   function exposureBadge(internal) {
     return internal
-      ? h('span', { class: 'xb tn', title: 'Tailnet or LAN only: this name answers only from the private network. Not reachable from the internet.' }, 'tailnet')
-      : h('span', { class: 'xb pub', title: 'Public: this name answers from the internet (behind Traefik and its sign-in, where the route has one).' }, 'public');
+      ? pair('xb tn', 'exposed', 'Tailscale', null, 'Tailscale or LAN only: this name answers only from the private network. Not reachable from the internet.')
+      : pair('xb pub', 'exposed', 'Public', null, 'Public: this name answers from the internet (behind Traefik and its sign-in, where the route has one).');
   }
+  function typeTag(host) { const t = h('span', { class: 'type', title: 'Host type: vps, lxc, vm, metal (a physical machine) or unraid' }, host.type || '?'); t.style.setProperty('--k', `hsl(${hue('type:' + (host.type || '?'))} 62% 58%)`); return t; }
   function card(host) {
     const hh = hostHealth(host);
     const routes = routeNames(host);
@@ -176,10 +206,8 @@
     return h('div', { class: `card s-${hh.level}`, tabindex: '0', role: 'button', 'aria-label': 'Details for ' + host.name, onclick: () => openHost(host.name),
       onkeydown: (e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openHost(host.name); } } },
       h('div', { class: 'row head' }, h('span', { class: 'dot ' + hh.dot, title: hh.dot === 'ok' ? 'Sending logs to Loki' : hh.dot === 'bad' ? 'No logs for 10 minutes' : 'Status unknown' }),
-        h('span', { class: 'name' }, host.name), h('span', { class: 'type', title: 'Host type: vps, lxc, vm, metal (a physical machine) or unraid' }, host.type || '?')),
-      place ? h('div', { class: 'place', title: 'Location and provider (site) from the host table' }, h('span', { class: 'pin', 'aria-hidden': 'true' }, '⌖'), place) : null,
-      nodeOf(host) ? h('div', { class: 'place on', title: 'The Proxmox node this guest runs on (node: in the host table)' }, h('span', { class: 'pin', 'aria-hidden': 'true' }, '⤷'), 'on ',
-        state.data.hosts.some((x) => x.name === host.node) ? h('a', { href: '#', onclick: (e) => { e.preventDefault(); e.stopPropagation(); openHost(host.node); } }, host.node) : host.node) : null,
+        h('span', { class: 'name' }, host.name), typeTag(host)),
+      host.location || host.site || host.org || nodeOf(host) ? h('div', { class: 'attrs', title: 'Place, provider (site), organisation and Proxmox node from the host table' }, attr('location', host.location), attr('site', host.site), attr('org', host.org), attr('node', nodeOf(host))) : null,
       h('div', { class: 'stat', title: 'The last reconcile run: the host applying the fleet repo to itself' }, h('span', { class: 'dot ' + hh.rec.cls }), h('span', null, hh.rec.text)),
       meters(host),
       body ? h('div', { class: 'cbody' }, body) : null,
@@ -213,7 +241,7 @@
       h('div', { class: 'note' }, 'Paste into a terminal in the fleet repo checkout. cmdr itself never runs anything on a host.'),
       h('h2', null, 'Details'),
       h('table', null,
-        kv('Type', host.type || '?'), kv('Organisation', host.org || ''), kv('Site (provider)', host.site || ''), kv('Location', host.location || ''), nodeOf(host) ? kv('Runs on (Proxmox node)', host.node) : null,
+        kv('Type', typeTag(host)), kv('Organisation', attr('org', host.org) || ''), kv('Site (provider)', attr('site', host.site) || ''), kv('Location', attr('location', host.location) || ''), nodeOf(host) ? kv('Runs on (Proxmox node)', attr('node', host.node)) : null,
         kv(kindLabel('util'), tags(host.util, 'util')), kv(kindLabel('feat'), tags(host.feat, 'feat')), kv(kindLabel('prop'), tags(host.prop, 'prop')),
         kv('Certificates', (host.cert || []).join(', ') || 'none'), kv('Public ports (fw)', (host.fw || []).join(', ') || 'none (tailnet only)')),
       h('h2', null, 'Routes'),
@@ -269,8 +297,7 @@
         const ic = okIcon ? h('img', { class: 'ic img', src: '/static/icons/' + t.icon, alt: '' }) : h('span', { class: 'ic', 'aria-hidden': 'true' }, t.name.trim().slice(0, 2));
         if (!okIcon) ic.style.background = `hsl(${hue(t.name)} 38% 34%)`;
         const mk = (state.data.mgmt_kinds || {})[t.mgmt];
-        const badge = mk ? h('span', { class: 'mg', title: `${mk.label}: ${mk.desc}` }, mk.label) : null;
-        if (badge && mk.color) badge.style.setProperty('--k', mk.color);
+        const badge = mk ? pair('mgp', 'managed by', mk.label, mk.color, `Managed by ${mk.label}: ${mk.desc}`) : null;
         return h('a', { class: 'tool', href: safeUrl(t.url), target: '_blank', rel: 'noopener noreferrer' }, ic,
           h('span', null, h('b', null, t.name), t.desc ? h('small', null, t.desc) : null, badge), t.tailnet ? h('span', { class: 'tn', title: 'reachable from the LAN or tailnet only' }, 'tailnet') : null);
       })))));
@@ -285,16 +312,17 @@
       h('div', { class: 'kcols' },
         h('div', { class: 'kcol' }, h('h4', null, 'Status'), h('p', null,
           'Top dot: sending logs (green) or silent for 10 minutes (red). Second line: the last reconcile run: in sync, changed something, failed, or not seen in 24 hours. The bar on the left edge takes the worst of these.')),
-        h('div', { class: 'kcol' }, h('h4', null, 'Serves'), h('p', null, 'The hostnames Traefik serves for this host, one per line. ', exposureBadge(false), ' answers from the internet; ', exposureBadge(true), ' only from the LAN or tailnet.')),
+        h('div', { class: 'kcol' }, h('h4', null, 'Serves'), h('p', null, 'The hostnames Traefik serves for this host, one per line. ', exposureBadge(false), ' answers from the internet; ', exposureBadge(true), ' only from the LAN or Tailscale. Place, site, org and node chips share one colour per value: hover one to light up the hosts that share it, click to filter.')),
         h('div', { class: 'kcol' }, h('h4', null, 'CPU, MEM, DISK'), h('p', null, 'Right now, from the host\'s metrics agent. Amber from 75%, red from 90%. DISK is the root filesystem. Hosts without the agent show no bars.'))),
-      h('div', { class: 'kcols' }, Object.entries(d.mgmt_kinds || {}).map(([k, m]) => { const t = h('span', { class: 'mg' }, m.label); if (m.color) t.style.setProperty('--k', m.color);
-        return h('div', { class: 'kcol' }, h('h4', null, 'Launchpad badge'), h('p', null, t, ' ', m.desc)); })),
+      h('div', { class: 'kcols' }, Object.entries(d.mgmt_kinds || {}).map(([k, m]) => { const t = pair('mgp', 'managed by', m.label, m.color);
+        return h('div', { class: 'kcol' }, h('h4', null, 'Launchpad: managed by'), h('p', null, t, ' ', m.desc)); })),
       h('p', { class: 'note' }, 'Names and colours of the kinds, and any single tag, are set in the fleet repo (cmdr_tag_kinds, cmdr_tag_overrides); a tag\'s description comes from its manifest.'));
   }
   function renderChips() {
     const types = [...new Set(state.data.hosts.map((x) => x.type || '?'))].sort();
-    $('chips').replaceChildren(...types.map((t) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(state.types.has(t)), onclick: () => { state.types.has(t) ? state.types.delete(t) : state.types.add(t); render(); } }, t)),
-      h('button', { class: 'chip', type: 'button', 'aria-pressed': String(state.problems), onclick: () => { state.problems = !state.problems; render(); } }, 'problems only'));
+    $('chips').replaceChildren(...[...types.map((t) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(state.types.has(t)), onclick: () => { state.types.has(t) ? state.types.delete(t) : state.types.add(t); render(); } }, t)),
+      state.attr ? h('button', { class: 'chip', type: 'button', 'aria-pressed': 'true', title: 'Clear this filter', onclick: () => { state.attr = null; render(); } }, ATTR[state.attr.kind] + ': ' + state.attr.value + ' ✕') : null,
+      h('button', { class: 'chip', type: 'button', 'aria-pressed': String(state.problems), onclick: () => { state.problems = !state.problems; render(); } }, 'problems only')].filter(Boolean));
   }
   function renderMap() {
     if (!window.CmdrMap) return;
@@ -311,7 +339,7 @@
   }
   function render() {
     const d = state.data;
-    renderStrip(); renderMap(); renderTools(); renderChips(); renderKey(); renderExposure();
+    renderStrip(); renderMap(); renderTools(); renderChips(); renderKey(); renderExposure(); requestAnimationFrame(markMore);
     const list = sorted(d.hosts.filter(matches));
     const g = $('hosts');
     g.className = 'grid' + (state.view === 'list' ? ' list' : '');

@@ -182,14 +182,13 @@ button.b.done{border-color:var(--ok);color:var(--ok)}
    background and blur (expensive to repaint while scrolling) are dropped. */
 @media (pointer:coarse),(max-width:760px){
   .worldmap{touch-action:pan-y pinch-zoom}
+  .grid:not(.list){grid-auto-rows:auto}
   .cbody{max-height:none;overflow:visible;mask-image:none;-webkit-mask-image:none;overscroll-behavior:auto}
   body{background-attachment:scroll}
   .top,.scrim{backdrop-filter:none;-webkit-backdrop-filter:none}
   .card:hover,.tool:hover{transform:none}
   .mapwrap{max-height:48vh}.worldmap{max-height:48vh}
 }
-.card .place.on a{color:var(--gold)}
-.card .place.on{margin-top:-8px}
 
 .sr{position:fixed;opacity:0;pointer-events:none}
 .gate h1 .cursor{height:.8em;width:.5em}
@@ -250,11 +249,13 @@ img.ic.img{object-fit:cover;background:none;border-radius:9px}
 
 /* host cards: roomier, the body scrolls instead of growing */
 .grid{gap:16px}
+.grid:not(.list){grid-auto-rows:1fr}
 .card{gap:12px;padding:16px 16px 14px 19px}
 .card .place{display:flex;gap:6px;align-items:center;font:12px var(--mono);color:var(--mute);margin-top:-6px}
 .card .place .pin{color:var(--gold)}
 .cbody{max-height:15rem;overflow-y:auto;overscroll-behavior:contain;padding-right:4px;scrollbar-width:thin;scrollbar-color:var(--line2) transparent;
-  mask-image:linear-gradient(to bottom,#000 calc(100% - 14px),transparent);-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 14px),transparent)}
+}
+.cbody.more{mask-image:linear-gradient(to bottom,#000 calc(100% - 14px),transparent);-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 14px),transparent)}
 .cbody:not(:hover){scrollbar-width:none}
 .cbody .secs{border-top:0;padding-top:0;gap:10px}
 .sec{grid-template-columns:58px 1fr;gap:10px}
@@ -307,3 +308,19 @@ img.ic.img{object-fit:cover;background:none;border-radius:9px}
 .maplegend{display:flex;gap:14px;flex-wrap:wrap;color:var(--mute);margin-left:auto}
 .maplegend .dot{display:inline-block;width:8px;height:8px;margin-right:2px;box-shadow:none}
 @media (prefers-reduced-motion:reduce){.worldmap .arc,.mk .pulse{animation:none}}
+
+/* attribute chips: one colour per value (set inline as --k), a quiet key, a coloured value */
+.attrs{display:flex;gap:6px;flex-wrap:wrap;margin-top:-4px}
+.attr,.pair{--k:var(--mute);display:inline-flex;align-items:baseline;gap:5px;font:600 11.5px var(--mono);padding:1px 9px;border-radius:99px;border:1px solid color-mix(in srgb,var(--k) 55%,var(--line));
+  background:color-mix(in srgb,var(--k) 12%,transparent);color:color-mix(in srgb,var(--k) 70%,var(--ink));max-width:100%}
+.attr{cursor:pointer}
+.attr i,.pair i{font:600 8.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;font-style:normal;color:var(--mute)}
+.attr.hl{background:color-mix(in srgb,var(--k) 30%,transparent);border-color:var(--k)}
+.card.rel{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold),var(--shadow)}
+.pair{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;padding:0 8px}
+.pair.xb{border-radius:99px}
+.xb.tn{--k:var(--c-tn)}.xb.pub{--k:var(--c-pub)}
+.type{--k:var(--mute);color:color-mix(in srgb,var(--k) 70%,var(--ink));border-color:color-mix(in srgb,var(--k) 55%,var(--line));background:color-mix(in srgb,var(--k) 12%,transparent)}
+.pair{white-space:nowrap}.pair.mgp{margin-top:3px}
+/* in the narrow Serves list the badge drops its key so the hostname keeps room; the key is in the tooltip and the page key */
+.route .pair i{display:none}
