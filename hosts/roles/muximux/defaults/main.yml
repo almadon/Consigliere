@@ -11,7 +11,7 @@
 #   muximux_oidc_client_id, muximux_oidc_client_secret
 # In the identity provider: a confidential client whose callback URL is  <muximux_url>/api/auth/oidc/callback,
 # allowed to read the "groups" claim, and a group (muximux_oidc_admin_groups) for the people who may use the console.
-muximux_version: "3.6.2"
+muximux_version: "3.7.0"
 muximux_user_editable: false
 # Only with muximux_user_editable: does the repo keep owning the tiles and groups it declares (true), or are they just the starting set written on the very first
 # run and the console entirely yours afterwards (false)? Sign-in settings and the listen address follow the repo either way.
@@ -63,4 +63,7 @@ muximux_groups: []
 #     open: new_tab                 # new_tab (default; right for apps with their own sign-in), iframe, new_window
 #     health_url: http://...        # optional: what the health check calls instead of url
 #     min_role: admin               # optional: user | power-user | admin
+#     allow_navigation: false       # optional, Muximux 3.7.0+: this app (a dashboard such as Homarr) may switch Muximux to other apps with links to
+#                                   #   https://<console>/#app or #a+b (split view). Off unless set. ONLY for apps you trust: a target="_top" link in it
+#                                   #   can send the whole browser tab to any website. Set it on the app the click happens in, not on the apps it opens.
 muximux_apps: []

@@ -12,6 +12,10 @@ The fleet console: a [Muximux](https://github.com/mescon/Muximux) dashboard whos
   `config.yaml.pre-merge`; `managed.json` records which tiles the repo manages.
 - Tiles open in a new tab by default: admin tools have their own sign-in, which cannot complete inside a frame.
 - Health dots come from Muximux's own checks (`health_url` when the public address is not what should be checked).
+- **Embedded apps can drive the console (Muximux 3.7.0 and later).** A dashboard such as Homarr, opened inside Muximux, can switch Muximux to another app, or to two apps side by side,
+  with links to `https://<console>/#sonarr` or `#a+b`. This is off until `allow_navigation: true` is set on the app the click happens in (a tile's `allow_navigation` in `muximux_apps`, or the
+  "Allow navigating Muximux" switch in the app's settings in the UI). **Turn it on only for apps you trust:** a `target="_top"` link inside such an app can send the whole tab to any website.
+  The link's address before the `#` must be the address you have the console open on. Details: [Navigation from embedded apps](https://github.com/mescon/Muximux/wiki/apps#navigation-from-embedded-apps).
 - `muximux_auth: none` is refused unless `muximux_allow_no_auth: true`.
 - The container drops all capabilities except `CHOWN`, `SETUID` and `SETGID`, which its entrypoint needs to start as root and then run as uid 1000. Verified: anonymous requests to `/api/apps` get 401.
 

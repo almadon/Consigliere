@@ -51,6 +51,9 @@ apps:
 {% if a.min_role is defined %}
     min_role: {{ a.min_role }}
 {% endif %}
+{% if a.allow_navigation is defined %}
+    allow_navigation: {{ a.allow_navigation | bool | lower }}
+{% endif %}
 {% endfor %}
 {% else %}
 apps: []
