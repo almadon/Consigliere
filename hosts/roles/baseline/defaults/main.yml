@@ -19,6 +19,13 @@ baseline_packages:
   - unattended-upgrades
   - apt-listchanges
 
+# Acquire::Retries for apt. 0 = a failed download is not retried, which closes CVE-2026-109518
+# (retry-driven package swap, fixed in apt 2.4.15 / 2.6.2 / 2.8.4 / 3.0.4 and later). This is a
+# stopgap taken from secondary reports, not from the Debian/Ubuntu advisories, which only say to
+# upgrade apt. Cost: a flaky mirror now fails the run instead of retrying. Once every host has a
+# fixed apt, set this to null (the file is then left alone) or back to 3.
+baseline_apt_retries: 0
+
 # Set false on a host whose packages must only change on purpose (a Proxmox VE node: see the util: [pve] tag): the role then writes no
 # unattended-upgrades configuration and leaves the apt timers alone. Also leave "unattended-upgrades" out of baseline_packages there, because
 # installing that package turns the upgrades on by itself.

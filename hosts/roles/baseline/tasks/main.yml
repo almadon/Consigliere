@@ -1,4 +1,19 @@
 ---
+# CVE-2026-109518: an on-path attacker can use redirects and transient errors to make apt
+# retry a download and swap a verified package. It needs Acquire::Retries to be non-zero.
+# Done before the first apt call below, and independent of the unattended-upgrades switch
+# (a Proxmox node still needs it). 99 so that it is read last and wins over scripts.
+- name: Disable apt download retries (stopgap for CVE-2026-109518)
+  when: baseline_apt_retries is not none
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/99consigliere-apt-retries
+    content: |
+      // Managed by Ansible (hosts/roles/baseline). Stopgap for CVE-2026-109518.
+      Acquire::Retries "{{ baseline_apt_retries }}";
+    owner: root
+    group: root
+    mode: "0644"
+
 - name: Install baseline packages
   ansible.builtin.apt:
     name: "{{ baseline_packages }}"

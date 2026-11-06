@@ -37,3 +37,7 @@ Numbered, never reused. A reversed decision gets a new entry that supersedes the
 ## 7. Em dashes replaced repo-wide with spaced hyphens in older files
 
 **Chosen.** To satisfy conformIT's mechanical check without rewriting every sentence, older text had the em-dash character with spaces replaced by ` - `. New and rewritten prose avoids both. **Cost.** Some older sentences read less well than a rewrite would. **Revisit** when those files are next edited for content.
+
+## 8. Disable apt download retries while CVE-2026-109518 is open
+
+**Chosen.** The `baseline` role writes `/etc/apt/apt.conf.d/99consigliere-apt-retries` with `Acquire::Retries "0"` on every node, including Proxmox nodes (`baseline_apt_retries`, default `0`). The flaw lets an on-path attacker swap a verified package by forcing download retries. **VERIFY.** The setting is a stopgap reported by secondary sources; the APT team's advisory and the Debian and Ubuntu notices say only to upgrade apt, and name no workaround. The real fix is a fixed apt (2.2.5, 2.4.15, 2.6.2, 2.8.4, 3.0.4 or later). **Cost.** A flaky mirror now fails an apt run instead of retrying. **Rejected.** Relying on this alone; Proxmox nodes have unattended upgrades off, so they need `apt install --only-upgrade apt` by hand. **Revisit when** every host runs a fixed apt: set `baseline_apt_retries: null` (the file is then left in place, so remove it by hand) or back to `3`.
