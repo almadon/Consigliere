@@ -5,10 +5,14 @@
 # so the host needs no inbound ports and no firewall changes.
 #
 # arcane_agent_token: NOT a shared secret -- the manager's agent wizard
-# generates one per agent (an `arc_...` token). It goes in that host's file
-# under config/vars/host/ in your fleet-config repo (not in this public
-# repo, and never in the shared group files). Tokens are cheap to
-# regenerate: if one leaks, invalidate it in the manager and mint another.
+# generates one per agent (an `arc_...` token). It is a per-host sops secret in
+# your fleet-config repo, config/secrets/arcane/agent-<host>.yml with the one key
+#   arcane_agent_token: arc_...
+# and that file is granted to that host only (extra_grants in config/access.yml:
+#   arcane.agent-<host>: [<host>]). Never put it in this public repo or in the shared
+# group files. (Setting the variable in config/vars/host/<host>.yml still works but
+# keeps the token in clear text.) Tokens are cheap to regenerate: if one leaks,
+# invalidate it in the manager and mint another.
 # arcane_server_api_url (group-wide) is the manager's URL, set in
 # config/vars/group/feat_arcane.yml.
 

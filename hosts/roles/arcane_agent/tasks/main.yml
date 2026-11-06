@@ -15,14 +15,29 @@
     arcane_server_api_url is not defined or not arcane_server_api_url or
     arcane_server_api_url is search('CHANGEME')
 
+# The token is a per-host secret: config/secrets/arcane/agent-<host>.yml in the fleet repo, readable only by that host (scope
+# arcane.agent-<host>, granted with extra_grants in config/access.yml). A token set as the host variable arcane_agent_token still
+# works, but it sits in the repo in clear text; the secret wins when both exist.
+- name: Look for this host's Arcane agent token secret
+  ansible.builtin.stat:
+    path: "{{ fleet_secrets_dir | default(playbook_dir ~ '/secrets') }}/arcane/agent-{{ inventory_hostname }}.yml"
+  register: _arcane_agent_secret
+
+- name: Load this host's Arcane agent token
+  ansible.builtin.include_role:
+    name: load_secrets
+  vars:
+    load_secrets_scopes: ["arcane.agent-{{ inventory_hostname }}"]
+  when: _arcane_agent_secret.stat.exists
+
 # util: docker hosts get this role by default, so a host whose token has not been minted
 # yet is skipped with a warning instead of failing the whole run.
 - name: Skip until this host has an Arcane agent token
   ansible.builtin.debug:
     msg: >-
       Arcane agent skipped on {{ inventory_hostname }}: arcane_agent_token is not set. Mint one in
-      the Arcane manager (Environments > add an edge agent) and put it in this host's
-      config/vars/host/{{ inventory_hostname }}.yml (see defaults/main.yml). Set arcane_agent_skip: true
+      the Arcane manager (Environments > add an edge agent) and store it as the secret
+      arcane.agent-{{ inventory_hostname }} (see defaults/main.yml). Set arcane_agent_skip: true
       there to silence this.
   when: >-
     not (arcane_agent_skip | default(false)) and
