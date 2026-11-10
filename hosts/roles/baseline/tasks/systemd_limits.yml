@@ -59,9 +59,13 @@
         mode: "0644"
       register: _baseline_journald_dropin
 
-    - name: Restart journald and trim the journal to the new size
-      ansible.builtin.shell: |
-        systemctl restart systemd-journald
-        journalctl --vacuum-size={{ baseline_journald_max_use }}
+    - name: Restart journald to pick up the new size
+      ansible.builtin.systemd:
+        name: systemd-journald
+        state: restarted
+      when: _baseline_journald_dropin is changed and not ansible_check_mode
+
+    - name: Trim the journal to the new size
+      ansible.builtin.command: journalctl --vacuum-size={{ baseline_journald_max_use }}
       changed_when: true
       when: _baseline_journald_dropin is changed and not ansible_check_mode and baseline_journald_max_use | length > 0
