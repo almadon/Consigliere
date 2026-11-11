@@ -6,6 +6,7 @@ A role that sets something up and then leaves it to the app's own UI is a legiti
 | Thing | Owner | Mechanism | Why | Where to change it | Backup |
 |---|---|---|---|---|---|
 | OS baseline (packages, ssh, sysctl, users, upgrades) | This repo | Rewritten every run | One source of truth; drift is the failure mode | Role defaults, fleet `config/vars/` | Hand-made sysctl lines are commented out, originals kept in `/var/backups/consigliere` |
+| Windows baseline (clock, Windows Update policy, Defender, firewall, Remote Desktop) | This repo | Rewritten every run | Same reason as the Linux baseline; the keys are Group Policy's own | `windows/roles/baseline` defaults, fleet `config/vars/` | None kept; turning a `*_manage` variable off stops managing it, it does not undo it |
 | Firewall rules | This repo | Rewritten every run | A closed host by default | `firewall` role, tag manifests' `firewall:` lists | Image-provided rules saved to `/var/backups/consigliere/*.from-image` |
 | Tailscale enrollment | This repo, first run | Seeded once | Auth keys are never stored | `bootstrap.sh` prompt | Re-run `tailscale up` |
 | Tailscale ACLs and tailnet settings | The Tailscale admin console | Read-only here | Policy belongs to the network, not a host | Tailscale admin | Tailscale's own history |

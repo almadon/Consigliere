@@ -1,6 +1,6 @@
 # Adding a Windows host (design, not built)
 
-Status: **designed; `bootstrap.ps1` and `reconcile.ps1` are written but have not been run on a host.** The inventory, group, variable and tag-selection
+Status: **designed; `bootstrap.ps1`, `reconcile.ps1` and the `baseline` role are written but have not been run on a host.** The inventory, group, variable and tag-selection
 logic was exercised against the real fleet config on a Mac; everything that touches Windows (the task, WinGet, the Event Log) was not. The first target is one Windows 11 Pro VM on an Unraid host. This page is what the
 baseline will do, so it can be corrected before scripts exist. [decisions.md](decisions.md) entry 9 records the choice.
 
@@ -88,9 +88,7 @@ run go ahead even when nothing changed, the counterpart of `scripts/reconcile-no
 
 | Role | What it does |
 |---|---|
-| `baseline` | Time zone from the fleet vars, `w32time` set to sync and started, hostname left alone. |
-| `updates` | Windows Update through the policy registry keys: automatic install, reboot at a set time (`windows_update_reboot_time`, default `04:00`), no reboot while a user is signed in unless the window passes. Reports a pending reboot. |
-| `security` | Defender real-time protection on, the firewall on for all profiles, RDP enabled with a firewall rule for the tailnet range only. |
+| `baseline` (written) | Time zone and `w32time`, Windows Update through the policy registry keys (install and restart at `windows_update_reboot_time`, default `04:00`; a pending restart is reported), Defender real-time protection on, the firewall on for all profiles, RDP with NLA reachable from the tailnet only. Hostname left alone. See its [README](../windows/roles/baseline/README.md). |
 | `ssh` | OpenSSH Server installed as a Windows capability, bound to the tailnet address, key-only, fleet admin keys in `administrators_authorized_keys` with the ACLs the service demands. |
 | `tailscale` | Installed and joined (tag from the host table). Settings the Linux role sets on DNS and routes are options here too. |
 | `otel_agent` | The OpenTelemetry collector as a service: Windows Event Log channels (System, Application, Security) as logs, host metrics (CPU, memory, disk, network, processes) as metrics, plus the reconcile status and pending-reboot state. Config changes validate, keep a copy, apply, health-check and restore, like `safe_apply`. |
