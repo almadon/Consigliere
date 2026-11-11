@@ -1,6 +1,6 @@
 # Adding a Windows host (design, not built)
 
-Status: **designed, nothing is implemented yet.** The first target is one Windows 11 Pro VM on an Unraid host. This page is what the
+Status: **designed; `windows/bootstrap/bootstrap.ps1` is written but has not been run on a host.** The first target is one Windows 11 Pro VM on an Unraid host. This page is what the
 baseline will do, so it can be corrected before scripts exist. [decisions.md](decisions.md) entry 9 records the choice.
 
 The model does not change: the host reconciles itself, on a timer, from the public framework repo and the private fleet repo. Nothing
@@ -45,7 +45,7 @@ The host is identified by its Tailscale name, like every other host, and looked 
 
 One command from an elevated PowerShell. The script needs the framework URL and a Tailscale auth key (or approves the node by hand):
 
-1. Install git, Tailscale, sops and age with WinGet.
+1. Install git, Tailscale and age with WinGet, and the pinned sops release.
 2. Join the tailnet with the fleet's tag.
 3. Create the host's age key and print its public half, so you add it to `config/access.yml` and run `scripts/access.sh sync` in the fleet
    repo (the same step a Linux host needs).
@@ -65,14 +65,15 @@ One command from an elevated PowerShell. The script needs the framework URL and 
 
 ## Where WinGet fits
 
-WinGet installs and upgrades the fixed set of tools: git, Tailscale, sops and age, pinned by version in the role defaults
-(`windows_<tool>_version`). It is used for enrolment and from the reconciler.
+WinGet installs git, Tailscale and age (`Git.Git`, `Tailscale.Tailscale`, `FiloSottile.age`; all three exist in the WinGet repository).
+It installs the version WinGet offers unless a version is set in the script or role defaults. sops is not in the WinGet repository, so it
+is the vendor's release, checked against a pinned SHA-256, as on Linux. It is used for enrolment and from the reconciler.
 
 - **VERIFY.** WinGet is a per-user app and is known to behave badly when run as SYSTEM from a Scheduled Task. The reconciler needs a
   tested way to run it (the full path to `winget.exe`, or the `Microsoft.WinGet.Client` module), and a fallback: download the vendor
   installer or release archive over HTTPS and check a pinned SHA-256.
-- **VERIFY.** Whether the OpenTelemetry collector is in the WinGet repository. If not, it is installed from the release archive with a
-  pinned checksum, the way the Linux role pins its package.
+- The OpenTelemetry collector is not in the WinGet repository (only an unrelated `OpenTelemetry.Weaver` is), so it is installed from the
+  release archive with a pinned checksum, the way the Linux role pins its package.
 
 ## Secrets
 
