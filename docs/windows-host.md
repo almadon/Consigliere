@@ -1,6 +1,7 @@
 # Adding a Windows host (design, not built)
 
-Status: **designed; `windows/bootstrap/bootstrap.ps1` is written but has not been run on a host.** The first target is one Windows 11 Pro VM on an Unraid host. This page is what the
+Status: **designed; `bootstrap.ps1` and `reconcile.ps1` are written but have not been run on a host.** The inventory, group, variable and tag-selection
+logic was exercised against the real fleet config on a Mac; everything that touches Windows (the task, WinGet, the Event Log) was not. The first target is one Windows 11 Pro VM on an Unraid host. This page is what the
 baseline will do, so it can be corrected before scripts exist. [decisions.md](decisions.md) entry 9 records the choice.
 
 The model does not change: the host reconciles itself, on a timer, from the public framework repo and the private fleet repo. Nothing
@@ -51,6 +52,37 @@ One command from an elevated PowerShell. The script needs the framework URL and 
    repo (the same step a Linux host needs).
 4. Clone both repos to `C:\ProgramData\Consigliere`.
 5. Register the Scheduled Task and run the first reconcile.
+
+## How a run picks its roles
+
+The host is found in `config/inventory/hosts.yml` by its Tailscale name, and its values become groups through the `keyed_groups` of
+`groups.yml` (`type_vps`, `util_traefik`, ...) plus `os_windows`. Variables merge as on Linux, with a later file replacing a whole key:
+`vars/group/all.yml`, then each group's file in alphabetical order, then `vars/host/<name>.yml`, then the host's own table values.
+
+Roles come from two places, in this order:
+
+1. `windows/site.yml` (or the fleet's `config/windows/site.yml`, which wins): the roles every Windows host runs.
+2. The tag manifests, the same files Linux uses (`config/tags/<dim>/<value>.yml`, then the framework's `hosts/tags/`). A manifest adds
+   `windows_roles: [name, ...]` and optionally `windows_vars: {...}` beside its Linux `roles:` and `vars:`, so `feat: [otel]` means
+   observability on either OS. A tag with no `windows_roles` is only a class on Windows. `order` and `requires` work as on Linux.
+
+Not evaluated in this version: `groups:` and `compose:` rules in `groups.yml` (a warning is logged), Jinja inside variable files, and
+`vars/routes`.
+
+## The role contract
+
+A role is `windows/roles/<name>/role.ps1` (or `config/windows/roles/<name>/role.ps1` in the fleet repo, which wins). It is a script
+taking `-Context` and returning `@{ Changed = $true|$false; Message = '...' }`.
+
+- `$Context.Check` is true in a check pass: change nothing, say whether you would.
+- It must be idempotent, and throw when it fails. A failed role stops the host's run, as in Ansible.
+- `$Context.Vars` are the merged variables (with the manifest's `windows_vars` on top), `$Context.Name` the host, `$Context.Paths` the
+  folders and `sops.exe`, and `& $Context.GetSecret 'kind.name'` returns the decrypted `config/secrets/<kind>/<name>.yml`.
+- A config change to a running service goes through the validate, keep a copy, apply, health-check and restore pattern of `safe_apply`.
+
+The run writes a summary line in Ansible's recap format (so the Linux tooling that reads it still works), one Event Log entry (source
+`Consigliere`), and `last-status.json` under `C:\ProgramData\Consigliere` for the telemetry. `force-run` in that folder makes the next
+run go ahead even when nothing changed, the counterpart of `scripts/reconcile-now.sh`.
 
 ## Roles in the first version
 

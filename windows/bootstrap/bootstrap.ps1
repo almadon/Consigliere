@@ -73,11 +73,21 @@ function Warn($m) { Write-Warning $m }
 function Fail($m) { throw $m }
 
 # Run a native program; stop with its output when it fails (PowerShell does not do that by itself).
+# Windows PowerShell 5.1 turns anything a native program writes to stderr (git's progress lines, for one) into a
+# terminating error when $ErrorActionPreference is Stop, so it is relaxed inside the function; the exit code decides.
 function Invoke-Native {
   param([Parameter(Mandatory)][string]$Exe, [string[]]$Arguments = @(), [switch]$AllowFail)
+  $ErrorActionPreference = 'Continue'
   $out = & $Exe @Arguments 2>&1
   if ($LASTEXITCODE -ne 0 -and -not $AllowFail) { Fail "$Exe $($Arguments -join ' ') failed ($LASTEXITCODE): $out" }
   return $out
+}
+
+# True when the program exits 0; output is discarded.
+function Test-Native([string]$Exe, [string[]]$Arguments = @()) {
+  $ErrorActionPreference = 'Continue'
+  & $Exe @Arguments *> $null
+  return ($LASTEXITCODE -eq 0)
 }
 
 # Only SYSTEM and Administrators (by well-known SID, so the account names' language does not matter).
@@ -125,8 +135,9 @@ if (-not $winget) {
   Fail 'winget was not found. On Windows 11 it ships as "App Installer"; update it from the Microsoft Store, then re-run.'
 }
 foreach ($p in $WingetPackages) {
-  & winget.exe list --exact --id $p.Id --source winget --accept-source-agreements *> $null
-  if ($LASTEXITCODE -eq 0) { Say "OK $($p.Id) already installed"; continue }
+  if (Test-Native winget.exe @('list', '--exact', '--id', $p.Id, '--source', 'winget', '--accept-source-agreements')) {
+    Say "OK $($p.Id) already installed"; continue
+  }
   $a = @('install', '--exact', '--id', $p.Id, '--source', 'winget', '--silent',
          '--accept-package-agreements', '--accept-source-agreements')
   if ($p.Version) { $a += @('--version', $p.Version) }
@@ -144,7 +155,7 @@ if (-not $ageKeygen) { Fail 'age-keygen.exe not found on PATH after installing F
 
 # ---- 1b. sops: pinned release, checksum verified ----------------------------------------------------
 $sops = Join-Path $BinDir 'sops.exe'
-$sopsOk = (Test-Path $sops) -and ((& $sops --version 2>&1 | Out-String) -match [regex]::Escape($SopsVersion))
+$sopsOk = (Test-Path $sops) -and ((Invoke-Native $sops @('--version') -AllowFail | Out-String) -match [regex]::Escape($SopsVersion))
 if ($sopsOk) {
   Say "OK sops $SopsVersion already installed"
 } else {
@@ -164,7 +175,7 @@ if ($sopsOk) {
 $ts = Join-Path $env:ProgramFiles 'Tailscale\tailscale.exe'
 if (-not (Test-Path $ts)) { Fail "tailscale.exe not found at $ts" }
 function Get-TailscaleSelf {
-  $j = & $ts status --json 2>$null | Out-String
+  $j = Invoke-Native $ts @('status', '--json') -AllowFail | Out-String
   if (-not $j) { return $null }
   try { $s = ($j | ConvertFrom-Json) } catch { return $null }
   if ($s.BackendState -eq 'Running' -and $s.Self) { return $s.Self }
@@ -205,8 +216,7 @@ Lock-Path $CredDir
 $keyFwd = $DeployKey -replace '\\', '/'
 $env:GIT_SSH_COMMAND = "ssh -i `"$keyFwd`" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o BatchMode=yes"
 function Test-FleetRead {
-  & $git ls-remote --exit-code $FleetConfigRepoUrl HEAD *> $null
-  return ($LASTEXITCODE -eq 0)
+  return (Test-Native $git @('ls-remote', '--exit-code', $FleetConfigRepoUrl, 'HEAD'))
 }
 if (Test-FleetRead) {
   Say 'Access to the fleet-config repo already works'
