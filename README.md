@@ -56,7 +56,7 @@ This is the contract. If a thing is in the first table, edit it in git and let t
 | Proxmox, Unraid and the hardware under them | **The platform itself** | Container-based roles run on Unraid; Proxmox has its own [guide](docs/proxmox-host.md) |
 | Data inside services: backups' contents, databases, object storage buckets' contents | **The service and you** | Runs the service and declares buckets and keys, not the data |
 | Hand-registered credentials: the Forgejo runner registration, Garage's capacity layout | **You, once** | Keeps the result in place afterwards |
-| Windows hosts | Not supported | None |
+| Windows hosts | Not supported yet; a [design](docs/windows-host.md) exists | None |
 
 The full table, with the mechanism and rollback for each row, is [docs/ownership.md](docs/ownership.md).
 
