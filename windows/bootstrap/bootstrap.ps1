@@ -6,7 +6,7 @@
   The Windows counterpart of hosts/bootstrap/bootstrap.sh. A new host has neither repo, so the timed
   reconcile cannot be the first step. This script:
 
-    1. installs git, Tailscale and age with WinGet, and the pinned sops release (checksum-verified);
+    1. installs git and Tailscale with WinGet (machine-wide), and age and sops from pinned, checksum-verified releases;
     2. joins the tailnet, if it is not on it yet;
     3. gives the host its own read-only deploy key for the PRIVATE fleet repo (registered through the
        GitHub API when -FleetConfigRegisterToken is given, otherwise printed for you to add);
@@ -45,14 +45,23 @@ Set-StrictMode -Version 2.0
 $env:GIT_TERMINAL_PROMPT = '0'   # unattended runs never wait on a credentials prompt
 
 # ---- Pinned tools -----------------------------------------------------------------------------------
-# WinGet installs git, Tailscale and age at the version it offers (set a version here to pin one).
-# sops is not in the WinGet repository, so it is the vendor's release, checked against a pinned SHA-256
-# from that release's sops-vX.Y.Z.checksums.txt. Change the version and both checksums together.
+# Everything the reconcile uses must be machine-wide: it runs as SYSTEM and cannot see a user's profile. So:
+#   - git and Tailscale have machine-scope installers; WinGet installs them here, in your elevated session only (the
+#     scheduled task never calls WinGet), and the script checks afterwards that they landed in Program Files;
+#   - sops and age are single programs: the vendors' release files, checked against pinned SHA-256 values, in
+#     C:\ProgramData\Consigliere\bin (readable only by SYSTEM and Administrators). WinGet would install age as a per-user
+#     portable package, and sops is not in the WinGet repository.
+# Change a version and its checksums together. (age publishes no checksum file; its values are the SHA-256 of the release zips as
+# downloaded when this was written.)
 $WingetPackages = @(
   @{ Id = 'Git.Git';             Version = '' },
-  @{ Id = 'Tailscale.Tailscale'; Version = '' },
-  @{ Id = 'FiloSottile.age';     Version = '' }
+  @{ Id = 'Tailscale.Tailscale'; Version = '' }
 )
+$AgeVersion = '1.3.2'
+$AgeSha256 = @{
+  amd64 = 'f48d8f8f9ebe903ab5027ed067652f2cc1db94bc206976430133b905dcd8e8c7'
+  arm64 = 'fae351336c8d5f30f93cc3ccdec16d1ed7851d68cdd6656d41955cc31a447c9d'
+}
 $SopsVersion = '3.13.3'
 $SopsSha256 = @{
   amd64 = 'a4a9a398858fe8b2ef72d9686d930bf7c5cece9be74ad83ac3b53cfdd70e6b1c'
@@ -99,8 +108,8 @@ function Update-SessionPath {
   $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')
 }
 
-# Install one package with WinGet unless it is already there. Machine scope first, because the reconcile runs as SYSTEM
-# and a per-user install is invisible to it; a package with no machine-scope installer is retried without the flag.
+# Install one package with WinGet unless it is already there. Machine scope only, because the reconcile runs as SYSTEM
+# and a per-user install is invisible to it; a package with no machine-scope installer fails here, on purpose.
 function Install-WingetPackage([string]$Id, [string]$Version = '') {
   if (-not (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
     Fail 'winget was not found. On Windows 11 it ships as "App Installer"; update it from the Microsoft Store, then re-run.'
@@ -110,9 +119,7 @@ function Install-WingetPackage([string]$Id, [string]$Version = '') {
   }
   $a = @('install', '--exact', '--id', $Id, '--source', 'winget', '--silent', '--accept-package-agreements', '--accept-source-agreements')
   if ($Version) { $a += @('--version', $Version) }
-  if (-not (Test-Native winget.exe ($a + @('--scope', 'machine')))) {
-    Invoke-Native winget.exe $a | Out-Null
-  }
+  Invoke-Native winget.exe ($a + @('--scope', 'machine')) | Out-Null   # no fallback to a per-user install: SYSTEM could not use it
   Say "INSTALLED $Id"
 }
 
@@ -199,16 +206,38 @@ New-Item -ItemType Directory -Force -Path $Root, $CredDir, $BinDir | Out-Null
 Lock-Path $Root
 
 # ---- 1. git, Tailscale, age (WinGet) ----------------------------------------------------------------
-Say 'Installing git, Tailscale and age with WinGet'
+Say 'Installing git and Tailscale with WinGet (machine-wide)'
 foreach ($p in $WingetPackages) { Install-WingetPackage $p.Id $p.Version }
 Update-SessionPath
 
 $git = (Get-Command git.exe -ErrorAction Stop).Source
+$pf = @($env:ProgramFiles, ${env:ProgramFiles(x86)}) | Where-Object { $_ }
+if (-not ($pf | Where-Object { $git.StartsWith($_, [StringComparison]::OrdinalIgnoreCase) })) {
+  Fail "git is at $git, outside Program Files: it was installed for one user, and the reconcile runs as SYSTEM. Uninstall it and re-run."
+}
 $gitUsr = Join-Path (Split-Path (Split-Path $git)) 'usr\bin'
 $sshKeygen = Join-Path $gitUsr 'ssh-keygen.exe'
 if (-not (Test-Path $sshKeygen)) { Fail "ssh-keygen.exe not found next to git ($sshKeygen)." }
-$ageKeygen = (Get-Command age-keygen.exe -ErrorAction SilentlyContinue)
-if (-not $ageKeygen) { Fail 'age-keygen.exe not found on PATH after installing FiloSottile.age; open a new elevated shell and re-run.' }
+
+# ---- 1a. age: pinned release, checksum verified -------------------------------------------------------
+$ageKeygen = [pscustomobject]@{ Source = (Join-Path $BinDir 'age-keygen.exe') }
+$ageOk = (Test-Path $ageKeygen.Source) -and ((Invoke-Native $ageKeygen.Source @('--version') -AllowFail | Out-String) -match [regex]::Escape($AgeVersion))
+if ($ageOk) {
+  Say "OK age $AgeVersion already installed"
+} else {
+  $aarch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'amd64' }
+  $atmp = Join-Path ([IO.Path]::GetTempPath()) "age-$([guid]::NewGuid())"
+  New-Item -ItemType Directory -Force -Path $atmp | Out-Null
+  try {
+    $azip = Join-Path $atmp 'age.zip'
+    Invoke-WebRequest -UseBasicParsing -OutFile $azip -Uri "https://github.com/FiloSottile/age/releases/download/v$AgeVersion/age-v$AgeVersion-windows-$aarch.zip"
+    $agot = (Get-FileHash -Algorithm SHA256 $azip).Hash.ToLowerInvariant()
+    if ($agot -ne $AgeSha256[$aarch]) { Fail "age checksum mismatch (got $agot)" }
+    Expand-Archive -Path $azip -DestinationPath $atmp -Force
+    foreach ($n in 'age.exe', 'age-keygen.exe') { Copy-Item (Join-Path $atmp "age\$n") (Join-Path $BinDir $n) -Force }
+  } finally { Remove-Item $atmp -Recurse -Force -ErrorAction SilentlyContinue }
+  Say "INSTALLED age $AgeVersion"
+}
 
 # ---- 1b. sops: pinned release, checksum verified ----------------------------------------------------
 $sops = Join-Path $BinDir 'sops.exe'

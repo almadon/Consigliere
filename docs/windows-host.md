@@ -54,8 +54,8 @@ The host is identified by its Tailscale name, like every other host, and looked 
 
 One command from an elevated PowerShell. The script needs the framework URL and a Tailscale auth key (or approves the node by hand):
 
-1. Make sure PowerShell 7.4 or later is installed (it is a prerequisite, see below), then install git, Tailscale and age with WinGet, and
-   the pinned sops release.
+1. Make sure PowerShell 7.4 or later is installed (it is a prerequisite, see below), then install git and Tailscale with WinGet
+   (machine-wide, checked afterwards) and age and sops from pinned, checksum-verified releases.
 2. Join the tailnet with the fleet's tag.
 3. Create the host's age key and print its public half, so you add it to `config/access.yml` and run `scripts/access.sh sync` in the fleet
    repo (the same step a Linux host needs).
@@ -104,9 +104,11 @@ run go ahead even when nothing changed, the counterpart of `scripts/reconcile-no
 
 ## Where WinGet fits
 
-WinGet installs git, Tailscale and age (`Git.Git`, `Tailscale.Tailscale`, `FiloSottile.age`; all three exist in the WinGet repository).
-It installs the version WinGet offers unless a version is set in the script or role defaults. sops is not in the WinGet repository, so it
-is the vendor's release, checked against a pinned SHA-256, as on Linux. It is used for enrolment and from the reconciler.
+The reconcile runs as SYSTEM, so everything it uses must be machine-wide; nothing may live in a user's profile. WinGet is used only at
+enrolment, in the administrator's own session, and the scheduled task never calls it. It installs git and Tailscale (`Git.Git`,
+`Tailscale.Tailscale`; both have machine-scope installers, and the script checks afterwards that git is under Program Files). PowerShell 7,
+sops and age are the vendors' release files, checked against pinned SHA-256 values, because WinGet would put PowerShell (MSIX) and age
+(portable) in the user's profile and sops is not in its repository. Version bumps are therefore by hand.
 
 - **VERIFY.** WinGet is a per-user app and is known to behave badly when run as SYSTEM from a Scheduled Task. The reconciler needs a
   tested way to run it (the full path to `winget.exe`, or the `Microsoft.WinGet.Client` module), and a fallback: download the vendor
