@@ -363,8 +363,17 @@ if ($interactive) { Read-Host 'Press Enter once that is pushed (Ctrl-C to abort)
 
 # ---- 5. Settings for the timed reconcile, and the framework clone ------------------------------------
 Say 'Writing the settings file for future reconcile runs (no secrets in it)'
-# A copy left by an earlier run may have an empty access list; the folder lets Administrators delete it, so start clean.
-Remove-Item -LiteralPath $ConfigFile -Force -ErrorAction SilentlyContinue
+# A copy left by an earlier run may carry a broken access list (an empty one, from the first version of Lock-Path). Start clean; if the
+# delete is refused, take ownership, reset the list and try again, and say so rather than failing later with "access denied".
+if (Test-Path -LiteralPath $ConfigFile) {
+  try { Remove-Item -LiteralPath $ConfigFile -Force -ErrorAction Stop }
+  catch {
+    Warn "could not delete the old $ConfigFile ($($_.Exception.Message)); taking ownership and resetting its access list"
+    Invoke-Native takeown.exe @('/f', $ConfigFile) -AllowFail | Out-Null
+    Invoke-Native icacls.exe @($ConfigFile, '/reset') -AllowFail | Out-Null
+    Remove-Item -LiteralPath $ConfigFile -Force -ErrorAction Stop
+  }
+}
 [ordered]@{
   FrameworkRepoUrl      = $FrameworkRepoUrl
   FrameworkRepoBranch   = [string]$FrameworkRepoBranch
