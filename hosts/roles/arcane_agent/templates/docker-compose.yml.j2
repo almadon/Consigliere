@@ -8,10 +8,18 @@ services:
     container_name: arcane-edge-agent
     restart: unless-stopped
     environment:
+{% if arcane_agent_env_prefixed %}
+      # Arcane 3 (the "next" images): every setting is ARCANE_-prefixed and the old names are no longer read.
+      - ARCANE_AGENT=true
+      - ARCANE_AGENT_TRANSPORT={{ 'auto' if arcane_agent_edge_transport == 'poll' else arcane_agent_edge_transport }}
+      - ARCANE_AGENT_TOKEN={{ arcane_agent_token }}
+      - ARCANE_MANAGER_API_URL={{ arcane_server_api_url }}
+{% else %}
       - EDGE_AGENT=true
       - EDGE_TRANSPORT={{ arcane_agent_edge_transport }}
       - AGENT_TOKEN={{ arcane_agent_token }}
       - MANAGER_API_URL={{ arcane_server_api_url }}
+{% endif %}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - arcane-data:/app/data

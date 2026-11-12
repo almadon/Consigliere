@@ -25,3 +25,9 @@ arcane_agent_dir: "{{ common_dir | default('/opt/common') }}/arcane"
 # "poll" is what the wizard emitted for edge agents; the previous default
 # ("websocket") was a guess from the non-edge example.
 arcane_agent_edge_transport: poll
+# Which names the agent reads its settings from. Arcane 3 (the "next" images, and 3.x tags) takes only ARCANE_-prefixed names
+# (ARCANE_AGENT, ARCANE_AGENT_TOKEN, ARCANE_MANAGER_API_URL, ARCANE_AGENT_TRANSPORT) and refuses to start on the old ones; Arcane 2 and
+# earlier take the old names (EDGE_AGENT, AGENT_TOKEN, MANAGER_API_URL, EDGE_TRANSPORT). Worked out from arcane_agent_version, so
+# "latest" is treated as the old style: set this to true once latest means Arcane 3. In the prefixed style the transport is auto, grpc
+# or websocket, and poll (which only the old agents have) becomes auto.
+arcane_agent_env_prefixed: "{{ arcane_agent_version in ['next', 'edge', 'dev'] or arcane_agent_version is match('^v?[3-9][.]') }}"

@@ -77,3 +77,32 @@
     pull: "{{ 'always' if _arcane_agent_compose.changed else 'missing' }}"
   # In a check run the directory and compose file above are not really written yet.
   when: not ansible_check_mode or not _arcane_agent_compose.changed
+
+# A container that starts and dies again would otherwise go unnoticed: `docker compose up` succeeds, the reconcile reports success, and the
+# agent sits in a restart loop (all six agents did for six days after a change of image that renamed their settings). So give a new
+# container a few seconds, then fail the run, and so Cmdr's reconcile status, if it is not up.
+- name: Give a changed agent a moment to start (or to fall over)
+  ansible.builtin.pause:
+    seconds: 15
+  when: not ansible_check_mode and _arcane_agent_compose.changed
+
+- name: Look at the agent container
+  community.docker.docker_container_info:
+    name: arcane-edge-agent
+  register: _arcane_agent_info
+  when: not ansible_check_mode
+
+- name: Fail the run if the agent is not staying up
+  ansible.builtin.assert:
+    that:
+      - _arcane_agent_info.exists
+      - _arcane_agent_info.container.State.Running
+      - not _arcane_agent_info.container.State.Restarting
+      - _arcane_agent_info.container.RestartCount | int < 5
+    fail_msg: >-
+      The Arcane agent is not staying up (running: {{ _arcane_agent_info.container.State.Running | default('no container') }},
+      restarting: {{ _arcane_agent_info.container.State.Restarting | default('n/a') }},
+      restarts: {{ _arcane_agent_info.container.RestartCount | default('n/a') }}). See `docker logs arcane-edge-agent` on this host;
+      a setting the image no longer reads is the usual cause.
+    quiet: true
+  when: not ansible_check_mode
