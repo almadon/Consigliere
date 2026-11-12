@@ -14,7 +14,7 @@ _notify() {  # _notify <tag> <title> <body>
 }
 
 # Where to send the run summary as syslog (host:port, TCP), for hosts with no journal for the log collector to read (Unraid): RECONCILE_SYSLOG in the environment, or
-# a line RECONCILE_SYSLOG=10.0.1.3:1514 in the host's reconcile.env (re-read at every run, so changing it needs no container restart). Empty = nothing is sent.
+# a line RECONCILE_SYSLOG=192.0.2.10:1514 in the host's reconcile.env (re-read at every run, so changing it needs no container restart). Empty = nothing is sent.
 _syslog_target() {
   local t="${RECONCILE_SYSLOG:-}" f
   if [ -z "$t" ]; then

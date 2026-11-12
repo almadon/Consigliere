@@ -21,6 +21,23 @@ What this project adopts, under which licence, and what it passed over. A licenc
 | Wazuh | Security monitoring | VERIFY |
 | Apprise | Notifications | BSD-2-Clause, VERIFY |
 | Pocket ID | Sign-in (used by the fleet, not deployed by this repo) | VERIFY |
+| Ansible collections `community.general`, `community.docker`, `ansible.posix` | Modules the roles call (`hosts/requirements.yml`) | VERIFY |
+| Forgejo runner | CI runner role | VERIFY |
+| Semaphore UI | Ansible run UI | VERIFY |
+| Z-Wave JS UI | Z-Wave controller UI | VERIFY |
+| Proxmox Backup Server (community container image `ayufan/proxmox-backup-server`) | Backups of Proxmox guests | AGPL-3.0 upstream, VERIFY the image |
+| Garage Web UI (`khairul169/garage-webui`) | Admin UI for Garage | VERIFY |
+| Tecnativa docker-socket-proxy | Limits what containers may ask the Docker socket | VERIFY |
+| nginx, nginx-unprivileged | Static front ends (Cmdr, sign-in) | VERIFY |
+| Python (container image and the host's own) | Cmdr back end, inventory and helper scripts | VERIFY |
+| PyYAML | YAML in the helper scripts | VERIFY |
+| Next.js, next-auth, React, TypeScript (`console/`) | The optional console app | VERIFY |
+| GitHub Actions `checkout`, `cache`, `setup-python` | CI | VERIFY |
+| PowerShell 7 | Windows reconcile and roles (pinned release zip) | VERIFY |
+| WinGet | Installs git and Tailscale at Windows enrolment | VERIFY |
+| Git for Windows | Windows hosts (installed through WinGet) | VERIFY |
+| powershell-yaml (and the YamlDotNet it bundles) | YAML in the Windows reconcile | VERIFY |
+| Sigsum (`sigsum-verify`) | Checks age's release proofs when its pin is bumped | VERIFY |
 
 World map outlines in Cmdr come from Natural Earth (public domain), via the `world-atlas` package.
 
