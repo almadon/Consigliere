@@ -51,8 +51,8 @@ $env:GIT_TERMINAL_PROMPT = '0'   # unattended runs never wait on a credentials p
 #   - sops and age are single programs: the vendors' release files, checked against pinned SHA-256 values, in
 #     C:\ProgramData\Consigliere\bin (readable only by SYSTEM and Administrators). WinGet would install age as a per-user
 #     portable package, and sops is not in the WinGet repository.
-# Change a version and its checksums together. (age publishes no checksum file; its values are the SHA-256 of the release zips as
-# downloaded when this was written.)
+# Change a version and its checksums together. The age values match the SHA-256 GitHub records for each release asset;
+# windows/tools/verify-age-pins.sh checks them against age's Sigsum proofs (the .proof files) when you bump the version.
 $WingetPackages = @(
   @{ Id = 'Git.Git';             Version = '' },
   @{ Id = 'Tailscale.Tailscale'; Version = '' }
