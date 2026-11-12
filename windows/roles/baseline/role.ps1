@@ -169,11 +169,6 @@ if (V 'windows_security_manage') {
     $c2 = Set-RegValue "$ts\WinStations\RDP-Tcp" 'UserAuthentication' 1
     if ($c1 -or $c2) { Note 'turn Remote Desktop on with Network Level Authentication' }
     if (V 'windows_rdp_tailnet_only') {
-      $builtin = @(Get-NetFirewallRule -Group $rdpGroup -ErrorAction SilentlyContinue | Where-Object { "$($_.Enabled)" -eq 'True' })
-      if ($builtin.Count -gt 0) {
-        if (-not $check) { $builtin | Disable-NetFirewallRule }
-        Note "turn off the built-in Remote Desktop firewall rules ($($builtin.Count))"
-      }
       $ranges = @(V 'windows_tailnet_ranges')
       foreach ($proto in 'TCP', 'UDP') {
         $name = "$mine $proto"
@@ -190,6 +185,13 @@ if (V 'windows_security_manage') {
           }
           Note "allow Remote Desktop ($proto 3389) from the tailnet only"
         }
+      }
+      # Last, so there is never a moment with no rule at all: a session that arrived over the old rules must not be cut off before the
+      # new ones exist (an apply over RDP was killed mid-way on the first test).
+      $builtin = @(Get-NetFirewallRule -Group $rdpGroup -ErrorAction SilentlyContinue | Where-Object { "$($_.Enabled)" -eq 'True' })
+      if ($builtin.Count -gt 0) {
+        if (-not $check) { $builtin | Disable-NetFirewallRule }
+        Note "turn off the built-in Remote Desktop firewall rules ($($builtin.Count))"
       }
     } else {
       # Windows' own arrangement: the built-in Remote Desktop rules, reachable from the LAN. Undo what tailnet-only mode did.
