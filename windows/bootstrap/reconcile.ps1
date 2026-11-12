@@ -1,3 +1,4 @@
+#Requires -Version 7.4
 <#
 .SYNOPSIS
   The timed pull for a Windows host: sync both repos, work out what this host runs, run the roles.

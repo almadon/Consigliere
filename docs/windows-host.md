@@ -29,9 +29,16 @@ Why not Ansible: it has no native Windows controller, so the choice is a Linux l
 framework keeps one pull loop and a short list of roles, so plain PowerShell is the smaller change. Every role script follows the Ansible
 rules in spirit: idempotent, a `-WhatIf` path where a cmdlet allows it, and a result of `changed` or `unchanged` that the reconciler logs.
 
+## Prerequisite: PowerShell 7
+
+The reconcile and every role need PowerShell 7.4 or later (`#Requires -Version 7.4`); Windows PowerShell 5.1, which a fresh Windows has, is
+not enough. `bootstrap.ps1` is the one file kept valid for 5.1: when it finds an older PowerShell it installs `Microsoft.PowerShell` with
+WinGet (machine scope, so SYSTEM can use it) and starts itself again under `pwsh.exe`, passing its parameters on (secrets by environment,
+not the command line). The Scheduled Task runs `pwsh.exe`. Roles can therefore use PowerShell 7 features and the .NET it brings.
+
 ## Reconcile loop
 
-A Scheduled Task running as SYSTEM, every 20 minutes with a random delay, no overlapping runs. Each run:
+A Scheduled Task running `pwsh.exe` as SYSTEM, every 20 minutes with a random delay, no overlapping runs. Each run:
 
 1. `git pull --ff-only` the framework and the fleet repo (same two-repo pattern as `hosts/bootstrap/reconcile.sh`; credentials never
    prompt).
@@ -46,7 +53,8 @@ The host is identified by its Tailscale name, like every other host, and looked 
 
 One command from an elevated PowerShell. The script needs the framework URL and a Tailscale auth key (or approves the node by hand):
 
-1. Install git, Tailscale and age with WinGet, and the pinned sops release.
+1. Make sure PowerShell 7.4 or later is installed (it is a prerequisite, see below), then install git, Tailscale and age with WinGet, and
+   the pinned sops release.
 2. Join the tailnet with the fleet's tag.
 3. Create the host's age key and print its public half, so you add it to `config/access.yml` and run `scripts/access.sh sync` in the fleet
    repo (the same step a Linux host needs).

@@ -99,12 +99,49 @@ function Update-SessionPath {
   $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')
 }
 
+# Install one package with WinGet unless it is already there. Machine scope first, because the reconcile runs as SYSTEM
+# and a per-user install is invisible to it; a package with no machine-scope installer is retried without the flag.
+function Install-WingetPackage([string]$Id, [string]$Version = '') {
+  if (-not (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
+    Fail 'winget was not found. On Windows 11 it ships as "App Installer"; update it from the Microsoft Store, then re-run.'
+  }
+  if (Test-Native winget.exe @('list', '--exact', '--id', $Id, '--source', 'winget', '--accept-source-agreements')) {
+    Say "OK $Id already installed"; return
+  }
+  $a = @('install', '--exact', '--id', $Id, '--source', 'winget', '--silent', '--accept-package-agreements', '--accept-source-agreements')
+  if ($Version) { $a += @('--version', $Version) }
+  if (-not (Test-Native winget.exe ($a + @('--scope', 'machine')))) {
+    Invoke-Native winget.exe $a | Out-Null
+  }
+  Say "INSTALLED $Id"
+}
+
 # ---- 0. Preconditions -------------------------------------------------------------------------------
 $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
   Fail 'Run this in an elevated PowerShell (Run as administrator).'
 }
 if ([Environment]::OSVersion.Platform -ne 'Win32NT') { Fail 'This script is for Windows.' }
+
+# ---- 0b. PowerShell 7 is a prerequisite ---------------------------------------------------------------
+# The reconcile and the roles need PowerShell 7.4 or later (Windows PowerShell 5.1 is what a fresh Windows has). This file
+# must stay valid 5.1 syntax so that it can get this far; it installs PowerShell 7 and carries on there.
+if ($PSVersionTable.PSVersion -lt [version]'7.4') {
+  Say "Windows PowerShell $($PSVersionTable.PSVersion) is too old; installing PowerShell 7 and continuing in it"
+  if (-not $PSCommandPath) { Fail 'Save this script to a file and run it from there (it has to start itself again under PowerShell 7).' }
+  Install-WingetPackage 'Microsoft.PowerShell'
+  $pwsh7 = Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe'
+  if (-not (Test-Path $pwsh7)) { Fail "PowerShell 7 is not at $pwsh7 after the install." }
+  $forward = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $PSCommandPath)
+  foreach ($k in $PSBoundParameters.Keys) {
+    $v = $PSBoundParameters[$k]
+    if ($k -eq 'TailscaleAuthKey') { $env:TAILSCALE_AUTHKEY = [string]$v; continue }                 # secrets go by environment,
+    if ($k -eq 'FleetConfigRegisterToken') { $env:FLEET_CONFIG_REGISTER_TOKEN = [string]$v; continue } # not the command line
+    if ($v -is [switch]) { if ($v.IsPresent) { $forward += "-$k" } } else { $forward += @("-$k", [string]$v) }
+  }
+  & $pwsh7 @forward
+  exit $LASTEXITCODE
+}
 $interactive = [Environment]::UserInteractive -and -not [Console]::IsInputRedirected
 
 if ($interactive) {
@@ -130,20 +167,7 @@ Lock-Path $Root
 
 # ---- 1. git, Tailscale, age (WinGet) ----------------------------------------------------------------
 Say 'Installing git, Tailscale and age with WinGet'
-$winget = Get-Command winget.exe -ErrorAction SilentlyContinue
-if (-not $winget) {
-  Fail 'winget was not found. On Windows 11 it ships as "App Installer"; update it from the Microsoft Store, then re-run.'
-}
-foreach ($p in $WingetPackages) {
-  if (Test-Native winget.exe @('list', '--exact', '--id', $p.Id, '--source', 'winget', '--accept-source-agreements')) {
-    Say "OK $($p.Id) already installed"; continue
-  }
-  $a = @('install', '--exact', '--id', $p.Id, '--source', 'winget', '--silent',
-         '--accept-package-agreements', '--accept-source-agreements')
-  if ($p.Version) { $a += @('--version', $p.Version) }
-  Invoke-Native winget.exe $a | Out-Null
-  Say "INSTALLED $($p.Id)"
-}
+foreach ($p in $WingetPackages) { Install-WingetPackage $p.Id $p.Version }
 Update-SessionPath
 
 $git = (Get-Command git.exe -ErrorAction Stop).Source
@@ -304,7 +328,8 @@ if (-not (Test-Path $reconcile)) {
   Warn "windows\bootstrap\reconcile.ps1 is not in this framework checkout (it is not built yet). Enrolment is done up to here; the Scheduled Task was NOT registered."
   return
 }
-$ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+$ps = Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe'   # PowerShell 7: the reconcile needs it (see 0b)
+if (-not (Test-Path $ps)) { Fail "PowerShell 7 is not at $ps" }
 Say 'First run: CHECK ONLY (nothing on this host is changed)'
 & $ps -NoProfile -ExecutionPolicy Bypass -File $reconcile -Mode check
 if ($LASTEXITCODE -ne 0) { Warn 'the check pass reported errors; read the output above.' }

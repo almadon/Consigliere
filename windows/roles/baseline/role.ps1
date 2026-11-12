@@ -1,3 +1,4 @@
+#Requires -Version 7.4
 <#
 .SYNOPSIS
   The Windows baseline: clock, Windows Update, Defender, firewall and Remote Desktop. See README.md.
