@@ -111,6 +111,13 @@ function Update-SessionPath {
   $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')
 }
 
+# The machine's architecture, not the running process's: an x64 shell emulated on an ARM64 Windows still reports AMD64 in
+# $env:PROCESSOR_ARCHITECTURE, and would fetch the wrong binaries.
+function Get-OsArch {
+  if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq [Runtime.InteropServices.Architecture]::Arm64) { return 'arm64' }
+  return 'amd64'
+}
+
 # Install one package with WinGet unless it is already there. Machine scope only, because the reconcile runs as SYSTEM
 # and a per-user install is invisible to it; a package with no machine-scope installer fails here, on purpose.
 function Install-WingetPackage([string]$Id, [string]$Version = '') {
@@ -141,7 +148,7 @@ function Install-PowerShell7 {
     $have = [version](((Get-Item $exe).VersionInfo.ProductVersion) -replace '[-+ ].*$', '')
     if ($have -ge [version]'7.4') { Say "OK PowerShell $have already installed"; return $exe }
   }
-  $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'amd64' }
+  $arch = Get-OsArch
   $zipName = "PowerShell-$Pwsh7Version-win-$(if ($arch -eq 'arm64') { 'arm64' } else { 'x64' }).zip"
   $tmp = Join-Path ([IO.Path]::GetTempPath()) "pwsh7-$([guid]::NewGuid())"
   New-Item -ItemType Directory -Force -Path $tmp | Out-Null
@@ -228,7 +235,7 @@ $ageOk = (Test-Path $ageKeygen.Source) -and ((Invoke-Native $ageKeygen.Source @(
 if ($ageOk) {
   Say "OK age $AgeVersion already installed"
 } else {
-  $aarch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'amd64' }
+  $aarch = Get-OsArch
   $atmp = Join-Path ([IO.Path]::GetTempPath()) "age-$([guid]::NewGuid())"
   New-Item -ItemType Directory -Force -Path $atmp | Out-Null
   try {
@@ -248,7 +255,7 @@ $sopsOk = (Test-Path $sops) -and ((Invoke-Native $sops @('--version') -AllowFail
 if ($sopsOk) {
   Say "OK sops $SopsVersion already installed"
 } else {
-  $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'amd64' }
+  $arch = Get-OsArch
   $tmp = Join-Path ([IO.Path]::GetTempPath()) "sops-$([guid]::NewGuid()).exe"
   try {
     Invoke-WebRequest -UseBasicParsing -OutFile $tmp `
