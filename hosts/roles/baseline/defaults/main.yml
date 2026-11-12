@@ -22,8 +22,8 @@ baseline_packages:
 # Acquire::Retries for apt. 0 = a failed download is not retried, which closes CVE-2026-109518
 # (retry-driven package swap, fixed in apt 2.4.15 / 2.6.2 / 2.8.4 / 3.0.4 and later). This is a
 # stopgap taken from secondary reports, not from the Debian/Ubuntu advisories, which only say to
-# upgrade apt. Cost: a flaky mirror now fails the run instead of retrying. Once every host has a
-# fixed apt, set this to null (the file is then left alone) or back to 3.
+# upgrade apt. Cost: a flaky mirror now fails an apt run instead of retrying (it did, on ampere). Once every host has a
+# fixed apt, set this to null: the drop-in is removed and apt's own default (a few retries) returns.
 baseline_apt_retries: 0
 
 # Set false on a host whose packages must only change on purpose (a Proxmox VE node: see the util: [pve] tag): the role then writes no

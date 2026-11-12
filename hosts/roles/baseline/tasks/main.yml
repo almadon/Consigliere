@@ -14,12 +14,32 @@
     group: root
     mode: "0644"
 
+# With the setting off (null) the drop-in goes, and apt's own default (retry a few times) comes back.
+- name: Remove the apt retries drop-in (the setting is off)
+  when: baseline_apt_retries is none
+  ansible.builtin.file:
+    path: /etc/apt/apt.conf.d/99consigliere-apt-retries
+    state: absent
+
+# A mirror that is down (a 503 from the cloud provider's Ubuntu mirror stopped a whole reconcile on ampere) must not stop every role
+# after this one. Packages that are already installed need no download, so refresh the lists if we can, say so if we cannot, and let the
+# install below fail only if something it needs is really missing.
+- name: Refresh the apt package lists
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  register: _baseline_apt_refresh
+  ignore_errors: true  # noqa: ignore-errors
+
+- name: Say so when the package lists could not be refreshed
+  when: _baseline_apt_refresh is failed
+  ansible.builtin.debug:
+    msg: "apt could not refresh its package lists (mirror down?): {{ _baseline_apt_refresh.msg | default('no message') }}. Carrying on with the lists already on the host."
+
 - name: Install baseline packages
   ansible.builtin.apt:
     name: "{{ baseline_packages }}"
     state: present
-    update_cache: true
-    cache_valid_time: 3600
 
 - name: Set timezone (only when baseline_timezone is set; otherwise leave it alone)
   community.general.timezone:
