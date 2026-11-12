@@ -28,7 +28,7 @@ The baseline every Windows host gets: the clock, Windows Update, Defender, the f
 | `windows_defender_manage` | `true` | Real-time protection on. Skipped when another antivirus has replaced Defender. |
 | `windows_firewall_manage` | `true` | Firewall on for every profile, inbound blocked unless a rule allows it. |
 | `windows_rdp_enable` | `true` | Remote Desktop on, with Network Level Authentication. `false` turns it off. |
-| `windows_rdp_tailnet_only` | `true` | The built-in Remote Desktop rules are switched off and one rule allows only `windows_tailnet_ranges`. |
+| `windows_rdp_tailnet_only` | `true` | `true`: the built-in Remote Desktop rules are switched off and one rule allows only `windows_tailnet_ranges`. `false`: Windows' own rules are switched back on (reachable from the LAN) and the role's tailnet-only rules are removed. |
 | `windows_tailnet_ranges` | the Tailscale IPv4 and IPv6 ranges | Where RDP may be reached from. |
 
 ## Notes

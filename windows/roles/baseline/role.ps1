@@ -191,6 +191,21 @@ if (V 'windows_security_manage') {
           Note "allow Remote Desktop ($proto 3389) from the tailnet only"
         }
       }
+    } else {
+      # Windows' own arrangement: the built-in Remote Desktop rules, reachable from the LAN. Undo what tailnet-only mode did.
+      # Public-profile-only variants stay off: Windows itself does not open Remote Desktop on a public network when you switch it on.
+      $off = @(Get-NetFirewallRule -Group $rdpGroup -ErrorAction SilentlyContinue | Where-Object { "$($_.Enabled)" -ne 'True' -and "$($_.Profile)" -ne 'Public' })
+      if ($off.Count -gt 0) {
+        if (-not $check) { $off | Enable-NetFirewallRule }
+        Note "turn the built-in Remote Desktop firewall rules back on ($($off.Count))"
+      }
+      foreach ($proto in 'TCP', 'UDP') {
+        $mine1 = Get-NetFirewallRule -DisplayName "$mine $proto" -ErrorAction SilentlyContinue
+        if ($mine1) {
+          if (-not $check) { $mine1 | Remove-NetFirewallRule }
+          Note "remove the tailnet-only Remote Desktop rule ($proto)"
+        }
+      }
     }
   } else {
     if (Set-RegValue $ts 'fDenyTSConnections' 1) { Note 'turn Remote Desktop off' }
