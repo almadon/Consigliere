@@ -36,7 +36,7 @@
   const ATTR = { site: 'site', location: 'place', org: 'org', node: 'on' };
   const attrKey = (kind, value) => kind + ':' + value;
   function relate(key, on) {
-    for (const el of document.querySelectorAll('.attr')) if (el.dataset.attr === key) { el.classList.toggle('hl', on); const c = el.closest('.card'); if (c) c.classList.toggle('rel', on); }
+    for (const el of document.querySelectorAll('.attr, .mk')) if (el.dataset.attr === key) { el.classList.toggle('hl', on); const c = el.closest('.card'); if (c) c.classList.toggle('rel', on); }
   }
   function attr(kind, value) {
     if (!value) return null;
@@ -326,7 +326,7 @@
   }
   function renderMap() {
     if (!window.CmdrMap) return;
-    window.CmdrMap.render($('map'), { h, hosts: state.data.hosts, health: hostHealth, layers: state.mapLayers, view: state.mapView, open: openHost, again: renderMap });
+    window.CmdrMap.render($('map'), { h, attr, relate, hosts: state.data.hosts, health: hostHealth, layers: state.mapLayers, view: state.mapView, open: openHost, again: renderMap });
   }
   function renderExposure() {
     const rows = state.data.exposure || [];

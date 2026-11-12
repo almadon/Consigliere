@@ -26,7 +26,7 @@
     const placed = o.hosts.filter((x) => validGeo(x.geo));
     const unplaced = o.hosts.filter((x) => !validGeo(x.geo));
     if (!placed.length) {
-      box.replaceChildren(h('div', { class: 'empty' }, 'No host has coordinates yet. Add geo: [latitude, longitude] to a host in the host table (config/inventory/hosts.yml) and it appears here.'));
+      box.replaceChildren(h('div', { class: 'empty' }, 'No host has coordinates yet. Add a location to a host in the host table and its coordinates to config/inventory/locations.yml (or geo: [latitude, longitude] on the host) and it appears here.'));
       return;
     }
     // Places: hosts at the same coordinates.
@@ -74,7 +74,8 @@
     const dots = [];
     for (const p of list) {
       const [cx, cy] = p.xy;
-      const g = el('g', { class: 'mk ' + p.level, tabindex: '0', role: 'button', 'aria-label': `${p.location || 'Location'}: ${p.hosts.map((x) => x.name).join(', ')}`, transform: `translate(${cx} ${cy})` });
+      const locKey = p.location ? 'location:' + p.location : '';   // the same key the location chips use, so hover and click relate both ways
+      const g = el('g', { class: 'mk ' + p.level, tabindex: '0', role: 'button', ...(locKey ? { 'data-attr': locKey } : {}), 'aria-label': `${p.location || 'Location'}: ${p.hosts.map((x) => x.name).join(', ')}`, transform: `translate(${cx} ${cy})` });
       const pulse = el('circle', { class: 'pulse', r: 6 });
       const dot = el('circle', { class: 'pt', r: 4.5 });
       const count = p.hosts.length > 1 ? el('text', { class: 'ct', y: 3.2 }, String(p.hosts.length)) : null;
@@ -83,9 +84,9 @@
       const open = (ev) => { ev.stopPropagation(); if (p.hosts.length === 1) o.open(p.hosts[0].name); else pop(p, ev); };
       g.addEventListener('click', open);
       g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(e); } });
-      g.addEventListener('pointerenter', (e) => tip(p, e));
+      g.addEventListener('pointerenter', (e) => { tip(p, e); if (locKey && o.relate) o.relate(locKey, true); });
       g.addEventListener('pointermove', (e) => tip(p, e));
-      g.addEventListener('pointerleave', () => { tipEl.hidden = true; });
+      g.addEventListener('pointerleave', () => { tipEl.hidden = true; if (locKey && o.relate) o.relate(locKey, false); });
       g.addEventListener('focus', () => tip(p, null, g));
       g.addEventListener('blur', () => { tipEl.hidden = true; });
       marks.append(g);
@@ -139,7 +140,8 @@
     }
     function pop(p, ev) {
       tipEl.hidden = true;
-      popEl.replaceChildren(h('div', { class: 'th' }, p.location || 'Unnamed place'),
+      // In the popup the location is the same clickable value as on the cards: click it to show only that place's hosts.
+      popEl.replaceChildren(h('div', { class: 'th' }, p.location ? (o.attr ? o.attr('location', p.location) : p.location) : 'Unnamed place'),
         ...p.hosts.map((x) => h('button', { class: 'tl btn-row', type: 'button', onclick: () => { popEl.hidden = true; o.open(x.name); } }, h('span', { class: 'dot ' + o.health(x).dot }), h('b', null, x.name), h('span', { class: 'mute' }, ' · ' + (x.type || '?')))));
       place(popEl, ev);
     }
@@ -151,7 +153,7 @@
     const legend = h('div', { class: 'maplegend' },
       [['ok', 'reporting, in sync'], ['warn', 'drift or changes'], ['bad', 'needs attention'], ['unk', 'unknown']].map(([c, t]) => h('span', null, h('span', { class: 'dot ' + c }), ' ' + t)));
     box.replaceChildren(h('div', { class: 'mapwrap' }, svg, controls, tipEl, popEl), h('div', { class: 'mapfoot' }, layers, legend,
-      unplaced.length ? h('span', { class: 'mute', title: 'Add geo: [latitude, longitude] to these hosts in the host table to place them' }, 'Not on the map (no coordinates): ' + unplaced.map((x) => x.name).join(', ')) : null));
+      unplaced.length ? h('span', { class: 'mute', title: 'Give these hosts a location that is listed in inventory/locations.yml (or a geo: [latitude, longitude] of their own) to place them' }, 'Not on the map (no coordinates): ' + unplaced.map((x) => x.name).join(', ')) : null));
     rescale();
   }
 

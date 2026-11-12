@@ -68,6 +68,19 @@
     src: "{{ cmdr_conf_dir }}/inventory/hosts.yml"
   register: _cmdr_hosts_raw
 
+# Where a location is on the map lives with the location, not with each host: an optional inventory/locations.yml maps a location name
+# (as written in a host's `location:`) to {geo: [latitude, longitude]}. A host's own `geo:` still wins.
+- name: Look for the locations file
+  ansible.builtin.stat:
+    path: "{{ cmdr_conf_dir }}/inventory/locations.yml"
+  register: _cmdr_locations_stat
+
+- name: Read the locations
+  ansible.builtin.slurp:
+    src: "{{ cmdr_conf_dir }}/inventory/locations.yml"
+  when: _cmdr_locations_stat.stat.exists
+  register: _cmdr_locations_raw
+
 - name: Find the route files
   ansible.builtin.find:
     paths: "{{ cmdr_conf_dir }}/vars/routes"

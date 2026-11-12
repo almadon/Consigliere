@@ -289,7 +289,7 @@ img.ic.img{object-fit:cover;background:none;border-radius:9px}
 .mk .pulse{fill:none;stroke:var(--unk);stroke-width:1.5;vector-effect:non-scaling-stroke;opacity:.7;transform-box:fill-box;transform-origin:center;animation:ping 2.6s ease-out infinite}
 .mk.ok .pulse{stroke:var(--ok)}.mk.warn .pulse{stroke:var(--warn)}.mk.bad .pulse{stroke:var(--bad);animation-duration:1.3s}
 @keyframes ping{from{transform:scale(1);opacity:.7}to{transform:scale(3.2);opacity:0}}
-.mk:hover .pt,.mk:focus-visible .pt{stroke:var(--gold);stroke-width:2.5}
+.mk:hover .pt,.mk:focus-visible .pt,.mk.hl .pt{stroke:var(--gold);stroke-width:2.5}
 .mk .ct{font:700 5.5px var(--mono);fill:var(--bg);text-anchor:middle;pointer-events:none}
 .mk:focus-visible{outline:none}
 .mapctl{position:absolute;top:10px;right:10px;display:flex;flex-direction:column;gap:6px}
