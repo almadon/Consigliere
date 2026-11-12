@@ -32,9 +32,10 @@ rules in spirit: idempotent, a `-WhatIf` path where a cmdlet allows it, and a re
 ## Prerequisite: PowerShell 7
 
 The reconcile and every role need PowerShell 7.4 or later (`#Requires -Version 7.4`); Windows PowerShell 5.1, which a fresh Windows has, is
-not enough. `bootstrap.ps1` is the one file kept valid for 5.1: when it finds an older PowerShell it installs `Microsoft.PowerShell` with
-WinGet (machine scope, so SYSTEM can use it) and starts itself again under `pwsh.exe`, passing its parameters on (secrets by environment,
-not the command line). The Scheduled Task runs `pwsh.exe`. Roles can therefore use PowerShell 7 features and the .NET it brings.
+not enough. `bootstrap.ps1` is the one file kept valid for 5.1: when it finds an older PowerShell it installs PowerShell 7 from the project's
+release zip (pinned version, SHA-256 checked) into `C:\Program Files\PowerShell\7` and starts itself again under `pwsh.exe`, passing its
+parameters on (secrets by environment, not the command line). It is not installed with WinGet: 7.7 is an MSIX package, WinGet puts that
+in the signed-in user's profile, and SYSTEM, which runs the reconcile, cannot use it. The Scheduled Task runs `pwsh.exe`. Roles can therefore use PowerShell 7 features and the .NET it brings.
 
 ## Reconcile loop
 

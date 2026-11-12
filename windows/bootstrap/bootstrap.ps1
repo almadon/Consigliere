@@ -116,6 +116,41 @@ function Install-WingetPackage([string]$Id, [string]$Version = '') {
   Say "INSTALLED $Id"
 }
 
+# PowerShell 7 is installed from the project's release zip, not WinGet: 7.7 ships only as an MSIX (and a zip), WinGet installs an MSIX for
+# the signed-in user, and the reconcile runs as SYSTEM, which cannot see that. The zip goes to Program Files, machine-wide, checked
+# against the SHA-256 in the release's hashes.sha256. To upgrade: change the version and both checksums together.
+$Pwsh7Version = '7.7.0'
+$Pwsh7Sha256 = @{
+  amd64 = '7c74e03b20a75b59715847439d046a6214b1863ee79b187872980f139bb4a05f'
+  arm64 = '5dc7440cd98f0ba786a44d7db9205df5058474fd4db143caf7171e8375f34f75'
+}
+function Install-PowerShell7 {
+  $dir = Join-Path $env:ProgramFiles 'PowerShell\7'
+  $exe = Join-Path $dir 'pwsh.exe'
+  if (Test-Path $exe) {
+    $have = [version](((Get-Item $exe).VersionInfo.ProductVersion) -replace '[-+ ].*$', '')
+    if ($have -ge [version]'7.4') { Say "OK PowerShell $have already installed"; return $exe }
+  }
+  $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'amd64' }
+  $zipName = "PowerShell-$Pwsh7Version-win-$(if ($arch -eq 'arm64') { 'arm64' } else { 'x64' }).zip"
+  $tmp = Join-Path ([IO.Path]::GetTempPath()) "pwsh7-$([guid]::NewGuid())"
+  New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+  try {
+    $zip = Join-Path $tmp $zipName
+    Say "Downloading PowerShell $Pwsh7Version"
+    Invoke-WebRequest -UseBasicParsing -OutFile $zip -Uri "https://github.com/PowerShell/PowerShell/releases/download/v$Pwsh7Version/$zipName"
+    $got = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLowerInvariant()
+    if ($got -ne $Pwsh7Sha256[$arch]) { Fail "PowerShell checksum mismatch (got $got)" }
+    if (Test-Path $dir) { Remove-Item $dir -Recurse -Force }
+    Expand-Archive -Path $zip -DestinationPath $dir -Force
+  } finally { Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue }
+  if (-not (Test-Path $exe)) { Fail "PowerShell 7 is not at $exe after unpacking." }
+  $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+  if (($machinePath -split ';') -notcontains $dir) { [Environment]::SetEnvironmentVariable('Path', "$machinePath;$dir", 'Machine') }
+  Say "INSTALLED PowerShell $Pwsh7Version"
+  return $exe
+}
+
 # ---- 0. Preconditions -------------------------------------------------------------------------------
 $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -125,13 +160,11 @@ if ([Environment]::OSVersion.Platform -ne 'Win32NT') { Fail 'This script is for 
 
 # ---- 0b. PowerShell 7 is a prerequisite ---------------------------------------------------------------
 # The reconcile and the roles need PowerShell 7.4 or later (Windows PowerShell 5.1 is what a fresh Windows has). This file
-# must stay valid 5.1 syntax so that it can get this far; it installs PowerShell 7 and carries on there.
+# must stay valid 5.1 syntax so that it can get this far; it installs PowerShell 7 (below) and carries on there.
 if ($PSVersionTable.PSVersion -lt [version]'7.4') {
   Say "Windows PowerShell $($PSVersionTable.PSVersion) is too old; installing PowerShell 7 and continuing in it"
   if (-not $PSCommandPath) { Fail 'Save this script to a file and run it from there (it has to start itself again under PowerShell 7).' }
-  Install-WingetPackage 'Microsoft.PowerShell'
-  $pwsh7 = Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe'
-  if (-not (Test-Path $pwsh7)) { Fail "PowerShell 7 is not at $pwsh7 after the install." }
+  $pwsh7 = Install-PowerShell7
   $forward = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $PSCommandPath)
   foreach ($k in $PSBoundParameters.Keys) {
     $v = $PSBoundParameters[$k]
