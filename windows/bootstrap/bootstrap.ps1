@@ -100,8 +100,11 @@ function Test-Native([string]$Exe, [string[]]$Arguments = @()) {
 }
 
 # Only SYSTEM and Administrators (by well-known SID, so the account names' language does not matter).
+# The inherit flags (OI)(CI) are for folders only: on a file they leave an entry that applies to nothing, so the file ends up with an
+# empty access list that nobody can read (found on the first real run).
 function Lock-Path([string]$Path) {
-  Invoke-Native icacls @($Path, '/inheritance:r', '/grant:r', '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-544:(OI)(CI)F') | Out-Null
+  $rights = if (Test-Path -LiteralPath $Path -PathType Container) { '(OI)(CI)F' } else { 'F' }
+  Invoke-Native icacls @($Path, '/inheritance:r', '/grant:r', "*S-1-5-18:$rights", "*S-1-5-32-544:$rights") | Out-Null
 }
 
 function Update-SessionPath {
@@ -360,6 +363,8 @@ if ($interactive) { Read-Host 'Press Enter once that is pushed (Ctrl-C to abort)
 
 # ---- 5. Settings for the timed reconcile, and the framework clone ------------------------------------
 Say 'Writing the settings file for future reconcile runs (no secrets in it)'
+# A copy left by an earlier run may have an empty access list; the folder lets Administrators delete it, so start clean.
+Remove-Item -LiteralPath $ConfigFile -Force -ErrorAction SilentlyContinue
 [ordered]@{
   FrameworkRepoUrl      = $FrameworkRepoUrl
   FrameworkRepoBranch   = [string]$FrameworkRepoBranch
