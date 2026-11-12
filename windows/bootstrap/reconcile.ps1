@@ -54,7 +54,8 @@ $ForceFile   = Join-Path $Root 'force-run'
 $StatusFile  = Join-Path $Root 'last-status.json'
 $RunLog      = Join-Path $Root 'last-run.log'
 $Sops        = Join-Path $BinDir 'sops.exe'
-$YamlModuleVersion = '0.4.9'   # powershell-yaml, pinned; VERIFY: PowerShell Gallery gives no checksum to pin here
+$YamlModuleVersion = '0.4.9'   # powershell-yaml, pinned: the package's SHA-256 below (the nupkg as the Gallery serves it)
+$YamlModuleSha256 = '9148c268709ab46b21835c3ed8502ebdbff4a6dc19e65b7b3dd6b66e9131fd28'
 $EventSource = 'Consigliere'
 
 function Say($m)  { Write-Host "==> $m" }
@@ -99,14 +100,24 @@ function Send-Heartbeat([string]$Url) {
 # ---- YAML (powershell-yaml, pinned, saved under the Consigliere folder) -------------------------------
 function Initialize-Yaml {
   if (Get-Command ConvertFrom-Yaml -ErrorAction SilentlyContinue) { return }
-  $found = Get-ChildItem -Path (Join-Path $ModuleDir "powershell-yaml\$YamlModuleVersion") -Filter 'powershell-yaml.psd1' -ErrorAction SilentlyContinue
-  if (-not $found) {
+  $psd1 = Join-Path $ModuleDir "powershell-yaml\$YamlModuleVersion\powershell-yaml.psd1"
+  if (-not (Test-Path $psd1)) {
+    # Straight from the Gallery's package URL, checked against a pinned SHA-256. (Install-Module and Save-Module need the NuGet
+    # provider, which PowerShell 7 does not have the way Windows PowerShell does, and would need a trusted-repository prompt.)
     Say "Fetching powershell-yaml $YamlModuleVersion"
-    New-Item -ItemType Directory -Force -Path $ModuleDir | Out-Null
-    $null = Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope AllUsers
-    Save-Module -Name powershell-yaml -RequiredVersion $YamlModuleVersion -Path $ModuleDir -Repository PSGallery -Force
+    $tmp = Join-Path ([IO.Path]::GetTempPath()) "psyaml-$([guid]::NewGuid())"
+    New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+    try {
+      $pkg = Join-Path $tmp 'powershell-yaml.zip'   # a .nupkg is a zip; Expand-Archive wants the extension
+      Invoke-WebRequest -UseBasicParsing -OutFile $pkg -Uri "https://www.powershellgallery.com/api/v2/package/powershell-yaml/$YamlModuleVersion"
+      $got = (Get-FileHash -Algorithm SHA256 $pkg).Hash.ToLowerInvariant()
+      if ($got -ne $YamlModuleSha256) { Fail "powershell-yaml checksum mismatch (got $got)" }
+      $dest = Split-Path $psd1
+      if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+      Expand-Archive -Path $pkg -DestinationPath $dest -Force
+    } finally { Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue }
   }
-  Import-Module (Join-Path $ModuleDir "powershell-yaml\$YamlModuleVersion\powershell-yaml.psd1") -Force
+  Import-Module $psd1 -Force
 }
 function Read-Yaml([string]$Path) {
   $t = Get-Content -LiteralPath $Path -Raw -Encoding UTF8

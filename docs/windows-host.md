@@ -116,6 +116,12 @@ sops and age are the vendors' release files, checked against pinned SHA-256 valu
 - The OpenTelemetry collector is not in the WinGet repository (only an unrelated `OpenTelemetry.Weaver` is), so it is installed from the
   release archive with a pinned checksum, the way the Linux role pins its package.
 
+## YAML on the host
+
+The reconcile reads the fleet's YAML with the `powershell-yaml` module (which bundles YamlDotNet), pinned to a version and a SHA-256. It is
+fetched on first use straight from the PowerShell Gallery's package URL into `C:\ProgramData\Consigliere\modules` and imported from there;
+`Install-Module` is not used, because it needs the NuGet provider, which PowerShell 7 does not have the way Windows PowerShell does.
+
 ## Secrets
 
 The same sops and age scheme as Linux. The age key lives in `C:\ProgramData\Consigliere\age.key` with an ACL for SYSTEM and Administrators
