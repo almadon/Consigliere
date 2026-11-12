@@ -6,7 +6,7 @@
   The Windows counterpart of hosts/bootstrap/bootstrap.sh. A new host has neither repo, so the timed
   reconcile cannot be the first step. This script:
 
-    1. installs git and Tailscale with WinGet (machine-wide), and age and sops from pinned, checksum-verified releases;
+    1. installs git (MinGit), Tailscale, age and sops from pinned, checksum-verified vendor releases, all machine-wide (no WinGet);
     2. joins the tailnet, if it is not on it yet;
     3. gives the host its own read-only deploy key for the PRIVATE fleet repo (registered through the
        GitHub API when -FleetConfigRegisterToken is given, otherwise printed for you to add);
@@ -45,18 +45,26 @@ Set-StrictMode -Version 2.0
 $env:GIT_TERMINAL_PROMPT = '0'   # unattended runs never wait on a credentials prompt
 
 # ---- Pinned tools -----------------------------------------------------------------------------------
-# Everything the reconcile uses must be machine-wide: it runs as SYSTEM and cannot see a user's profile. So:
-#   - git and Tailscale have machine-scope installers; WinGet installs them here, in your elevated session only (the
-#     scheduled task never calls WinGet), and the script checks afterwards that they landed in Program Files;
-#   - sops and age are single programs: the vendors' release files, checked against pinned SHA-256 values, in
-#     C:\ProgramData\Consigliere\bin (readable only by SYSTEM and Administrators). WinGet would install age as a per-user
-#     portable package, and sops is not in the WinGet repository.
-# Change a version and its checksums together. The age values match the SHA-256 GitHub records for each release asset;
-# windows/tools/verify-age-pins.sh checks them against age's Sigsum proofs (the .proof files) when you bump the version.
-$WingetPackages = @(
-  @{ Id = 'Git.Git';             Version = '' },
-  @{ Id = 'Tailscale.Tailscale'; Version = '' }
-)
+# Everything the reconcile uses must be machine-wide: it runs as SYSTEM and cannot see a user's profile, and nothing here needs WinGet (it
+# is a per-user app, absent on some editions, and a moving part). So every tool is the vendor's release file checked against a pinned SHA-256:
+#   - git: MinGit, Git for Windows' minimal zip (no installer, no GUI), in Program Files\MinGit;
+#   - Tailscale: the vendor's MSI, installed with unattended mode on;
+#   - PowerShell 7, sops and age: release zips and files, in Program Files and C:\ProgramData\Consigliere\bin (readable only by SYSTEM
+#     and Administrators).
+# Change a version and its checksums together. Git's and age's values match the SHA-256 GitHub records for each release asset, and
+# Tailscale's the .msi.sha256 file next to each MSI on pkgs.tailscale.com; windows/tools/verify-age-pins.sh checks age's against its
+# Sigsum proofs (the .proof files) when you bump that version.
+$GitVersion = '2.56.1'
+$GitTag = 'v2.56.1.windows.1'
+$GitSha256 = @{
+  amd64 = '4a92850b6e917da4fd010669b614b55dccf5b0ec333a534cc4be4700dfefdafd'   # MinGit-2.56.1-64-bit.zip
+  arm64 = '96571e442e90523a90e5fd8661b4c4e43bc192910f3c6db938816e6955b4cc8c'   # MinGit-2.56.1-arm64.zip
+}
+$TailscaleVersion = '1.104.6'
+$TailscaleSha256 = @{
+  amd64 = '8445636f79e258f56e01d324e5562d4ebcdf898ab84c2e618ae05014b8ba90ab'
+  arm64 = '2810b17d4edcb6feb0307d0029e67426d2af78f0e4b1092fbbe307f5875c82b7'
+}
 $AgeVersion = '1.3.2'
 $AgeSha256 = @{
   amd64 = 'f48d8f8f9ebe903ab5027ed067652f2cc1db94bc206976430133b905dcd8e8c7'
@@ -118,54 +126,57 @@ function Get-OsArch {
   return 'amd64'
 }
 
-# Install one package with WinGet unless it is already there. Machine scope only, because the reconcile runs as SYSTEM
-# and a per-user install is invisible to it; a package with no machine-scope installer fails here, on purpose.
-function Install-WingetPackage([string]$Id, [string]$Version = '') {
-  if (-not (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
-    Fail 'winget was not found. On Windows 11 it ships as "App Installer"; update it from the Microsoft Store, then re-run.'
+# git: use one that is already machine-wide (Git for Windows in Program Files); otherwise unpack MinGit and put it on the machine PATH.
+function Install-MinGit {
+  $existing = Get-Command git.exe -ErrorAction SilentlyContinue
+  $pfs = @($env:ProgramFiles, ${env:ProgramFiles(x86)}) | Where-Object { $_ }
+  if ($existing -and ($pfs | Where-Object { $existing.Source.StartsWith($_, [StringComparison]::OrdinalIgnoreCase) })) {
+    Say "OK git already installed ($($existing.Source))"; return $existing.Source
   }
-  if (Test-Native winget.exe @('list', '--exact', '--id', $Id, '--source', 'winget', '--accept-source-agreements')) {
-    Say "OK $Id already installed"; return
+  $dir = Join-Path $env:ProgramFiles 'MinGit'
+  $exe = Join-Path $dir 'cmd\git.exe'
+  if (-not (Test-Path $exe)) {
+    $arch = Get-OsArch
+    $zipName = if ($arch -eq 'arm64') { "MinGit-$GitVersion-arm64.zip" } else { "MinGit-$GitVersion-64-bit.zip" }
+    $tmp = Join-Path ([IO.Path]::GetTempPath()) "mingit-$([guid]::NewGuid())"
+    New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+    try {
+      $zip = Join-Path $tmp $zipName
+      Say "Downloading MinGit $GitVersion"
+      Invoke-WebRequest -UseBasicParsing -OutFile $zip -Uri "https://github.com/git-for-windows/git/releases/download/$GitTag/$zipName"
+      $got = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLowerInvariant()
+      if ($got -ne $GitSha256[$arch]) { Fail "MinGit checksum mismatch (got $got)" }
+      if (Test-Path $dir) { Remove-Item $dir -Recurse -Force }
+      Expand-Archive -Path $zip -DestinationPath $dir -Force
+    } finally { Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue }
+    if (-not (Test-Path $exe)) { Fail "git is not at $exe after unpacking." }
+    Say "INSTALLED MinGit $GitVersion"
   }
-  $a = @('install', '--exact', '--id', $Id, '--source', 'winget', '--silent', '--accept-package-agreements', '--accept-source-agreements')
-  if ($Version) { $a += @('--version', $Version) }
-  Invoke-Native winget.exe ($a + @('--scope', 'machine')) | Out-Null   # no fallback to a per-user install: SYSTEM could not use it
-  Say "INSTALLED $Id"
+  $cmd = Join-Path $dir 'cmd'
+  $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+  if (($machinePath -split ';') -notcontains $cmd) { [Environment]::SetEnvironmentVariable('Path', "$machinePath;$cmd", 'Machine') }
+  return $exe
 }
 
-# PowerShell 7 is installed from the project's release zip, not WinGet: 7.7 ships only as an MSIX (and a zip), WinGet installs an MSIX for
-# the signed-in user, and the reconcile runs as SYSTEM, which cannot see that. The zip goes to Program Files, machine-wide, checked
-# against the SHA-256 in the release's hashes.sha256. To upgrade: change the version and both checksums together.
-$Pwsh7Version = '7.7.0'
-$Pwsh7Sha256 = @{
-  amd64 = '7c74e03b20a75b59715847439d046a6214b1863ee79b187872980f139bb4a05f'
-  arm64 = '5dc7440cd98f0ba786a44d7db9205df5058474fd4db143caf7171e8375f34f75'
-}
-function Install-PowerShell7 {
-  $dir = Join-Path $env:ProgramFiles 'PowerShell\7'
-  $exe = Join-Path $dir 'pwsh.exe'
-  if (Test-Path $exe) {
-    $have = [version](((Get-Item $exe).VersionInfo.ProductVersion) -replace '[-+ ].*$', '')
-    if ($have -ge [version]'7.4') { Say "OK PowerShell $have already installed"; return $exe }
-  }
+# Tailscale: the vendor's MSI, machine-wide, with unattended mode on so the tunnel does not wait for a login. An existing install is kept.
+function Install-Tailscale {
+  $ts = Join-Path $env:ProgramFiles 'Tailscale\tailscale.exe'
+  if (Test-Path $ts) { Say 'OK Tailscale already installed'; return }
   $arch = Get-OsArch
-  $zipName = "PowerShell-$Pwsh7Version-win-$(if ($arch -eq 'arm64') { 'arm64' } else { 'x64' }).zip"
-  $tmp = Join-Path ([IO.Path]::GetTempPath()) "pwsh7-$([guid]::NewGuid())"
+  $msiName = "tailscale-setup-$TailscaleVersion-$arch.msi"
+  $tmp = Join-Path ([IO.Path]::GetTempPath()) "tailscale-$([guid]::NewGuid())"
   New-Item -ItemType Directory -Force -Path $tmp | Out-Null
   try {
-    $zip = Join-Path $tmp $zipName
-    Say "Downloading PowerShell $Pwsh7Version"
-    Invoke-WebRequest -UseBasicParsing -OutFile $zip -Uri "https://github.com/PowerShell/PowerShell/releases/download/v$Pwsh7Version/$zipName"
-    $got = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLowerInvariant()
-    if ($got -ne $Pwsh7Sha256[$arch]) { Fail "PowerShell checksum mismatch (got $got)" }
-    if (Test-Path $dir) { Remove-Item $dir -Recurse -Force }
-    Expand-Archive -Path $zip -DestinationPath $dir -Force
+    $msi = Join-Path $tmp $msiName
+    Say "Downloading Tailscale $TailscaleVersion"
+    Invoke-WebRequest -UseBasicParsing -OutFile $msi -Uri "https://pkgs.tailscale.com/stable/$msiName"
+    $got = (Get-FileHash -Algorithm SHA256 $msi).Hash.ToLowerInvariant()
+    if ($got -ne $TailscaleSha256[$arch]) { Fail "Tailscale checksum mismatch (got $got)" }
+    $p = Start-Process msiexec.exe -Wait -PassThru -ArgumentList @('/i', "`"$msi`"", '/qn', '/norestart', 'TS_UNATTENDEDMODE=always', 'TS_NOLAUNCH=1')
+    if ($p.ExitCode -notin 0, 3010) { Fail "the Tailscale installer failed (msiexec exit $($p.ExitCode))" }
   } finally { Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue }
-  if (-not (Test-Path $exe)) { Fail "PowerShell 7 is not at $exe after unpacking." }
-  $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
-  if (($machinePath -split ';') -notcontains $dir) { [Environment]::SetEnvironmentVariable('Path', "$machinePath;$dir", 'Machine') }
-  Say "INSTALLED PowerShell $Pwsh7Version"
-  return $exe
+  if (-not (Test-Path $ts)) { Fail "Tailscale is not at $ts after the install." }
+  Say "INSTALLED Tailscale $TailscaleVersion"
 }
 
 # ---- 0. Preconditions -------------------------------------------------------------------------------
@@ -215,19 +226,24 @@ if ($FleetConfigRepoUrl -notmatch '^(git@[^:]+:|ssh://)') {
 New-Item -ItemType Directory -Force -Path $Root, $CredDir, $BinDir | Out-Null
 Lock-Path $Root
 
-# ---- 1. git, Tailscale, age (WinGet) ----------------------------------------------------------------
-Say 'Installing git and Tailscale with WinGet (machine-wide)'
-foreach ($p in $WingetPackages) { Install-WingetPackage $p.Id $p.Version }
+# ---- 1. git and Tailscale ---------------------------------------------------------------------------
+Say 'Installing git and Tailscale (pinned releases, machine-wide)'
+$git = Install-MinGit
+Install-Tailscale
 Update-SessionPath
 
-$git = (Get-Command git.exe -ErrorAction Stop).Source
 $pf = @($env:ProgramFiles, ${env:ProgramFiles(x86)}) | Where-Object { $_ }
 if (-not ($pf | Where-Object { $git.StartsWith($_, [StringComparison]::OrdinalIgnoreCase) })) {
   Fail "git is at $git, outside Program Files: it was installed for one user, and the reconcile runs as SYSTEM. Uninstall it and re-run."
 }
-$gitUsr = Join-Path (Split-Path (Split-Path $git)) 'usr\bin'
-$sshKeygen = Join-Path $gitUsr 'ssh-keygen.exe'
-if (-not (Test-Path $sshKeygen)) { Fail "ssh-keygen.exe not found next to git ($sshKeygen)." }
+# ssh-keygen comes with Windows' own OpenSSH client (MinGit leaves it out).
+$sshKeygen = Join-Path $env:SystemRoot 'System32\OpenSSH\ssh-keygen.exe'
+if (-not (Test-Path $sshKeygen)) {
+  Say 'Installing the Windows OpenSSH client'
+  Import-Module Dism -UseWindowsPowerShell -WarningAction SilentlyContinue
+  Add-WindowsCapability -Online -Name 'OpenSSH.Client~~~~0.0.1.0' | Out-Null
+  if (-not (Test-Path $sshKeygen)) { Fail "ssh-keygen.exe is not at $sshKeygen after installing the OpenSSH client." }
+}
 
 # ---- 1a. age: pinned release, checksum verified -------------------------------------------------------
 $ageKeygen = [pscustomobject]@{ Source = (Join-Path $BinDir 'age-keygen.exe') }

@@ -54,8 +54,8 @@ The host is identified by its Tailscale name, like every other host, and looked 
 
 One command from an elevated PowerShell. The script needs the framework URL and a Tailscale auth key (or approves the node by hand):
 
-1. Make sure PowerShell 7.4 or later is installed (it is a prerequisite, see below), then install git and Tailscale with WinGet
-   (machine-wide, checked afterwards) and age and sops from pinned, checksum-verified releases.
+1. Make sure PowerShell 7.4 or later is installed (it is a prerequisite, see below), then install git (MinGit), Tailscale, age and sops from
+   pinned, checksum-verified vendor releases, all machine-wide.
 2. Join the tailnet with the fleet's tag.
 3. Create the host's age key and print its public half, so you add it to `config/access.yml` and run `scripts/access.sh sync` in the fleet
    repo (the same step a Linux host needs).
@@ -98,23 +98,20 @@ run go ahead even when nothing changed, the counterpart of `scripts/reconcile-no
 | Role | What it does |
 |---|---|
 | `baseline` (written) | Time zone and `w32time`, Windows Update through the policy registry keys (install and restart at `windows_update_reboot_time`, default `04:00`; a pending restart is reported), Defender real-time protection on, the firewall on for all profiles, RDP with NLA reachable from the tailnet only. Hostname left alone. See its [README](../windows/roles/baseline/README.md). |
+| `tailscale` (written) | The Tailscale service running and set to start automatically, and unattended mode on, so the host rejoins the tailnet at boot with no one signed in. Joining stays with `bootstrap.ps1`. See its [README](../windows/roles/tailscale/README.md). |
 | `ssh` (written) | OpenSSH Server installed as a Windows capability, key-only (fleet admin keys in `administrators_authorized_keys`), with `sshd_config` changes validated and restored on failure, and port 22 allowed from the tailnet only when `windows_access` is `tailnet`. See its [README](../windows/roles/ssh/README.md). |
 | `tailscale` | Installed and joined (tag from the host table). Settings the Linux role sets on DNS and routes are options here too. |
 | `otel_agent` | The OpenTelemetry collector as a service: Windows Event Log channels (System, Application, Security) as logs, host metrics (CPU, memory, disk, network, processes) as metrics, plus the reconcile status and pending-reboot state. Config changes validate, keep a copy, apply, health-check and restore, like `safe_apply`. |
 
-## Where WinGet fits
+## Where the tools come from
 
-The reconcile runs as SYSTEM, so everything it uses must be machine-wide; nothing may live in a user's profile. WinGet is used only at
-enrolment, in the administrator's own session, and the scheduled task never calls it. It installs git and Tailscale (`Git.Git`,
-`Tailscale.Tailscale`; both have machine-scope installers, and the script checks afterwards that git is under Program Files). PowerShell 7,
-sops and age are the vendors' release files, checked against pinned SHA-256 values, because WinGet would put PowerShell (MSIX) and age
-(portable) in the user's profile and sops is not in its repository. Version bumps are therefore by hand.
+The reconcile runs as SYSTEM, so everything it uses must be machine-wide; nothing may live in a user's profile, and WinGet is not used at all
+(it is a per-user app, absent on some editions, and one more thing that changes versions). Every tool is the vendor's release file checked
+against a pinned SHA-256: PowerShell 7, sops, age, MinGit (Git for Windows' minimal zip) and the Tailscale MSI, which is installed with
+unattended mode on. Version bumps are therefore by hand ([decisions.md](decisions.md) entries 11, 12 and 16).
 
-- **VERIFY.** WinGet is a per-user app and is known to behave badly when run as SYSTEM from a Scheduled Task. The reconciler needs a
-  tested way to run it (the full path to `winget.exe`, or the `Microsoft.WinGet.Client` module), and a fallback: download the vendor
-  installer or release archive over HTTPS and check a pinned SHA-256.
-- The OpenTelemetry collector is not in the WinGet repository (only an unrelated `OpenTelemetry.Weaver` is), so it is installed from the
-  release archive with a pinned checksum, the way the Linux role pins its package.
+- **The OpenTelemetry collector** will follow the same pattern: the project's release archive with a pinned checksum, as the Linux role pins
+  its package. (It is not in the WinGet repository either.)
 
 ## YAML on the host
 

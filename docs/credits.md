@@ -34,8 +34,7 @@ What this project adopts, under which licence, and what it passed over. A licenc
 | Next.js, next-auth, React, TypeScript (`console/`) | The optional console app | VERIFY |
 | GitHub Actions `checkout`, `cache`, `setup-python` | CI | VERIFY |
 | PowerShell 7 | Windows reconcile and roles (pinned release zip) | VERIFY |
-| WinGet | Installs git and Tailscale at Windows enrolment | VERIFY |
-| Git for Windows | Windows hosts (installed through WinGet) | VERIFY |
+| Git for Windows (MinGit) | git on Windows hosts, from the pinned release zip | VERIFY |
 | powershell-yaml (and the YamlDotNet it bundles) | YAML in the Windows reconcile | VERIFY |
 | Sigsum (`sigsum-verify`) | Checks age's release proofs when its pin is bumped | VERIFY |
 
