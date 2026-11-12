@@ -1,0 +1,13 @@
+---
+# Defaults shared by the Windows roles: the framework's lowest layer. The fleet overrides any of them in config/vars/ (all.yml, a group
+# or the host's file). A setting used by one role has its default in that role; a setting two roles share lives here.
+
+# How reachable the host's remote access is. One switch for Remote Desktop and SSH:
+#   tailnet  only from the tailnet (the locked-down default)
+#   lan      Windows' own arrangement: reachable from the local network too
+windows_access: tailnet
+
+# Where "the tailnet" is: Tailscale's IPv4 (CGNAT) and IPv6 ranges.
+windows_tailnet_ranges:
+  - 100.64.0.0/10
+  - fd7a:115c:a1e0::/48

@@ -28,8 +28,9 @@ The baseline every Windows host gets: the clock, Windows Update, Defender, the f
 | `windows_defender_manage` | `true` | Real-time protection on. Skipped when another antivirus has replaced Defender. |
 | `windows_firewall_manage` | `true` | Firewall on for every profile, inbound blocked unless a rule allows it. |
 | `windows_rdp_enable` | `true` | Remote Desktop on, with Network Level Authentication. `false` turns it off. |
-| `windows_rdp_tailnet_only` | `true` | `true`: the built-in Remote Desktop rules are switched off and one rule allows only `windows_tailnet_ranges`. `false`: Windows' own rules are switched back on (reachable from the LAN) and the role's tailnet-only rules are removed. |
-| `windows_tailnet_ranges` | the Tailscale IPv4 and IPv6 ranges | Where RDP may be reached from. |
+| `windows_access` | `tailnet` | One switch for Remote Desktop and SSH (see the `ssh` role): `tailnet` switches the built-in Remote Desktop rules off and allows only `windows_tailnet_ranges`; `lan` switches Windows' own rules back on (reachable from the LAN) and removes the role's tailnet-only rules. |
+| `windows_tailnet_ranges` | the Tailscale IPv4 and IPv6 ranges | What `tailnet` means. Both settings are defined in `windows/defaults.yml`. |
+| `windows_rdp_tailnet_only` | unset | Older switch for RDP alone; when a host sets it, it wins over `windows_access` for RDP. Kept so a half-updated fleet cannot lock a host out; prefer `windows_access`. |
 
 ## Notes
 

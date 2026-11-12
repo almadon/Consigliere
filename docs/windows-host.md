@@ -1,6 +1,6 @@
 # Adding a Windows host (design, not built)
 
-Status: **designed; `bootstrap.ps1`, `reconcile.ps1` and the `baseline` role are written but have not been run on a host.** The inventory, group, variable and tag-selection
+Status: **designed; `bootstrap.ps1`, `reconcile.ps1` and the `baseline` and `ssh` roles are written but have not been run on a host.** The inventory, group, variable and tag-selection
 logic was exercised against the real fleet config on a Mac; everything that touches Windows (the task, WinGet, the Event Log) was not. The first target is one Windows 11 Pro VM on an Unraid host. This page is what the
 baseline will do, so it can be corrected before scripts exist. [decisions.md](decisions.md) entry 9 records the choice.
 
@@ -98,7 +98,7 @@ run go ahead even when nothing changed, the counterpart of `scripts/reconcile-no
 | Role | What it does |
 |---|---|
 | `baseline` (written) | Time zone and `w32time`, Windows Update through the policy registry keys (install and restart at `windows_update_reboot_time`, default `04:00`; a pending restart is reported), Defender real-time protection on, the firewall on for all profiles, RDP with NLA reachable from the tailnet only. Hostname left alone. See its [README](../windows/roles/baseline/README.md). |
-| `ssh` | OpenSSH Server installed as a Windows capability, bound to the tailnet address, key-only, fleet admin keys in `administrators_authorized_keys` with the ACLs the service demands. |
+| `ssh` (written) | OpenSSH Server installed as a Windows capability, key-only (fleet admin keys in `administrators_authorized_keys`), with `sshd_config` changes validated and restored on failure, and port 22 allowed from the tailnet only when `windows_access` is `tailnet`. See its [README](../windows/roles/ssh/README.md). |
 | `tailscale` | Installed and joined (tag from the host table). Settings the Linux role sets on DNS and routes are options here too. |
 | `otel_agent` | The OpenTelemetry collector as a service: Windows Event Log channels (System, Application, Security) as logs, host metrics (CPU, memory, disk, network, processes) as metrics, plus the reconcile status and pending-reboot state. Config changes validate, keep a copy, apply, health-check and restore, like `safe_apply`. |
 
@@ -128,6 +128,12 @@ The same sops and age scheme as Linux. The age key lives in `C:\ProgramData\Cons
 only. A secret that is a credential is never written to the log or the status file. Read [security.md](security.md) before touching this.
 
 ## Reaching the host
+
+One setting, `windows_access`, says how reachable a host is, for Remote Desktop and SSH together: `tailnet` (the default, locked down: only
+the tailnet ranges may connect) or `lan` (Windows' own arrangement, reachable from the local network too). It is defined in
+`windows/defaults.yml` and set per host or group in the fleet's `config/vars/`. SSH is plain OpenSSH behind a firewall rule, not bound to the
+Tailscale address (sshd can start before Tailscale has one), and a rule is always made before the one it replaces is turned off.
+
 
 Over Tailscale only: SSH for automation, RDP for hands-on use. Neither is open on the LAN profile. `scripts/fleet-run.sh` could run plain
 commands and `--status` over SSH once the ssh role exists; the update and reboot actions are apt-shaped and stay Linux-only for now.

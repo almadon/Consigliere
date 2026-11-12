@@ -1,4 +1,4 @@
 ---
 # Roles that run on every Windows host, before what the tag manifests select (their `windows_roles:`).
 # A fleet repo can replace this file with its own config/windows/site.yml.
-roles: [baseline]
+roles: [baseline, ssh]

@@ -350,6 +350,8 @@ try {
   Say "Groups: $($groups -join ', ')"
 
   $vars = @{}
+  $defaultsFile = Join-Path $FrameworkDir 'windows\defaults.yml'   # the framework's own layer, below everything the fleet sets
+  if (Test-Path $defaultsFile) { Merge-Vars $vars (Read-Yaml $defaultsFile) }
   $groupDir = Join-Path $script:ConfDir 'vars\group'
   Merge-Vars $vars (Read-VarsFor $groupDir 'all')
   foreach ($g in $groups) { Merge-Vars $vars (Read-VarsFor $groupDir $g) }

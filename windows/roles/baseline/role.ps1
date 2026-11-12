@@ -26,8 +26,6 @@ $Defaults = @{
   windows_defender_manage         = $true          # real-time protection on; skipped when another antivirus has taken Defender's place
   windows_firewall_manage         = $true          # firewall on for every profile, inbound blocked unless a rule allows it
   windows_rdp_enable              = $true          # Remote Desktop on, with Network Level Authentication
-  windows_rdp_tailnet_only        = $true          # the built-in Remote Desktop rules are turned off; one rule allows the tailnet only
-  windows_tailnet_ranges          = @('100.64.0.0/10', 'fd7a:115c:a1e0::/48')
 }
 function V([string]$Name) { if ($Context.Vars.Contains($Name)) { return $Context.Vars[$Name] } else { return $Defaults[$Name] } }
 
@@ -168,7 +166,10 @@ if (V 'windows_security_manage') {
     $c1 = Set-RegValue $ts 'fDenyTSConnections' 0
     $c2 = Set-RegValue "$ts\WinStations\RDP-Tcp" 'UserAuthentication' 1
     if ($c1 -or $c2) { Note 'turn Remote Desktop on with Network Level Authentication' }
-    if (V 'windows_rdp_tailnet_only') {
+    # One switch for both ways in (windows_access, from windows\defaults.yml). The older windows_rdp_tailnet_only still wins when a host sets it.
+    if (([string](V 'windows_access')) -notin 'tailnet', 'lan') { throw "windows_access '$(V 'windows_access')' must be tailnet or lan" }
+    $tailnetOnly = if ($Context.Vars.Contains('windows_rdp_tailnet_only')) { [bool]$Context.Vars['windows_rdp_tailnet_only'] } else { ([string](V 'windows_access')) -eq 'tailnet' }
+    if ($tailnetOnly) {
       $ranges = @(V 'windows_tailnet_ranges')
       foreach ($proto in 'TCP', 'UDP') {
         $name = "$mine $proto"
