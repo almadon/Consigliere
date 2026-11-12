@@ -36,10 +36,17 @@ $changes = New-Object Collections.Generic.List[string]
 function Note([string]$What) { $changes.Add($(if ($check) { "would $What" } else { $What })) }
 
 # ---- Helpers -------------------------------------------------------------------------------------------
+# A registry value, or $null when the key or the value is not there. (Get-ItemPropertyValue throws a terminating error for a missing
+# value that -ErrorAction cannot silence, which is the usual state of a policy key nobody has set.)
+function Get-RegValue([string]$Path, [string]$Name) {
+  $item = Get-ItemProperty -LiteralPath $Path -ErrorAction SilentlyContinue
+  if ($null -ne $item -and $item.PSObject.Properties[$Name]) { return $item.PSObject.Properties[$Name].Value }
+  return $null
+}
+
 # Set a registry value; true when it was (or, in a check pass, would be) changed.
 function Set-RegValue([string]$Path, [string]$Name, $Value, [string]$Type = 'DWord') {
-  $cur = $null
-  if (Test-Path -LiteralPath $Path) { $cur = Get-ItemPropertyValue -LiteralPath $Path -Name $Name -ErrorAction SilentlyContinue }
+  $cur = Get-RegValue $Path $Name
   if ($null -ne $cur -and "$cur" -eq "$Value") { return $false }
   if (-not $check) {
     if (-not (Test-Path -LiteralPath $Path)) { New-Item -Path $Path -Force | Out-Null }
@@ -94,8 +101,7 @@ if (V 'windows_time_manage') {
   if ($peers.Count -gt 0) {
     $wantPeers = ($peers | ForEach-Object { "$_,0x9" }) -join ' '
     $wp = 'HKLM:\SYSTEM\CurrentControlSet\Services\W32Time\Parameters'
-    if ((Get-ItemPropertyValue -LiteralPath $wp -Name NtpServer -ErrorAction SilentlyContinue) -ne $wantPeers -or
-        (Get-ItemPropertyValue -LiteralPath $wp -Name Type -ErrorAction SilentlyContinue) -ne 'NTP') {
+    if ((Get-RegValue $wp 'NtpServer') -ne $wantPeers -or (Get-RegValue $wp 'Type') -ne 'NTP') {
       if (-not $check) {
         & w32tm.exe /config /syncfromflags:manual "/manualpeerlist:$($peers -join ' ')" /update | Out-Null
         if ($LASTEXITCODE -ne 0) { throw "w32tm /config failed ($LASTEXITCODE)" }
