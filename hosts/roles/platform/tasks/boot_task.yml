@@ -1,0 +1,77 @@
+---
+# Runs commands once at every boot, the way this platform does it (a systemd oneshot unit, or an OpenRC local.d script). Used as
+#   include_role: {name: platform, tasks_from: boot_task}   with   vars: {platform_boot_task: {...}}
+# platform_boot_task:
+#   name              the unit's or script's name (consigliere-nic-offload)
+#   description       what it does
+#   commands          the commands to run, in order (absolute paths)
+#   header            a comment line at the top of the file
+#   remain_after_exit systemd: keep the unit "active" after the commands ran (default false)
+#   unit_lines        more [Unit] lines (After=..., Wants=...; systemd only, ignored elsewhere)
+#   apply             `changed`: also run it now when its definition changed (a restart); `none` (default): only at the next boot
+# Changes the host. Idempotent.
+- name: Work out the platform if that has not been done
+  ansible.builtin.include_tasks: main.yml
+  when: platform_runtime_mode is not defined
+
+- name: Write the boot-time unit (systemd)
+  ansible.builtin.template:
+    src: boot_task.service.j2
+    dest: "/etc/systemd/system/{{ platform_boot_task.name }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  register: _platform_boot_unit
+  when: "'systemd' in platform_capabilities"
+
+- name: Enable the unit, and apply it now when it changed (systemd)
+  ansible.builtin.systemd:
+    name: "{{ platform_boot_task.name }}"
+    enabled: true
+    state: "{{ ('restarted' if _platform_boot_unit.changed else 'started') if (platform_boot_task.apply | default('none')) == 'changed' else omit }}"
+    daemon_reload: "{{ _platform_boot_unit.changed }}"
+  when:
+    - "'systemd' in platform_capabilities"
+    - not ansible_check_mode or not _platform_boot_unit.changed
+
+# OpenRC: the `local` service runs every executable /etc/local.d/*.start at boot.
+- name: Write the boot-time script (OpenRC)
+  ansible.builtin.template:
+    src: boot_task.local.j2
+    dest: "/etc/local.d/{{ platform_boot_task.name }}.start"
+    owner: root
+    group: root
+    mode: "0755"
+  register: _platform_boot_script
+  when:
+    - "'systemd' not in platform_capabilities"
+    - "'openrc' in platform_capabilities"
+
+- name: Make sure the local service runs at boot (OpenRC)
+  ansible.builtin.include_role:
+    name: platform
+    tasks_from: service
+  vars:
+    platform_service: local
+    platform_service_enabled: true
+    platform_service_state: started
+  when:
+    - "'systemd' not in platform_capabilities"
+    - "'openrc' in platform_capabilities"
+
+- name: Apply it now when it changed (OpenRC)
+  ansible.builtin.command: "/etc/local.d/{{ platform_boot_task.name }}.start"
+  changed_when: true
+  when:
+    - "'systemd' not in platform_capabilities"
+    - "'openrc' in platform_capabilities"
+    - (platform_boot_task.apply | default('none')) == 'changed'
+    - _platform_boot_script.changed
+    - not ansible_check_mode
+
+- name: Say so when this platform has neither systemd nor OpenRC
+  ansible.builtin.fail:
+    msg: "platform {{ platform_family }} has neither systemd nor OpenRC, so {{ platform_boot_task.name }} cannot be run at boot"
+  when:
+    - "'systemd' not in platform_capabilities"
+    - "'openrc' not in platform_capabilities"

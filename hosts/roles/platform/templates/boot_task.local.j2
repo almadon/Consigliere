@@ -1,0 +1,8 @@
+#!/bin/sh
+{% if platform_boot_task.header is defined %}
+# {{ platform_boot_task.header }}
+{% endif %}
+# {{ platform_boot_task.description }}
+{% for c in platform_boot_task.commands %}
+{{ c }}
+{% endfor %}

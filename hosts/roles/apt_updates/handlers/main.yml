@@ -1,4 +1,0 @@
----
-- name: Reload systemd for apt updates
-  ansible.builtin.systemd:
-    daemon_reload: true

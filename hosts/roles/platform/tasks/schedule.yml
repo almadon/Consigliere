@@ -1,0 +1,93 @@
+---
+# Runs a command on a schedule, the way this platform does it (a systemd timer, or cron). Used as
+#   include_role: {name: platform, tasks_from: schedule}   with   vars: {platform_schedule: {...}}
+# platform_schedule:
+#   name              the unit's name without the suffix (fleet-apt-update)
+#   description       what the service is
+#   timer_description what the timer is (default: description)
+#   command           the executable to run, with its arguments (an absolute path)
+#   calendar          when, as a systemd calendar expression ("Sun *-*-* 04:00:00", "daily"); cron gets a translation of it (platform_calendar_to_cron), or an error
+#   randomized_delay  spread the start by up to this long ("30min"); optional
+#   persistent        run once after boot if a run was missed (default true). systemd only: cron cannot catch up
+#   wants_network     wait for the network first (default true); systemd only
+#   after             more units to start after (systemd only; ignored by cron)
+#   service_options   more [Service] lines (Nice=10, ...; systemd only)
+#   header            a comment line at the top of each unit file (systemd)
+# Changes the host. Idempotent. The systemd files are written exactly as the roles that used to write them did.
+- name: Work out the platform if that has not been done
+  ansible.builtin.include_tasks: main.yml
+  when: platform_runtime_mode is not defined
+
+- name: Install the service and timer (systemd)
+  ansible.builtin.template:
+    src: "schedule.{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ platform_schedule.name }}.{{ item }}"
+    mode: "0644"
+  loop: [service, timer]
+  register: _platform_schedule_units
+  when: "'systemd' in platform_capabilities"
+
+- name: Enable the timer (systemd)
+  ansible.builtin.systemd:
+    name: "{{ platform_schedule.name }}.timer"
+    enabled: true
+    state: started
+    daemon_reload: true
+  when:
+    - "'systemd' in platform_capabilities"
+    - not ansible_check_mode or not _platform_schedule_units.changed
+
+# cron: busybox crond on Alpine. The calendar is translated (an expression cron cannot say stops the run with the reason), a delay becomes a sleep before the command,
+# and the output goes to the system log as it would to the journal. There is no catch-up after downtime.
+- name: Work out the cron entry
+  ansible.builtin.set_fact:
+    _platform_schedule_cron: "{{ platform_schedule.calendar | platform_calendar_to_cron }}"
+    _platform_schedule_delay: "{{ (platform_schedule.randomized_delay | default('0')) | platform_delay_seconds }}"
+  when:
+    - "'systemd' not in platform_capabilities"
+    - "'cron' in platform_capabilities"
+
+- name: Make sure the cron service is there (cron)
+  ansible.builtin.include_role:
+    name: platform
+    tasks_from: package
+  vars:
+    platform_package: cron
+    platform_package_update: false
+  when:
+    - "'systemd' not in platform_capabilities"
+    - "'cron' in platform_capabilities"
+
+- name: Install the cron entry
+  ansible.builtin.cron:
+    name: "{{ platform_schedule.name }}"
+    user: root
+    minute: "{{ _platform_schedule_cron.minute }}"
+    hour: "{{ _platform_schedule_cron.hour }}"
+    day: "{{ _platform_schedule_cron.day }}"
+    month: "{{ _platform_schedule_cron.month }}"
+    weekday: "{{ _platform_schedule_cron.weekday }}"
+    job: >-
+      {{ ('sleep $(( $(od -An -N2 -tu2 /dev/urandom) % ' ~ (_platform_schedule_delay | int) ~ ' )); ') if (_platform_schedule_delay | int) > 0 else '' }}{{ platform_schedule.command }} 2>&1 | logger -t {{ platform_schedule.name }}
+  when:
+    - "'systemd' not in platform_capabilities"
+    - "'cron' in platform_capabilities"
+
+- name: Make sure cron is running and starts at boot
+  ansible.builtin.include_role:
+    name: platform
+    tasks_from: service
+  vars:                       # explicit: a variable of the same name set around this call must not change what this primitive does
+    platform_service: cron
+    platform_service_enabled: true
+    platform_service_state: started
+  when:
+    - "'systemd' not in platform_capabilities"
+    - "'cron' in platform_capabilities"
+
+- name: Say so when this platform has neither systemd nor cron
+  ansible.builtin.fail:
+    msg: "platform {{ platform_family }} has neither systemd timers nor cron, so {{ platform_schedule.name }} cannot be scheduled"
+  when:
+    - "'systemd' not in platform_capabilities"
+    - "'cron' not in platform_capabilities"

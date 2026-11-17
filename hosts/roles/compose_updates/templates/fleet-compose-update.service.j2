@@ -1,9 +1,0 @@
-# Managed by Ansible (hosts/roles/compose_updates)
-[Unit]
-Description=docker compose pull and up -d, then notify
-Wants=network-online.target
-After=network-online.target docker.service
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/sbin/fleet-compose-update.sh

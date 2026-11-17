@@ -37,6 +37,43 @@
       ansible.builtin.shell: grep -q '^rc_after="tailscale"' /etc/conf.d/docker && grep -q '^rc_want="tailscale"' /etc/conf.d/docker && rc-update show default | grep -q docker
       changed_when: false
 
+    - name: Schedule a job through the platform layer (cron on Alpine)
+      ansible.builtin.include_role:
+        name: platform
+        tasks_from: schedule
+      vars:
+        platform_schedule:
+          name: ci-schedule
+          description: A job the CI schedules every minute
+          command: "/bin/sh -c 'date > /tmp/ci-schedule-ran'"
+          calendar: minutely
+          randomized_delay: 0
+
+    - name: The cron entry is in root's crontab and crond runs
+      ansible.builtin.shell: crontab -l | grep -q 'ci-schedule' && rc-service crond status | grep -q started
+      changed_when: false
+
+    - name: The scheduled job really fires (waits up to 100 seconds)
+      ansible.builtin.wait_for:
+        path: /tmp/ci-schedule-ran
+        timeout: 100
+
+    - name: Run a task at boot through the platform layer (local.d on Alpine)
+      ansible.builtin.include_role:
+        name: platform
+        tasks_from: boot_task
+      vars:
+        platform_boot_task:
+          name: ci-boot
+          description: A boot task from the CI
+          commands:
+            - "/bin/sh -c 'date > /tmp/ci-boot-ran'"
+          apply: changed
+
+    - name: The boot script is in local.d, applied now, and the local service is in the default runlevel
+      ansible.builtin.shell: test -x /etc/local.d/ci-boot.start && test -s /tmp/ci-boot-ran && rc-update show default | grep -q local
+      changed_when: false
+
     - name: Install tailscale's package so OpenRC knows its init script (the tailscale role itself needs an auth key to join, so it is not run)
       ansible.builtin.include_role:
         name: platform

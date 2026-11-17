@@ -5,14 +5,14 @@
 - name: Validate configuration
   ansible.builtin.import_tasks: validate.yml
 
-- name: Install curl and openssl
-  ansible.builtin.apt:
-    name:
-      - curl
-      - openssl
-    state: present
-    update_cache: true
-    cache_valid_time: 3600
+- name: Install curl and openssl (and bash, which the script uses)
+  ansible.builtin.include_role:
+    name: platform
+    tasks_from: package
+  vars:
+    platform_package: [curl, openssl, bash]
+    platform_package_update: true
+    platform_package_cache_valid_time: 3600
 
 - name: Create the certificate directory
   ansible.builtin.file:
@@ -37,25 +37,20 @@
     group: root
     mode: "0700"
 
-- name: Install the fetch service and timer
-  ansible.builtin.template:
-    src: "certwarden-fetch.{{ item }}.j2"
-    dest: "/etc/systemd/system/certwarden-fetch.{{ item }}"
-    mode: "0644"
-  loop:
-    - service
-    - timer
-  notify: Reload systemd for certwarden fetch
-  register: _certwarden_agent_units
-  tags: [timer]
-
-- name: Enable the daily check
-  ansible.builtin.systemd:
-    name: certwarden-fetch.timer
-    enabled: true
-    state: started
-    daemon_reload: true
-  when: not ansible_check_mode or not _certwarden_agent_units.changed
+- name: Schedule the daily check
+  ansible.builtin.include_role:
+    name: platform
+    tasks_from: schedule
+    apply:
+      tags: [timer]
+  vars:
+    platform_schedule:
+      name: certwarden-fetch
+      description: "Fetch certificates from Cert Warden"
+      timer_description: "Check Cert Warden for renewed certificates daily"
+      command: /usr/local/sbin/certwarden-fetch.sh
+      calendar: "{{ certwarden_agent_schedule }}"
+      randomized_delay: 30min
   tags: [timer]
 
 # Not fatal: on first bring-up Cert Warden may not have issued the certificate

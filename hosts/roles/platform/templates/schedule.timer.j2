@@ -1,0 +1,17 @@
+{% if platform_schedule.header is defined %}
+# {{ platform_schedule.header }}
+{% endif %}
+[Unit]
+Description={{ platform_schedule.timer_description | default(platform_schedule.description) }}
+
+[Timer]
+OnCalendar={{ platform_schedule.calendar }}
+{% if platform_schedule.randomized_delay is defined %}
+RandomizedDelaySec={{ platform_schedule.randomized_delay }}
+{% endif %}
+{% if platform_schedule.persistent | default(true) %}
+Persistent=true
+{% endif %}
+
+[Install]
+WantedBy=timers.target

@@ -13,10 +13,12 @@
     fail_msg: Set exposure_watch_targets (config/vars/group/util_exposure.yml); scripts/exposure.sh learn shows what is open now.
     quiet: true
 
-- name: Install nmap
-  ansible.builtin.apt:
-    name: nmap
-    state: present
+- name: Install nmap (and python3, which the scanner is written in)
+  ansible.builtin.include_role:
+    name: platform
+    tasks_from: package
+  vars:
+    platform_package: [nmap, python3]
 
 - name: Install the scanner
   ansible.builtin.copy:
@@ -56,19 +58,23 @@
     state: directory
     mode: "0750"
 
-- name: Install the service and timer
-  ansible.builtin.template:
-    src: "fleet-exposure-watch.{{ item }}.j2"
-    dest: "/etc/systemd/system/fleet-exposure-watch.{{ item }}"
-    mode: "0644"
-  loop: [service, timer]
-  notify: Reload systemd for the exposure watch
-  register: _exposure_watch_units
-
-- name: Enable the timer
-  ansible.builtin.systemd:
-    name: fleet-exposure-watch.timer
-    enabled: true
-    state: started
-    daemon_reload: true
-  when: not ansible_check_mode or not _exposure_watch_units.changed
+- name: Schedule the exposure watch
+  ansible.builtin.include_role:
+    name: platform
+    tasks_from: schedule
+  vars:
+    platform_schedule:
+      name: fleet-exposure-watch
+      header: "Managed by Ansible (hosts/roles/exposure_watch)"
+      description: "Check the fleet's public addresses for ports that should not be open"
+      timer_description: "Scheduled exposure watch"
+      command: /usr/local/sbin/fleet-exposure-watch
+      service_options:
+        - Nice=10
+        - TimeoutStartSec=3h
+        - ProtectHome=true
+        - PrivateTmp=true
+        - ProtectSystem=strict
+        - ReadWritePaths=/var/lib/fleet-exposure-watch
+      calendar: "{{ exposure_watch_schedule }}"
+      randomized_delay: "{{ exposure_watch_randomized_delay }}"

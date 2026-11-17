@@ -33,6 +33,13 @@
         platform_package: [jq, git]
         platform_package_update: true
 
+    - name: Install the packages the converted roles need (the names must exist on this platform)
+      ansible.builtin.include_role:
+        name: platform
+        tasks_from: package
+      vars:
+        platform_package: [nmap, python3, rsync, openssh-client, curl, openssl, bash, ethtool]
+
     - name: Add a vendor repository through the platform layer (Tailscale's)
       ansible.builtin.include_role:
         name: platform

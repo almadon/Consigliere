@@ -5,10 +5,12 @@
     fail_msg: Set restic_mirror_source (the Tailscale hostname of the REST server to copy from).
     quiet: true
 
-- name: Install rsync and OpenSSH client
-  ansible.builtin.apt:
-    name: [rsync, openssh-client]
-    state: present
+- name: Install rsync and OpenSSH client (and bash, which the script uses)
+  ansible.builtin.include_role:
+    name: platform
+    tasks_from: package
+  vars:
+    platform_package: [rsync, openssh-client, bash]
 
 - name: Make sure /root/.ssh exists
   ansible.builtin.file:
@@ -49,19 +51,18 @@
     group: root
     mode: "0750"
 
-- name: Install the service and timer
-  ansible.builtin.template:
-    src: "fleet-restic-mirror.{{ item }}.j2"
-    dest: "/etc/systemd/system/fleet-restic-mirror.{{ item }}"
-    mode: "0644"
-  loop: [service, timer]
-  notify: Reload systemd for the restic mirror
-  register: _restic_mirror_units
-
-- name: Enable the timer
-  ansible.builtin.systemd:
-    name: fleet-restic-mirror.timer
-    enabled: true
-    state: started
-    daemon_reload: true
-  when: not ansible_check_mode or not _restic_mirror_units.changed
+- name: Schedule the mirror
+  ansible.builtin.include_role:
+    name: platform
+    tasks_from: schedule
+  vars:
+    platform_schedule:
+      name: fleet-restic-mirror
+      header: "Managed by Ansible (hosts/roles/restic_mirror)"
+      description: "Mirror restic repositories from {{ restic_mirror_source }}"
+      timer_description: "Scheduled restic mirror"
+      command: /usr/local/sbin/fleet-restic-mirror.sh
+      after:
+        - tailscaled.service
+      calendar: "{{ restic_mirror_schedule }}"
+      randomized_delay: "{{ restic_mirror_randomized_delay }}"

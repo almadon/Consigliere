@@ -1,4 +1,0 @@
----
-- name: Reload systemd for the exposure watch
-  ansible.builtin.systemd:
-    daemon_reload: true

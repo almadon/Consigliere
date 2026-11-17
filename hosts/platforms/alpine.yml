@@ -2,7 +2,7 @@
 # Alpine on the host itself (a later step: today Alpine is reconciled by a container, so only `docker` is offered, see hosts/bootstrap/alpine/).
 family: alpine
 tier: full
-capabilities: [host, apk, openrc, docker, package, service]
+capabilities: [host, apk, openrc, docker, package, service, cron, schedule, boot]
 defaults:
   pkg_manager: apk
   init: openrc
@@ -10,10 +10,13 @@ defaults:
 packages:
   docker: [docker, docker-cli-compose]
   tailscale: [tailscale]
+  cron: [busybox-openrc]      # the crond init script
 services:
   docker: docker
   tailscale: tailscale
   ssh: sshd
+  cron: crond
+  local: local
 tools:
   apk: "apk --version | awk '{print $2}' | tr -d ,"
 versions: []

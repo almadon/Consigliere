@@ -7,19 +7,18 @@
     group: root
     mode: "0750"
 
-- name: Install the service and timer
-  ansible.builtin.template:
-    src: "fleet-compose-update.{{ item }}.j2"
-    dest: "/etc/systemd/system/fleet-compose-update.{{ item }}"
-    mode: "0644"
-  loop: [service, timer]
-  notify: Reload systemd for compose updates
-  register: _compose_updates_units
-
-- name: Enable the timer
-  ansible.builtin.systemd:
-    name: fleet-compose-update.timer
-    enabled: true
-    state: started
-    daemon_reload: true
-  when: not ansible_check_mode or not _compose_updates_units.changed
+- name: Schedule the update run
+  ansible.builtin.include_role:
+    name: platform
+    tasks_from: schedule
+  vars:
+    platform_schedule:
+      name: fleet-compose-update
+      header: "Managed by Ansible (hosts/roles/compose_updates)"
+      description: "docker compose pull and up -d, then notify"
+      timer_description: "Scheduled docker compose update"
+      command: /usr/local/sbin/fleet-compose-update.sh
+      after:
+        - docker.service
+      calendar: "{{ compose_updates_schedule }}"
+      randomized_delay: "{{ compose_updates_randomized_delay }}"

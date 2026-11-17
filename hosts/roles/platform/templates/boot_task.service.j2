@@ -1,0 +1,20 @@
+{% if platform_boot_task.header is defined %}
+# {{ platform_boot_task.header }}
+{% endif %}
+[Unit]
+Description={{ platform_boot_task.description }}
+{% for l in platform_boot_task.unit_lines | default([]) %}
+{{ l }}
+{% endfor %}
+
+[Service]
+Type=oneshot
+{% if platform_boot_task.remain_after_exit | default(false) %}
+RemainAfterExit=yes
+{% endif %}
+{% for c in platform_boot_task.commands %}
+ExecStart={{ c }}
+{% endfor %}
+
+[Install]
+WantedBy=multi-user.target

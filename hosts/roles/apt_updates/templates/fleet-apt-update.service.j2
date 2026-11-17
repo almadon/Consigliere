@@ -1,9 +1,0 @@
-# Managed by Ansible (hosts/roles/apt_updates)
-[Unit]
-Description=apt update and upgrade, then notify
-Wants=network-online.target
-After=network-online.target
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/sbin/fleet-apt-update.sh

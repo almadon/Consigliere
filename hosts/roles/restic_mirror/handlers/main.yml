@@ -1,4 +1,0 @@
----
-- name: Reload systemd for the restic mirror
-  ansible.builtin.systemd:
-    daemon_reload: true

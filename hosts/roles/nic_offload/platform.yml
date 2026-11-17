@@ -1,3 +1,3 @@
 ---
-# What this role needs from the platform (hosts/platforms/README.md). It changes the host, installs with apt and drives systemd services.
-requires: [host, apt, systemd]
+# What this role needs from the platform (hosts/platforms/README.md). It changes the host: installs ethtool and runs it at every boot (a systemd unit, or an OpenRC local.d script).
+requires: [host, package, boot]

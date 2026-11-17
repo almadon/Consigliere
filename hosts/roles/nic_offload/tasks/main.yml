@@ -11,26 +11,40 @@
   when: nic_offload_interfaces | length > 0
 
 - name: Make sure ethtool is installed
-  ansible.builtin.apt:
-    name: ethtool
-    state: present
-    cache_valid_time: 3600
+  ansible.builtin.include_role:
+    name: platform
+    tasks_from: package
+  vars:
+    platform_package: ethtool
   when: nic_offload_interfaces | length > 0
 
-- name: Write the unit that applies them at every boot
-  ansible.builtin.template:
-    src: consigliere-nic-offload.service.j2
-    dest: /etc/systemd/system/consigliere-nic-offload.service
-    owner: root
-    group: root
-    mode: "0644"
+# One ethtool command per interface, and the systemd ordering lines that wait for each interface to exist.
+- name: Work out what to run at boot
+  ansible.builtin.set_fact:
+    _nic_offload_plan: >-
+      {%- set cmds = [] -%}{%- set lines = [] -%}{%- set names = [] -%}
+      {%- for i in nic_offload_interfaces -%}
+      {%- set ns = namespace(c='/usr/sbin/ethtool -K ' ~ i.name) -%}
+      {%- for f in i.disable -%}{%- set ns.c = ns.c ~ ' ' ~ f ~ ' off' -%}{%- endfor -%}
+      {%- set _ = cmds.append(ns.c) -%}
+      {%- set _ = lines.append('After=sys-subsystem-net-devices-' ~ i.name ~ '.device') -%}
+      {%- set _ = lines.append('Wants=sys-subsystem-net-devices-' ~ i.name ~ '.device') -%}
+      {%- set _ = names.append(i.name) -%}
+      {%- endfor -%}
+      {{ {'commands': cmds, 'unit_lines': lines, 'names': names} | to_json }}
   when: nic_offload_interfaces | length > 0
-  register: _nic_offload_unit
 
-- name: Enable it, and apply it now when it changed
-  ansible.builtin.systemd:
-    name: consigliere-nic-offload
-    enabled: true
-    state: "{{ 'restarted' if _nic_offload_unit.changed else 'started' }}"
-    daemon_reload: "{{ _nic_offload_unit.changed }}"
-  when: nic_offload_interfaces | length > 0 and not ansible_check_mode
+- name: Apply the settings at every boot, and now when they changed
+  ansible.builtin.include_role:
+    name: platform
+    tasks_from: boot_task
+  vars:
+    platform_boot_task:
+      name: consigliere-nic-offload
+      header: "Managed by Ansible (hosts/roles/nic_offload) -- edits here get overwritten on the next reconciliation run."
+      description: "NIC offload settings ({{ (_nic_offload_plan | from_json).names | join(', ') }})"
+      commands: "{{ (_nic_offload_plan | from_json).commands }}"
+      unit_lines: "{{ (_nic_offload_plan | from_json).unit_lines }}"
+      remain_after_exit: true
+      apply: changed
+  when: nic_offload_interfaces | length > 0

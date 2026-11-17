@@ -7,19 +7,16 @@
     group: root
     mode: "0750"
 
-- name: Install the service and timer
-  ansible.builtin.template:
-    src: "fleet-apt-update.{{ item }}.j2"
-    dest: "/etc/systemd/system/fleet-apt-update.{{ item }}"
-    mode: "0644"
-  loop: [service, timer]
-  notify: Reload systemd for apt updates
-  register: _apt_updates_units
-
-- name: Enable the timer
-  ansible.builtin.systemd:
-    name: fleet-apt-update.timer
-    enabled: true
-    state: started
-    daemon_reload: true
-  when: not ansible_check_mode or not _apt_updates_units.changed
+- name: Schedule the update run
+  ansible.builtin.include_role:
+    name: platform
+    tasks_from: schedule
+  vars:
+    platform_schedule:
+      name: fleet-apt-update
+      header: "Managed by Ansible (hosts/roles/apt_updates)"
+      description: "apt update and upgrade, then notify"
+      timer_description: "Scheduled apt update and upgrade"
+      command: /usr/local/sbin/fleet-apt-update.sh
+      calendar: "{{ apt_updates_schedule }}"
+      randomized_delay: "{{ apt_updates_randomized_delay }}"

@@ -1,4 +1,0 @@
----
-- name: Reload systemd for certwarden fetch
-  ansible.builtin.systemd:
-    daemon_reload: true

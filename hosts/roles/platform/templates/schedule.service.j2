@@ -1,0 +1,20 @@
+{% if platform_schedule.header is defined %}
+# {{ platform_schedule.header }}
+{% endif %}
+[Unit]
+Description={{ platform_schedule.description }}
+{% set _net = platform_schedule.wants_network | default(true) %}
+{% if _net %}
+Wants=network-online.target
+{% endif %}
+{% set _after = (['network-online.target'] if _net else []) + (platform_schedule.after | default([])) %}
+{% if _after %}
+After={{ _after | join(' ') }}
+{% endif %}
+
+[Service]
+Type=oneshot
+ExecStart={{ platform_schedule.command }}
+{% for o in platform_schedule.service_options | default([]) %}
+{{ o }}
+{% endfor %}

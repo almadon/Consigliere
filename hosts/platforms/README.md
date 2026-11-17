@@ -11,7 +11,7 @@ In a host run the table's `os:` and `arch:` never override the facts: a disagree
 | `capabilities` | What a role can count on when the run changes the host itself. In a container run, only `docker` is offered. |
 | `defaults` | Values a role may read as `platform_defaults.<name>` instead of hardcoding them (package manager, service names). |
 
-Capabilities, kept deliberately few: `host` (the run changes the machine itself), `apt`, `apk`, `systemd`, `openrc`, `launchd`, `docker` (a Docker socket), `ufw`.
+Capabilities, kept deliberately few: `host` (the run changes the machine itself), `apt`, `apk`, `systemd`, `openrc`, `launchd`, `cron`, `docker` (a Docker socket), `ufw`, and the ones that say a platform has a primitive: `package`, `service`, `schedule`, `boot`.
 
 A role states what it needs in `hosts/roles/<role>/platform.yml`:
 
@@ -27,6 +27,8 @@ Roles do not call `apt` or `systemctl` for the things every platform has; they a
 | `package` | `platform_package` (a logical name, a plain package name, or a list), `platform_package_update` | Installs through apt, apk or the generic module. A logical name comes from the profile's `packages:` map (`docker` is `docker-ce`, `docker-ce-cli`, ... on Debian and `docker`, `docker-cli-compose` on Alpine); a name with no entry is used as it is. |
 | `repo` | `platform_repo` (`host`, and `apt:` / `apk:` settings) | Makes a vendor's repository available: key and source file on apt (a source set up another way is used instead of adding a second one), the community repository on Alpine. Sets `platform_repo_changed`. |
 | `service` | `platform_service` (a logical name or the service's own), `platform_service_enabled`, `platform_service_state` | Enables and starts it on systemd or OpenRC; the profile's `services:` map gives the platform's name (`tailscale` is `tailscaled` on Debian). |
+| `schedule` | `platform_schedule` (`name`, `description`, `command`, `calendar`, `randomized_delay`, `persistent`, `after`, `service_options`, `header`) | Runs a command on a schedule: a systemd service and timer (the files the roles used to write, byte for byte), or a cron entry on a host without systemd. The calendar is a systemd calendar expression; the cron backend translates it (`platform_calendar_to_cron`) and refuses what cron cannot say (a year, seconds, a day of the month together with a weekday). A delay becomes a `sleep`; output goes to the system log. **Cron cannot catch up a run missed while the host was off** (`persistent` is systemd only). |
+| `boot_task` | `platform_boot_task` (`name`, `description`, `commands`, `remain_after_exit`, `unit_lines`, `apply`, `header`) | Runs commands at every boot: a systemd oneshot unit, or a script in `/etc/local.d/` with OpenRC's `local` service. `apply: changed` also runs it now when its definition changed. |
 
 What only one init system has (a systemd unit's drop-in, a timer, an OpenRC `conf.d` line) stays in a task guarded by that capability (`'systemd' in platform_capabilities`), so a role degrades
 by capability instead of failing. The capabilities `package` and `service` say a platform has these primitives; a role that only needs them (docker, tailscale) declares `requires: [host, package, service]`.

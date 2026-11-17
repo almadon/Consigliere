@@ -2,7 +2,7 @@
 # Debian and Ubuntu: the full profile (Ansible on the host, systemd timer, apt).
 family: debian
 tier: full
-capabilities: [host, apt, systemd, docker, ufw, package, service]
+capabilities: [host, apt, systemd, docker, ufw, package, service, schedule, boot]
 defaults:
   pkg_manager: apt
   init: systemd
