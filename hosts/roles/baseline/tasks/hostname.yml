@@ -3,8 +3,9 @@
 # operating system's own hostname should be the short name too: "Nova", not "Nova.core.rmrg.casa". Provisioners
 # (cloud-init, VPS panels) often set an FQDN. This trims it to its first label, keeps the 127.0.1.1 line of
 # /etc/hosts in step, and tells cloud-init not to put the FQDN back. Nothing happens on a host that is already short.
+# hostnamectl where systemd is the init system; the plain `hostname` command elsewhere (OpenRC on Alpine).
 - name: Read the static hostname
-  ansible.builtin.command: hostnamectl --static
+  ansible.builtin.command: "{{ 'hostnamectl --static' if 'systemd' in platform_capabilities else 'hostname' }}"
   register: _baseline_hostname
   changed_when: false
   check_mode: false
@@ -16,7 +17,7 @@
 - name: Use the short name as the hostname
   ansible.builtin.hostname:
     name: "{{ _baseline_short_hostname }}"
-    use: systemd
+    use: "{{ 'systemd' if 'systemd' in platform_capabilities else omit }}"   # the module picks its own strategy otherwise (Alpine writes /etc/hostname)
   when:
     - "'.' in (_baseline_hostname.stdout | trim)"
     - _baseline_short_hostname | length > 0

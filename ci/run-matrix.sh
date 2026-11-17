@@ -2,6 +2,7 @@
 # The platform matrix: the platform layer on Debian, Ubuntu and Alpine, each in a throwaway container (needs Docker; OrbStack, Colima or Docker Desktop on a Mac).
 #   ci/run-matrix.sh                  all three
 #   ci/run-matrix.sh debian:13        one image (also ubuntu:24.04, alpine:3.22)
+# --init gives the container a real PID 1 that reaps children: OpenRC's supervise-daemon leaves zombies behind otherwise, and the service module can then wait forever.
 # Nothing on the host changes: the repository is mounted read-only and the containers are removed afterwards.
 set -eu
 here="$(cd "$(dirname "$0")/.." && pwd)"
@@ -13,6 +14,6 @@ for image in $images; do
     *)        family=debian; pm=apt ;;
   esac
   echo "################ $image"
-  docker run --rm -v "$here:/repo:ro" -e EXPECT_FAMILY="$family" -e EXPECT_PKG_MANAGER="$pm" "$image" sh /repo/ci/in-container.sh || { echo "FAILED: $image" >&2; fail=1; }
+  docker run --rm --init -v "$here:/repo:ro" -e EXPECT_FAMILY="$family" -e EXPECT_PKG_MANAGER="$pm" "$image" sh /repo/ci/in-container.sh || { echo "FAILED: $image" >&2; fail=1; }
 done
 exit $fail

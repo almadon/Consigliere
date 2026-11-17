@@ -31,7 +31,8 @@ Roles do not call `apt` or `systemctl` for the things every platform has; they a
 What only one init system has (a systemd unit's drop-in, a timer, an OpenRC `conf.d` line) stays in a task guarded by that capability (`'systemd' in platform_capabilities`), so a role degrades
 by capability instead of failing. The capabilities `package` and `service` say a platform has these primitives; a role that only needs them (docker, tailscale) declares `requires: [host, package, service]`.
 
-The matrix in `ci/` runs the platform layer for real on Debian, Ubuntu and Alpine in containers (`ci/run-matrix.sh`; CI does the same).
+The matrix in `ci/` runs the platform layer for real on Debian, Ubuntu and Alpine in containers (`ci/run-matrix.sh`; CI does the same). On Alpine it also initialises OpenRC and runs the service task,
+the docker role's start order (asserted against OpenRC's own dependency tree) and the baseline role end to end, twice (`ci/openrc.yml`); only the kernel and the Docker daemon are left out.
 
 ### Versions
 

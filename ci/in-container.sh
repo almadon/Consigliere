@@ -36,4 +36,15 @@ echo "==> Platform layer, second run: it must change nothing"
 out="$(ansible-playbook -i localhost, ci/platform-matrix.yml | tail -n 3)"
 echo "$out"
 echo "$out" | grep -Eq 'changed=0 ' || { echo "ERROR: the second run changed something (not idempotent)" >&2; exit 1; }
+if [ -f /etc/alpine-release ]; then
+  echo "==> OpenRC (Alpine): the service task, docker's start order and the baseline role"
+  apk add --no-cache openrc openssh >/dev/null
+  mkdir -p /run/openrc && touch /run/openrc/softlevel      # enough for rc-service and rc-update to work without booting a whole system
+  ssh-keygen -A >/dev/null                                 # a host that has run sshd has host keys; the baseline role validates its sshd drop-in with sshd -t, which needs them
+  ansible-playbook -i localhost, ci/openrc.yml | grep -E "fatal|FAILED|ERROR|PLAY RECAP|localhost +:|ordering known" | cut -c1-200
+  echo "==> OpenRC, second run: it must change nothing but the notified reload"
+  out="$(ansible-playbook -i localhost, ci/openrc.yml | grep -E "fatal|FAILED|ERROR|localhost +:")"
+  echo "$out"
+  echo "$out" | grep -Eq 'failed=0 ' || { echo "ERROR: the OpenRC playbook failed on the second run" >&2; exit 1; }
+fi
 echo "==> OK"

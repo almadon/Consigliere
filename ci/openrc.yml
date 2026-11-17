@@ -1,0 +1,52 @@
+---
+# The OpenRC pieces of the platform layer, on a real Alpine with OpenRC initialised (ci/in-container.sh, Alpine only): the service task, the docker role's start-order
+# lines, and the baseline role end to end including its OpenRC sshd reload handler. The kernel and the Docker daemon are not available in a container, so the docker
+# service is only enabled (not started) and the kernel settings are left alone.
+- name: The OpenRC pieces of the platform layer
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  vars:
+    platform_service_state: stopped          # used by the docker role's service task below: enable it, do not start dockerd in a container
+    baseline_sysctl_manage: false            # /proc/sys is read-only here
+    baseline_admin_ssh_keys: ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMP ci-test"]
+    baseline_ssh_password_auth: false        # writes the sshd drop-in and notifies the reload handler
+    baseline_unattended_upgrades_manage: false
+  roles:
+    - platform
+    - baseline
+    - docker
+  post_tasks:
+    - name: The service task enabled and started sshd on OpenRC
+      ansible.builtin.include_role:
+        name: platform
+        tasks_from: service
+      vars:
+        platform_service: ssh
+        platform_service_state: started
+
+    - name: sshd is started and in the default runlevel
+      ansible.builtin.shell: rc-service sshd status | grep -q started && rc-update show default | grep -q sshd
+      changed_when: false
+
+    - name: The sshd drop-in from the baseline role is there
+      ansible.builtin.command: grep -q 'PasswordAuthentication no' /etc/ssh/sshd_config.d/10-consigliere.conf
+      changed_when: false
+
+    - name: The docker role ordered docker after tailscale and enabled it
+      ansible.builtin.shell: grep -q '^rc_after="tailscale"' /etc/conf.d/docker && grep -q '^rc_want="tailscale"' /etc/conf.d/docker && rc-update show default | grep -q docker
+      changed_when: false
+
+    - name: Install tailscale's package so OpenRC knows its init script (the tailscale role itself needs an auth key to join, so it is not run)
+      ansible.builtin.include_role:
+        name: platform
+        tasks_from: package
+      vars:
+        platform_package: tailscale
+
+    - name: OpenRC itself knows that tailscale starts before docker
+      ansible.builtin.shell: |
+        rc-update -u >/dev/null 2>&1
+        n="$(sed -n "s/^depinfo_\([0-9]*\)_service='tailscale'$/\1/p" /run/openrc/deptree)"
+        test -n "$n" && grep -q "^depinfo_${n}_ibefore_[0-9]*='docker'$" /run/openrc/deptree
+      changed_when: false
