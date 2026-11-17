@@ -5,9 +5,13 @@
   ansible.builtin.set_fact:
     _traefik_server_zones: "{{ (lookup('fleet_routes', inventory_hostname, dirs=fleet_routes_dirs | default([]))).zones }}"
 
+# The variable of a domain's routes, and the file it came from, which the rendered routes name in their "# from" comment.
 - name: Make each domain's routes for this host a route source
   ansible.builtin.set_fact:
     "traefik_server_routes_zone_{{ item.name | regex_replace('[^A-Za-z0-9]', '_') }}": "{{ item.routes }}"
+    _traefik_server_source_labels: >-
+      {{ (_traefik_server_source_labels | default({}) if item != _traefik_server_zones[0] else {})
+         | combine({('traefik_server_routes_zone_' ~ (item.name | regex_replace('[^A-Za-z0-9]', '_'))): ('config/routes/' ~ item.name ~ '.yml')}) }}
   loop: "{{ _traefik_server_zones }}"
   loop_control:
     label: "{{ item.name }}: {{ item.routes | map(attribute='name') | join(', ') }}"

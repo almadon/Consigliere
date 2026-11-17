@@ -27,7 +27,7 @@ http:
 {% set internal = namespace(on=(r.internal | default(false) | bool)) %}
 {% for h in hosts %}{% for d in traefik_server_internal_domains %}{% if h == d or h.endswith('.' ~ d) %}{% set internal.on = true %}{% endif %}{% endfor %}{% endfor %}
 {% set chain = (['internal-only@file'] if internal.on else []) + (['redirect-' ~ r.name ~ '@file'] if r.redirect is defined else normal) %}
-    # from {{ r._src }}
+    # from {{ (_traefik_server_source_labels | default({})).get(r._src, r._src) }}
     {{ r.name }}:
       rule: {{ (r.rule | default(hosts | map('regex_replace', '^(.*)$', 'Host(`\\1`)') | join(' || '))) | to_json }}
       entryPoints: [{{ traefik_server_entrypoint_websecure }}]
