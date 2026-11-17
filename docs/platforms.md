@@ -4,9 +4,10 @@
 |---|---|
 | Debian 13, Debian 12 and **Ubuntu 24.04 or newer**, **x86_64** and **aarch64 (ARM64)** | Full: `bootstrap.sh` + the systemd timer (VPS, LXC, VM, bare metal, Oracle Ampere A1). Tested on Debian 13 (x86_64) and Ubuntu 24.04 (ARM64); Debian 12 takes the same path as Ubuntu below but has not been run |
 | Ubuntu 22.04 and older | Not supported: ansible-core 2.19 needs Python 3.11 or newer, and `install-ansible.sh` stops with that message |
-| Alpine (LXC or VM) | Docker and Tailscale from `apk`, then the same self-scheduling container as Unraid (`hosts/bootstrap/alpine/`); only container-based roles run there |
+| Alpine (LXC or VM) | Docker and Tailscale from `apk`, then the same self-scheduling container as Unraid (`hosts/bootstrap/alpine/`); only container-based roles run there. The roles themselves also run on an Alpine host with OpenRC in the CI matrix; a bootstrap that reconciles an Alpine host natively is not built |
 | Unraid (7.x) | A self-scheduling container (`hosts/bootstrap/unraid/`); only container-based roles run there |
-| macOS | launchd agent (`macos/`) |
+| macOS | A launchd agent running its own small playbook (`macos/`); not on the platform layer yet (see below) |
+| Windows 11 (amd64) | A pull-only PowerShell reconciler (`windows/`), experimental, run on one VM: [windows-host.md](windows-host.md) |
 
 ## The platform layer
 
@@ -34,6 +35,24 @@ See `hosts/platforms/README.md`.
 
 Roles install packages, add vendor repositories, manage services, run jobs on a schedule and at boot, and install pinned release downloads through the platform role's `package`, `repo`, `service`, `schedule`, `boot_task` and `artifact` tasks, so the same role runs on Debian, Ubuntu and Alpine, and `ci/run-matrix.sh`
 checks that in containers (see `hosts/platforms/README.md`).
+
+### What the platform layer covers, and what it does not
+
+The layer is for hosts that run the framework's Ansible code, so it covers every Linux-like host and any other family that gets a profile. Where each platform stands:
+
+| Platform | Runs through | Package | Service | Schedule | Boot task | Download |
+|---|---|---|---|---|---|---|
+| Debian, Ubuntu | `hosts/site.yml`, host run | apt | systemd | systemd timer | systemd unit | `artifact` |
+| Alpine (host run, CI matrix) | `hosts/site.yml`, host run | apk | OpenRC | cron | `local.d` | `artifact` |
+| Alpine, Unraid (container reconciler) | `hosts/site.yml` with `RECONCILE_RUNTIME=container`: only roles that need just `docker` run | none (the host is out of reach) | none | none | none | none |
+| macOS | `macos/site.yml`, its own playbook and launchd agent; **not on the layer** | Homebrew modules called directly | launchd, by the agent | not done | not done | not done |
+| Windows | `windows/`, a PowerShell reconciler; **Ansible does not run there** | its own installers, pinned by digest | its own role code | its own Scheduled Task | its own role code | inline in `bootstrap.ps1` |
+
+**macOS** has its own playbook and one role that calls Homebrew modules directly. Bringing it onto the layer means implementing the same tasks for Homebrew and launchd (a package task over `brew`, a service task over `launchctl`, a schedule as a `StartCalendarInterval` job, a boot task as `RunAtLoad`), running the `platform` role and `fleet_plan` from `macos/site.yml`, and testing on a Mac. None of that is done; the `macos` profile only names the family.
+
+**Windows** is not Ansible, so the layer's tasks cannot apply. It shares what is not code: the host table (with `os: windows` and `arch:`), the variable merge order, the tag manifests, sops and age for secrets, check-then-apply, and a role contract (a role returns what changed, honours a check pass and throws on failure). A Windows counterpart of the primitives would be PowerShell helpers for pinned installs, services and scheduled tasks; the bootstrap has these inline today and they are not abstracted.
+
+What is the same everywhere is the model: each host reconciles itself on a timer from the two repositories, and a role says what it needs before it runs.
 
 To support a new platform: add `hosts/platforms/<family>.yml`, then give the roles that are host-bound a `platform.yml`. Declarations are written by hand, because a role that mentions apt or
 systemd only conditionally may still work on a platform without them.

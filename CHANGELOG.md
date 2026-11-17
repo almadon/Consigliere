@@ -2,6 +2,19 @@
 
 What changed and why, including reverts. Dates are absolute.
 
+## 2026-11-17
+
+- **A platform layer.** What kind of machine a host is (family, release, architecture, whether Ansible changes it or runs in a container) is worked out once by the `platform` role from the Ansible facts and a profile in `hosts/platforms/`; roles declare what they need in `platform.yml` and `fleet_plan` skips a role a host cannot run, with a message. Decisions 18 to 26 record the choices. Each change was compared check-only against the previous version on a sample of the maintainer's Debian, Ubuntu and Proxmox hosts before it was merged, and showed no change.
+- **One entry playbook.** `hosts/site-unraid.yml` is gone: `site.yml` serves every Linux-like host, and `RECONCILE_RUNTIME=container` (or the older `RECONCILE_PLAYBOOK=site-unraid.yml`, still accepted) runs it on a container host.
+- **Alpine hosts.** `hosts/bootstrap/alpine/` installs Docker, Tailscale, OpenSSH and the admin key, then uses the container reconciler as Unraid does; `bootstrap.sh` detects Alpine. The host-level roles also run on Alpine with OpenRC in the CI matrix.
+- **Host table: `os:` and `arch:`.** Optional for a host that runs Ansible itself; the fleet's scripts read `os:` to know a host is reconciled by a container (`reconcile-now`, `fleet-run`). Cmdr shows both as chips.
+- **Releases and tool versions.** `platform_version`, per-release profile overrides, `requires_version`, and a Debian-style version comparison (Ansible's `version` test gets `~`, epochs and `ubuntu1` wrong). `baseline_apt_retries: auto` applies the apt retry stopgap only where apt is in a vulnerable range (opt-in; the ranges are marked VERIFY).
+- **Six portable tasks** in the platform role: `package`, `repo`, `service`, `schedule`, `boot_task`, `artifact`. The systemd units of `certwarden_agent`, `restic_mirror`, `exposure_watch`, `apt_updates`, `compose_updates` and `nic_offload` are written through them, byte for byte as before (checked by rendering the old templates and the new output side by side); on a host without systemd they become cron entries and `local.d` scripts. cron cannot catch up a missed run.
+- **Traefik routes by domain.** `config/routes/<domain>.yml` in the fleet repo: a default `via` and `cert` per file, `via` per route. Both layouts work and add up. Cmdr gained a Domains section.
+- **Deprecations fixed:** top-level facts (`ansible_facts[...]`), the internal `vars` dictionary (the `vars` lookup), and `ansible.posix` 2.2.2 installed on the hosts from `hosts/requirements-hosts.yml` (the bundled 2.1.x imports from a removed module).
+- **CI:** the `platforms` workflow runs the layer on Debian 13, Ubuntu 24.04 and Alpine 3.22 in containers; unit tests for the version, schedule and route code run in the same job.
+- **Documentation reviewed:** the README, platforms, architecture, ownership, security, credits and STATE pages updated for the above; the Windows page's status corrected (it is experimental and has run on one VM); role READMEs added for `platform` and `fleet_plan`.
+
 ## 2026-11-01
 
 - **Muximux 3.7.0 (from 3.6.2).** Released 2026-10-29. Embedded apps such as a Homarr dashboard can now switch Muximux to other apps (`allow_navigation`, off by default, per app), and the release updates `go-jose` for a denial-of-service fix. The role gains an optional `allow_navigation` field on tiles in `muximux_apps`; nothing changes for a tile that does not set it. The role's own pin is the only version change, so a host takes the upgrade at its next reconcile (the container image is pulled and recreated).

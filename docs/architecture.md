@@ -14,17 +14,25 @@ There is no controller that pushes. Each host runs `hosts/bootstrap/reconcile.sh
 
 1. syncs both repos, using a read-only deploy key that never leaves the host;
 2. skips the run when neither repo changed since the last successful apply, unless a full run is due or `force-run` exists;
-3. assembles a throwaway run directory: `group_vars`, a merged `host_vars/<host>/` (settings and routes kept in separate files), the lowercased host table, the secrets directory and the tag-manifest search path;
+3. installs the few collections the hosts need newer than the operating system's Ansible bundle (`hosts/requirements-hosts.yml`, pinned, only when that file changes), then assembles a throwaway run directory: `group_vars`, a merged `host_vars/<host>/` (settings and routes kept in separate files), the lowercased host table, the secrets directory and the tag-manifest search path;
 4. runs the playbook against this host only, over a local connection, with a check pass first when a repo changed.
 
 Why pull rather than push: a host that is offline catches up when it returns, there is no inventory server or SSH fan-out to keep healthy, and the blast radius of a bad run is one host. The cost is that a change
 takes up to 20 minutes to land, which `scripts/reconcile-now.sh` shortens on demand, and that every host carries Ansible.
+
+## One playbook, many platforms
+
+`site.yml` serves every Linux-like host. Before it runs anything, the `platform` role works out what the host is (family, release, architecture, and whether Ansible changes the machine or runs in a container on its Docker socket) from the Ansible facts and a profile in `hosts/platforms/`, and publishes what a role can count on (`apt`, `systemd`, `openrc`, `docker`, and so on). A role says what it needs in its `platform.yml`; `fleet_plan` skips a role the host cannot run, with a message, instead of failing halfway. Roles install packages, add repositories, manage services, schedule jobs, run things at boot and download pinned releases through six tasks every platform answers (`package`, `repo`, `service`, `schedule`, `boot_task`, `artifact`), so a role does not name `apt` or `systemctl` for what every platform has. Unraid and the container-run Alpine hosts use the same playbook with `RECONCILE_RUNTIME=container`, which leaves only the roles that need nothing but Docker.
+
+Before this, every platform had its own entry playbook and its own copy of the path, and a role that did not fit a platform was left out of that playbook by hand. The cost now is one more layer to read. What it does not cover is macOS and Windows, which have their own playbook and reconciler (see [platforms.md](platforms.md)). Decisions 18 to 26 record the choices.
 
 ## Tags choose roles
 
 A host's table entry carries tags in dimensions (`util`, `feat`, `prop`, `fw`, `cert`) and descriptive values (`site`, `org`, `type`, `location`, `geo`). The `groups.yml` in the fleet repo turns values into
 groups so variables can be attached (`vars/group/util_traefik.yml`). For `util` and `feat`, `hosts/tags/<dimension>/<value>.yml` names the roles and task files, an `order`, the secrets it needs and the ports it opens.
 The `fleet_plan` role reads these and runs the plan; `site.yml` needs no edit to add a service. The fleet may override or add manifests under `config/tags/`.
+
+Routes are the other thing declared by name rather than per host: Traefik routes live one file per domain in the fleet repo (`config/routes/<domain>.yml`), and each route says which host's Traefik serves it with `via`, so moving a service is one line ([decision 23](decisions.md)).
 
 ## Rollback of a running service
 

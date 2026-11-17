@@ -12,7 +12,7 @@ A role that sets something up and then leaves it to the app's own UI is a legiti
 | Tailscale enrollment | This repo, first run | Seeded once | Auth keys are never stored | `bootstrap.sh` prompt | Re-run `tailscale up` |
 | Tailscale ACLs and tailnet settings | The Tailscale admin console | Read-only here | Policy belongs to the network, not a host | Tailscale admin | Tailscale's own history |
 | Docker engine, published-port guard | This repo | Rewritten every run | The guard is what keeps ufw meaningful | `docker` role | Package manager |
-| Traefik routes, headers, certificates | This repo | Rewritten every run, via `safe_apply` for service config | Routes are declared per host | Fleet `config/vars/routes/<host>.yml` | `<file>.last-good` next to each file |
+| Traefik routes, headers, certificates | This repo | Rewritten every run, via `safe_apply` for service config | Routes are declared per host | Fleet `config/routes/<domain>.yml` | `<file>.last-good` next to each file |
 | ACME issuance | Cert Warden (this repo deploys it) | Issued once, fetched as files | DNS credentials live on one host | `certwarden_*` roles | Cert Warden's own store |
 | otel agent config | This repo | Rewritten every run, via `safe_apply` | The collector must never crash-loop silently | `otel_agent` defaults and fleet vars | `<file>.last-good` |
 | Loki, VictoriaMetrics storage | The service | Data kept on a data disk | Data is not config | Retention in role vars | Per the fleet's backup jobs |
@@ -31,6 +31,9 @@ A role that sets something up and then leaves it to the app's own UI is a legiti
 | DNS records | Your DNS provider | Documented, not applied | No DNS credentials are kept beyond the ACME challenge | The provider | The provider |
 | Cloud provider firewalls and security lists | The provider | Not touched | Out of reach of a host-level agent | The provider | The provider |
 | Host creation | You | Not built | Provisioning substrate is a mix | Your tooling | n/a |
+| Platform profiles, and a host's `os:` and `arch:` | This repo | Read every run; nothing is written to the host | The layer decides what can run; in a host run the host's own facts win over the table, so a wrong entry cannot make a host run another platform's roles | `hosts/platforms/`, `inventory/hosts.yml` | Git |
+| Scheduled jobs and boot tasks (systemd units, cron entries, `local.d` scripts) | This repo | Rewritten every run through the platform layer | The same unit or entry on every host that runs the role | The owning role's defaults and fleet vars | Regenerated; cron has no catch-up after downtime |
+| Pinned collections and downloads | This repo | `hosts/requirements-hosts.yml` installed under the work directory; releases installed by `artifact` at a pinned digest | A host runs what is written, not what is newest | `hosts/requirements-hosts.yml`, the role's artifact data | Falls back to the OS bundle if Galaxy is unreachable |
 | Proxmox, Unraid, hardware | The platform | Not touched beyond a documented profile | See [proxmox-host.md](proxmox-host.md), [platforms.md](platforms.md) | The platform | The platform |
 
 ## Synced both ways

@@ -1,8 +1,8 @@
-# Adding a Windows host (design, not built)
+# Adding a Windows host (experimental)
 
-Status: **designed; `bootstrap.ps1`, `reconcile.ps1` and the `baseline` and `ssh` roles are written but have not been run on a host.** The inventory, group, variable and tag-selection
-logic was exercised against the real fleet config on a Mac; everything that touches Windows (the task, WinGet, the Event Log) was not. The first target is one Windows 11 Pro VM on an Unraid host. This page is what the
-baseline will do, so it can be corrected before scripts exist. [decisions.md](decisions.md) entry 9 records the choice.
+Status: **experimental, run on one host.** `bootstrap.ps1`, `reconcile.ps1` and the `baseline` role ran on a Windows 11 Pro (amd64) VM on an Unraid host and the first apply worked after the fixes that run
+found (decisions 9 to 17 record them). The `ssh` and `tailscale` roles and the MinGit and Tailscale installers were written after that run and have **not** been run on a host yet; neither has an ARM64
+Windows (a Parallels VM is the next target). The OpenTelemetry role below is a plan. This work is on hold. The inventory, group, variable and tag-selection logic also ran against the real fleet config.
 
 The model does not change: the host reconciles itself, on a timer, from the public framework repo and the private fleet repo. Nothing
 reaches into it from outside.
@@ -138,7 +138,7 @@ commands and `--status` over SSH once the ssh role exists; the update and reboot
 ## Open items
 
 - `scripts/access.sh` and `config/access.yml` must accept a Windows host (an age recipient, no `apt`-shaped assumptions). Not checked yet.
-- The Spire VM's disk, vTPM and Secure Boot settings are the user's side; Windows 11 needs both, and the install itself is not managed.
+- The hypervisor's VM settings (disk, vTPM and Secure Boot) are the user's side; Windows 11 needs both, and the install itself is not managed.
 - Defender exclusions, if the collector's directory needs one, are decided when it is built.
 
 ## Testing

@@ -2,7 +2,7 @@
 
 **Declare a fleet in git. Every host keeps itself that way.**
 
-Consigliere is a GitOps framework for a homelab or small fleet of Linux hosts (macOS and Unraid in a smaller role) on a Tailscale network. You describe each machine in one table and a few variable files. Each host pulls that description on a timer, checks it against reality, and corrects the difference, with no central server pushing changes.
+Consigliere is a GitOps framework for a homelab or small fleet of Linux hosts (Debian, Ubuntu and Alpine; Unraid, macOS and Windows in a smaller role) on a Tailscale network. You describe each machine in one table and a few variable files. Each host pulls that description on a timer, checks it against reality, and corrects the difference, with no central server pushing changes.
 
 > **Status: in testing.** Used on a real fleet, but the interfaces still move and several roles have not been run on every platform.
 > This project comes with no warranty or guarantee of fitness for any purpose. Use it at your own risk.
@@ -34,13 +34,15 @@ This is the contract. If a thing is in the first table, edit it in git and let t
 | Host OS | Packages, users, ssh hardening, sysctl, unattended upgrades, hostname, time zone, journald and reconcile limits | `baseline` role, `vars/` |
 | Network | Tailscale install and enrollment, the ufw firewall (tailnet open, the world only where a tag asks), DNS resolver | `tailscale`, `firewall`, `dns_resolver` |
 | Container engine | Docker install, the guard that controls published ports, Arcane's own containers | `docker`, `arcane_*` |
-| Edge | Traefik routes, headers and certificates per host, issued once by Cert Warden and fetched as files | `traefik_server`, `certwarden_*`, `vars/routes/` |
+| Edge | Traefik routes (one file per domain, each route naming the host that serves it), headers and certificates, issued once by Cert Warden and fetched as files | `traefik_server`, `certwarden_*`, `config/routes/<domain>.yml` |
 | Observability | The otel agent on each host, Loki, VictoriaMetrics, Grafana's provisioned data sources and dashboards, exposure scans | `otel_agent`, `loki_server`, `victoria_server`, `grafana_server`, `exposure_watch` |
 | Backups | The Arkeep server and agents, the restic REST target and mirror | `arkeep_*`, `restic_*` |
 | Security | The Wazuh agents and the manager's kernel setting | `wazuh_*` |
 | Consoles | Cmdr (the fleet console), Muximux tiles, Homarr and its sign-in gate | `cmdr`, `muximux`, `homarr` |
 | Shared services | Garage S3, Apprise notifications and run reports, scheduled apt and compose updates, Forgejo runner | `garage`, `apprise`, `apt_updates`, `compose_updates`, `forgejo_runner` |
 | Secrets access | Who can decrypt which secret, derived from tags | `config/secrets/`, `scripts/access.sh` in the fleet repo |
+| Platforms | What kind of machine each host is (Debian, Ubuntu, Alpine, Unraid), so a role runs only where it can: capabilities, releases, tool versions, and portable package, repository, service, schedule, boot and download tasks | `hosts/platforms/`, the `platform` role, `os:` and `arch:` in the host table |
+| Windows hosts (experimental) | Clock, Windows Update policy, Defender, firewall, Remote Desktop, OpenSSH and Tailscale, from a pull-only PowerShell reconciler | `windows/`, `windows_*` variables |
 
 ### Not managed: owned by something else
 
@@ -53,10 +55,9 @@ This is the contract. If a thing is in the first table, edit it in git and let t
 | Tailscale ACLs, tailnet settings, key expiry | **The Tailscale admin console** | Enrolls the host; never edits the policy |
 | Cloud provider firewalls and security lists (for example Oracle's) | **The provider** | Leaves them alone |
 | Creating hosts: VMs, VPSs, bare metal, hypervisor guests | **You** (provisioning is not built) | Takes a host that already exists and makes it converge |
-| Proxmox, Unraid and the hardware under them | **The platform itself** | Container-based roles run on Unraid; Proxmox has its own [guide](docs/proxmox-host.md) |
+| Proxmox, Unraid and the hardware under them | **The platform itself** | Container-based roles run on Unraid and Alpine hosts; Proxmox has its own [guide](docs/proxmox-host.md) |
 | Data inside services: backups' contents, databases, object storage buckets' contents | **The service and you** | Runs the service and declares buckets and keys, not the data |
 | Hand-registered credentials: the Forgejo runner registration, Garage's capacity layout | **You, once** | Keeps the result in place afterwards |
-| Windows hosts | Not supported yet; a [design](docs/windows-host.md) exists | None |
 
 The full table, with the mechanism and rollback for each row, is [docs/ownership.md](docs/ownership.md).
 
@@ -123,7 +124,7 @@ Nothing sensitive is committed to this repo, ever. Secrets live in your fleet re
 | [docs/architecture.md](docs/architecture.md) | How the pieces fit and why |
 | [docs/ownership.md](docs/ownership.md) | What is managed, how, and how to roll it back |
 | [docs/cli-reference.md](docs/cli-reference.md) | `bootstrap.sh`, `reconcile.sh` and their variables |
-| [docs/platforms.md](docs/platforms.md) | Debian, Ubuntu, ARM64, Unraid, macOS |
+| [docs/platforms.md](docs/platforms.md) | Debian, Ubuntu, Alpine, ARM64, Unraid, macOS, Windows, and the platform layer that lets one role run on several |
 | [docs/proxmox-host.md](docs/proxmox-host.md), [docs/coordination-server.md](docs/coordination-server.md) | Specific host kinds |
 | [docs/security.md](docs/security.md) | Trust boundaries and secrets |
 | [docs/decisions.md](docs/decisions.md), [docs/STATE.md](docs/STATE.md), [CHANGELOG.md](CHANGELOG.md) | Why it is this way, what is true now, what changed |

@@ -8,6 +8,8 @@ This project's instance of the security posture. Reporting a vulnerability is a 
 - **Each host trusts git, not a controller.** A push to `main` on either repo is applied on every host that tracks it. The lint gate and review are therefore the change-approval step; protect both repos' default branches.
 - **A host reads only its own secrets.** Each secret file is encrypted to the age public keys of the hosts allowed to read it. The host's private key never leaves it.
 - **The deploy key is read-only** and used for nothing but the fleet clone and fetch.
+- **Pinned downloads.** Collections the hosts need newer than the OS bundle come from Ansible Galaxy at an exact version (`hosts/requirements-hosts.yml`), installed under the reconcile's work directory over TLS; Galaxy's own checksum guards the download, there is no signature check. Releases installed by the `artifact` task are verified against a SHA-256 digest pinned in the data (or a release's own `.sha256` file, which is only as trustworthy as that release), and a wrong digest stops the run.
+- **The host table never overrides a host's own facts.** In a host run, `os:` and `arch:` are used only to warn about a mismatch, so a wrong entry cannot make a host run another platform's roles. Inside a container (Unraid, Alpine) the table is what says what the host is.
 
 ## Secrets
 

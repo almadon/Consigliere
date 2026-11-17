@@ -34,6 +34,8 @@ Pushes to `main` are what hosts apply. Treat every change as a deployment.
 yamllint .                                  # config in .yamllint
 ansible-lint                                # config in .ansible-lint; collections from hosts/requirements.yml
 bash -n hosts/bootstrap/*.sh                # syntax check; shellcheck -x if installed
+python3 -m unittest discover -s hosts/tests   # version ordering, schedule translation, route files (needs PyYAML)
+ci/run-matrix.sh                            # the platform layer on Debian, Ubuntu and Alpine in containers (needs Docker)
 grep -rnP '\xe2\x80\x94' README.md docs/ hosts/ VISION.md   # em dash: must be empty
 bash ../conformIT/scripts/conform.sh audit .    # conformIT self-audit
 ```

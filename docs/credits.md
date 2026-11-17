@@ -21,7 +21,8 @@ What this project adopts, under which licence, and what it passed over. A licenc
 | Wazuh | Security monitoring | VERIFY |
 | Apprise | Notifications | BSD-2-Clause, VERIFY |
 | Pocket ID | Sign-in (used by the fleet, not deployed by this repo) | VERIFY |
-| Ansible collections `community.general`, `community.docker`, `ansible.posix` | Modules the roles call (`hosts/requirements.yml`) | VERIFY |
+| Ansible collections `community.general`, `community.docker`, `ansible.posix` | Modules the roles call (`hosts/requirements.yml`); `ansible.posix` 2.2.2 is also installed on the hosts (`hosts/requirements-hosts.yml`) because the bundled 2.1.x imports from a module removed in ansible-core 2.24 | GPL-3.0, VERIFY |
+| Alpine Linux, OpenRC, BusyBox, apk-tools | A supported host platform: package manager, init system and cron the platform layer drives (`hosts/platforms/alpine.yml`) | MIT, BSD-2-Clause, GPL-2.0, VERIFY |
 | Forgejo runner | CI runner role | VERIFY |
 | Semaphore UI | Ansible run UI | VERIFY |
 | Z-Wave JS UI | Z-Wave controller UI | VERIFY |
