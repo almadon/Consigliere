@@ -198,6 +198,8 @@ fi
 # Tag manifests (what each util:/feat: tag runs): your config/tags/ first, then the
 # framework's hosts/tags/.
 EXTRA_VARS+=(-e "{\"fleet_tags_dirs\": [\"$CONF/tags\", \"$FRAMEWORK_DIR/hosts/tags\"]}")
+# Traefik routes kept one file per domain (the fleet repo's config/routes/<domain>.yml): see the fleet_routes lookup and the traefik_server role.
+EXTRA_VARS+=(-e "{\"fleet_routes_dirs\": [\"$CONF/routes\"]}")
 # RECONCILE_PLAYBOOK picks the entry playbook (default site.yml). The fleet's own file of that name, if it has one, wins over the framework's.
 # RECONCILE_RUNTIME=container says Ansible runs inside a container on the host's Docker socket (Unraid, Alpine): `become` is off and only container roles run
 # (hosts/platforms/, decision 19). Container hosts set up before that name was used have RECONCILE_PLAYBOOK=site-unraid.yml: it is now site.yml run that way.

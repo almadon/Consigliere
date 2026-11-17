@@ -1,4 +1,29 @@
 ---
+# Routes can come from two places, merged: the per-domain route files in the fleet repo (config/routes/<domain>.yml; each route says which host serves it with `via`),
+# and traefik_server_routes* variables in any vars layer. Each domain file becomes a variable of its own below, so everything after this sees one list.
+- name: Read the route files for this host
+  ansible.builtin.set_fact:
+    _traefik_server_zones: "{{ (lookup('fleet_routes', inventory_hostname, dirs=fleet_routes_dirs | default([]))).zones }}"
+
+- name: Make each domain's routes for this host a route source
+  ansible.builtin.set_fact:
+    "traefik_server_routes_zone_{{ item.name | regex_replace('[^A-Za-z0-9]', '_') }}": "{{ item.routes }}"
+  loop: "{{ _traefik_server_zones }}"
+  loop_control:
+    label: "{{ item.name }}: {{ item.routes | map(attribute='name') | join(', ') }}"
+
+# A domain file names the certificate that covers its routes. The host gets certificates from its cert: tags (and certwarden_agent_certs*), so the two must agree.
+- name: Check that this host has the certificate each domain file names
+  ansible.builtin.assert:
+    that: item.cert is none or item.cert in (traefik_server_certificates | default(cert | default([])))
+    fail_msg: >-
+      config/routes/{{ item.name }}.yml says its names are covered by the certificate {{ item.cert }}, but this host serves {{ traefik_server_certificates | default(cert | default([])) }}.
+      Add {{ item.cert }} to this host's cert: list in inventory/hosts.yml (or fix the file's cert:).
+    quiet: true
+  loop: "{{ _traefik_server_zones }}"
+  loop_control:
+    label: "{{ item.name }}"
+
 - name: Collect this host's routes from every layer that defines them
   ansible.builtin.set_fact:
     _traefik_server_sources: "{{ query('ansible.builtin.varnames', '^traefik_server_routes(_.*)?$') | sort }}"
@@ -10,8 +35,8 @@
   ansible.builtin.debug:
     msg: >-
       {{ ('No Traefik routes on this host. Define traefik_server_routes (or traefik_server_routes_<anything>)'
-          ~ ' in any vars layer this host sees: util_traefik.yml, a service group file (util_arkeep.yml, ...),'
-          ~ ' all.yml or vars/host/<host>.yml.')
+          ~ ' in any vars layer this host sees (util_traefik.yml, a service group file, all.yml or vars/host/<host>.yml),'
+          ~ ' or give routes a `via: <this host>` in a domain file under config/routes/.')
          if _traefik_server_sources | length == 0 else
          ('Traefik routes on this host (' ~ (_traefik_server_routes | length) ~ '): '
           ~ (_traefik_server_sources

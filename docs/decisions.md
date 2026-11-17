@@ -130,3 +130,13 @@ Numbered, never reused. A reversed decision gets a new entry that supersedes the
 **Rejected.** Ansible's `version` test (wrong for `~`, epochs and distribution suffixes). Deciding by the distribution release alone: the vulnerability follows the apt package version, which differs by branch and can be updated or backported independently of the release. Reading every tool's version on every run: it costs a command per tool for nothing.
 
 **Revisit when** a platform needs a comparison dpkg's rules get wrong (Alpine's `-r` revisions are only approximated), or when reading versions costs enough to cache across runs.
+
+## 23. Routes kept one file per domain, each route says which host serves it
+
+**Chosen.** Traefik routes can be written in `config/routes/<domain>.yml` in the fleet repo, one file per domain or zone. A file may set a default `via` (the host or list of hosts whose Traefik serves its routes) and the `cert` that covers its names; a route can override `via`. The `fleet_routes` lookup (`hosts/plugins/lookup/`) returns the routes whose `via` names a host, and `traefik_server` turns each domain's routes into a route variable of its own, so everything downstream (conflict checks, templates) is unchanged. The existing `traefik_server_routes*` variables keep working and add up with the files, so hosts move over one at a time. A file that is not valid stops the run with every problem listed; a host that does not serve the certificate a file names is refused.
+
+**Cost.** Two places can define routes during the move. A mistake in a domain file can affect every host that serves routes from it (validated before push and by the role). The per-host file is no longer the place to see what a host serves: `scripts/routes.sh` and Cmdr show that view.
+
+**Rejected.** Tagging hosts with the domains they serve: one domain's routes are usually split across hosts (public and internal), so a host tag would mean all or nothing for a file; `via` per route with a file default covers both. Deriving each host's `cert:` tag from the files in this step: the tag also selects roles and secret grants at planning time, before the routes are read, so for now the files name the certificate and the role checks it agrees with the host.
+
+**Revisit when** the check is more of a chore than a help (then derive the certificate from the files, which means teaching the planner to read them), or when a route needs different settings on each of the hosts that serve it.

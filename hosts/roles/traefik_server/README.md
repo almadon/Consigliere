@@ -7,7 +7,23 @@ network. The host holds no DNS API key: certificates are files from Cert Warden.
 `traefik_server_deploy: false` to only render the config and run Traefik some other way.
 The stack is the successor to the geotraefik compose, minus its ACME resolver.
 
-## How a node knows which routes are its own
+## Routes by domain (route files)
+
+Routes can be kept one file per domain in the fleet repo, `config/routes/<domain>.yml` (`a64.one.yml`, `rmrg.casa.yml`), so a domain's routes are in one place and
+moving a service to another proxy is one `via:` line. Each file may set a default `via` (the host or hosts whose Traefik serve its routes) and the `cert` that
+covers its names; a route may override `via`:
+
+    cert: a64.one
+    via: constant
+    routes:
+      - {name: mail, host: mail.a64.one, backend: "http://mailflow-frontend:80", profile: relaxed}
+      - {name: arc, host: arc.ctrl.a64.one, backend: "http://arcane:3552", via: [constant, liaison], internal: true}
+
+A host takes the routes whose `via` names it; every other key is the same as in a `traefik_server_routes` variable. The two sources add up, so a host can move over route
+by route. The check refuses a file that is not valid (every problem is listed), a route with no `via`, a name used twice on one host, and a host that does not serve the
+certificate its file names. The reconciler passes the directory as `fleet_routes_dirs`; the reading is the `fleet_routes` lookup in `hosts/plugins/lookup/`.
+
+## How a node knows which routes are its own (variables)
 
 By ordinary Ansible variable scope. Define any variable named
 `traefik_server_routes` or `traefik_server_routes_<anything>`, and put it where
