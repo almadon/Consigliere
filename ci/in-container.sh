@@ -15,8 +15,14 @@ fi
 python3 -m venv --system-site-packages /tmp/venv
 /tmp/venv/bin/pip install -q "ansible-core~=2.19.0" PyYAML
 export PATH=/tmp/venv/bin:$PATH
-ansible-galaxy collection install -q -r hosts/requirements.yml -p /tmp/collections
 export ANSIBLE_COLLECTIONS_PATH=/tmp/collections ANSIBLE_CONFIG=/repo/hosts/ansible.cfg ANSIBLE_ROLES_PATH=/repo/hosts/roles ANSIBLE_NOCOLOR=1
+ansible-galaxy collection install -r hosts/requirements.yml -p /tmp/collections >/dev/null
+
+if [ -f /etc/alpine-release ]; then
+  # Alpine images ship with the community repository on; turn it off so the platform layer has to enable it (that is the path a bare Alpine host takes).
+  sed -i '/community/s/^[^#]/#&/' /etc/apk/repositories
+  ! grep -Eq '^[^#]*/community/?$' /etc/apk/repositories || { echo "ERROR: could not disable the community repository for the test" >&2; exit 1; }
+fi
 
 echo "==> Python unit tests (version ordering, route files)"
 python3 -m unittest discover -s hosts/tests
