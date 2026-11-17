@@ -1,0 +1,9 @@
+---
+# Alpine on the host itself (a later step: today Alpine is reconciled by a container, so only `docker` is offered, see hosts/bootstrap/alpine/).
+family: alpine
+tier: full
+capabilities: [host, apk, openrc, docker]
+defaults:
+  pkg_manager: apk
+  init: openrc
+  ssh_service: sshd

@@ -92,6 +92,8 @@ if [ ! -f "$DIR/vars.yml" ]; then
 common_dir: $DIR/data/common
 arkeep_agent_dir: $DIR/data/arkeep-agent
 firewall_manage: false
+# What kind of machine this is (hosts/platforms/): Ansible runs in a container here and cannot tell.
+platform_host: ${CONSIGLIERE_GENERIC:-unraid}
 VARS
 fi
 

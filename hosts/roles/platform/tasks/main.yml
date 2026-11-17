@@ -1,0 +1,43 @@
+---
+# Works out what kind of machine this is, once, and leaves the answer in facts that roles and the planner read:
+#   platform_family        debian | alpine | unraid | macos | unknown   (a profile file in hosts/platforms/)
+#   platform_arch          amd64 | arm64 | armv7 | the raw value
+#   platform_runtime_mode  host | container   (what this run can change)
+#   platform_capabilities  what a role can count on, e.g. [host, apt, systemd, docker, ufw]
+#   platform_defaults      the profile's defaults (package manager, init, service names)
+# Changes nothing on the host. See hosts/platforms/README.md and docs/decisions.md, entry 19.
+- name: Detect the platform family from the facts
+  ansible.builtin.set_fact:
+    _platform_detected: >-
+      {{ {'Debian': 'debian', 'Alpine': 'alpine', 'Darwin': 'macos'}.get(ansible_os_family | default(''),
+         (ansible_os_family | default('unknown')) | lower) }}
+  tags: [always]
+
+- name: Read the profile for it
+  ansible.builtin.include_vars:
+    file: "{{ lookup('ansible.builtin.first_found', _platform_candidates) }}"
+    name: _platform_profile
+  vars:
+    _platform_wanted: "{{ platform_host if (platform_host | length > 0) else _platform_detected }}"
+    _platform_candidates:
+      - "{{ role_path }}/../../platforms/{{ _platform_wanted }}.yml"
+      - "{{ role_path }}/../../platforms/unknown.yml"
+  tags: [always]
+
+- name: Publish the platform facts
+  ansible.builtin.set_fact:
+    platform_family: "{{ _platform_profile.family }}"
+    platform_tier: "{{ _platform_profile.tier }}"
+    platform_arch: >-
+      {{ {'x86_64': 'amd64', 'amd64': 'amd64', 'aarch64': 'arm64', 'arm64': 'arm64', 'armv7l': 'armv7'}.get(ansible_architecture | default(''),
+         ansible_architecture | default('unknown')) }}
+    platform_runtime_mode: "{{ 'container' if (platform_runtime == 'container' or _platform_profile.tier == 'container') else 'host' }}"
+    platform_defaults: "{{ _platform_profile.defaults | default({}) }}"
+  tags: [always]
+
+# In a container run the profile's host-level capabilities do not apply: the facts describe the container, and nothing but the Docker socket reaches the machine.
+- name: Publish what a role can count on
+  ansible.builtin.set_fact:
+    platform_capabilities: >-
+      {{ (_platform_profile.capabilities | intersect(['docker'])) if platform_runtime_mode == 'container' else _platform_profile.capabilities }}
+  tags: [always]

@@ -2,6 +2,12 @@
 # Runs whatever this host's tags select (see hosts/tags/ and the fleet repo's
 # config/tags/): each tag value in the host table (util, feat, ...) has a manifest
 # naming roles and task files. Included from site.yml.
+# What kind of machine this is (platform_family, platform_arch, platform_capabilities), for the items below to be checked against.
+- name: Work out the platform
+  ansible.builtin.include_role:
+    name: platform
+  tags: [always]
+
 - name: Work out what this host runs from its tags
   ansible.builtin.set_fact:
     _fleet_plan_data: "{{ lookup('fleet_roles') }}"
@@ -19,6 +25,7 @@
 - name: Report the plan
   ansible.builtin.debug:
     msg: >-
+      platform: {{ platform_family }}/{{ platform_arch }}, runs on the {{ platform_runtime_mode }}, offers {{ platform_capabilities }};
       tags with manifests: {{ _fleet_plan_data.tags }};
       tags without one (just classes): {{ _fleet_plan_data.unknown }};
       runs: {{ _fleet_plan_data.plan | map(attribute='tag') | list }}

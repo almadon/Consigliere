@@ -1,0 +1,3 @@
+---
+# What this role needs from the platform (hosts/platforms/README.md). It drives ufw on the host.
+requires: [host, ufw]

@@ -1,0 +1,8 @@
+---
+# Unraid: no apt, no systemd, a root filesystem in RAM. Always reconciled by a container, which offers only `docker`.
+family: unraid
+tier: container
+capabilities: [docker]
+defaults:
+  pkg_manager: none
+  init: none

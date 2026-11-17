@@ -1,0 +1,8 @@
+---
+# macOS has its own entry playbook (macos/site.yml) and launchd agent; listed so the family is known.
+family: macos
+tier: native
+capabilities: [host, launchd]
+defaults:
+  pkg_manager: brew
+  init: launchd

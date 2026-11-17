@@ -88,3 +88,15 @@ Numbered, never reused. A reversed decision gets a new entry that supersedes the
 
 **Revisit when** a second or third Alpine host needs host-level logs or metrics, or when the OpenTelemetry role can run as a container.
 
+
+## 19. A platform layer: one profile per host, roles declare what they need
+
+**Chosen.** Platform knowledge moves out of `bootstrap.sh`, the five entry playbooks and the roles into one place. A `platform` role works out `platform_family` (debian, alpine, macos, unraid), `platform_arch` (amd64, arm64, ...), `platform_runtime` (`host` when Ansible changes the machine itself, `container` when the reconciler runs in a container on a Docker socket) and `platform_capabilities` (`host`, `apt`, `apk`, `systemd`, `openrc`, `launchd`, `docker`, `ufw`), from the Ansible facts plus a data file per family in `hosts/platforms/`. A role that cannot work everywhere says what it needs in a `platform.yml` next to its tasks (`requires: [host, apt, systemd]`). `fleet_plan` compares the two before it runs an item and, when something is missing, skips it with a message that names the missing capability, instead of failing halfway or being left out of one playbook by hand. Roles with no `platform.yml` run wherever a tag selects them, as before, so the change is adopted role by role.
+
+**Cost.** One more role to run first, one more small file per host-bound role, and a vocabulary of capabilities to keep small. Declarations are written by hand: a scan for `apt` or `systemd` in a role overstates it (restic_server and safe_apply mention both conditionally and already run on Unraid), so a wrong declaration can skip a role that would have worked. The first step changes no behaviour on a Debian host; that is checked by running a check-mode pass before and after.
+
+**Rejected.** Making the roles portable by branching inside each task on `ansible_os_family`: it spreads the platform knowledge again, which is the problem. One implementation for every firewall (ufw, nftables, pf, Windows Firewall): they are different mechanisms, so they stay separate roles behind one name. Deriving the capabilities only from facts: inside the container reconciler the facts describe the container, not the host.
+
+**Revisit when** the capability list grows past about ten entries, when a role needs a version of a capability (systemd 252 or newer, say), or when a profile needs more than data (code per platform).
+
+**Next steps (not done in this change).** Merge `site-unraid.yml` into `site.yml` once the planner skips unsupported roles reliably; convert the apt-bound roles to package and service abstractions (baseline, docker, tailscale first); a CI matrix that runs the roles in Debian 13, Ubuntu 24.04 and Alpine containers; an `os:` attribute in the host table.

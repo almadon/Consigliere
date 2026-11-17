@@ -1,0 +1,6 @@
+---
+# A family with no profile: nothing is assumed. Roles that declare a requirement are skipped; roles that declare none still run.
+family: unknown
+tier: unknown
+capabilities: []
+defaults: {}

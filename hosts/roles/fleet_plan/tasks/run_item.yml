@@ -9,10 +9,25 @@
   loop_control:
     label: "{{ item.key }}"
 
+# What the role needs from the platform: its platform.yml (`requires: [host, apt, systemd]`), if it has one. A role without one runs wherever a tag selects it.
+- name: "Check what a role needs from this platform: {{ _fleet_item.name | default('') }}"
+  ansible.builtin.set_fact:
+    fleet_plan_missing: >-
+      {{ ((((lookup('ansible.builtin.file', role_path ~ '/../' ~ _fleet_item.name ~ '/platform.yml', errors='ignore') | default('', true)) | from_yaml)
+           or {}).requires | default([])) | difference(platform_capabilities) }}
+  when: _fleet_item.kind == 'role'
+
+- name: "Skip a role this platform does not support: {{ _fleet_item.name | default('') }}"
+  ansible.builtin.debug:
+    msg: >-
+      Skipped role {{ _fleet_item.name }} (tag {{ _fleet_item.tag }}): it needs {{ fleet_plan_missing }}, which a {{ platform_family }} host
+      ({{ platform_runtime_mode }} run) does not offer. It offers {{ platform_capabilities }}.
+  when: _fleet_item.kind == 'role' and fleet_plan_missing | length > 0
+
 - name: "Role {{ _fleet_item.name | default('') }}"
   ansible.builtin.include_role:
     name: "{{ _fleet_item.name }}"
-  when: _fleet_item.kind == 'role'
+  when: _fleet_item.kind == 'role' and fleet_plan_missing | length == 0
 
 - name: "Tasks {{ _fleet_item.file | default('') }}"
   ansible.builtin.include_tasks: "{{ _fleet_item.file }}"

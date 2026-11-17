@@ -1,0 +1,9 @@
+---
+# Debian and Ubuntu: the full profile (Ansible on the host, systemd timer, apt).
+family: debian
+tier: full
+capabilities: [host, apt, systemd, docker, ufw]
+defaults:
+  pkg_manager: apt
+  init: systemd
+  ssh_service: ssh

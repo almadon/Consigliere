@@ -8,6 +8,25 @@
 | Unraid (7.x) | A self-scheduling container (`hosts/bootstrap/unraid/`); only container-based roles run there |
 | macOS | launchd agent (`macos/`) |
 
+## The platform layer
+
+What kind of machine a host is gets decided once, in one place, and roles read the answer ([decision 19](decisions.md)). The `platform` role runs at the start of `fleet_plan` and sets:
+
+| Fact | Values |
+|---|---|
+| `platform_family` | `debian` (also Ubuntu), `alpine`, `unraid`, `macos`, `unknown`: a profile file in `hosts/platforms/` |
+| `platform_arch` | `amd64`, `arm64`, `armv7`, or the raw value: one spelling, whatever the OS calls it |
+| `platform_runtime_mode` | `host` (Ansible changes the machine) or `container` (Ansible runs in a container on the Docker socket: Unraid, Alpine) |
+| `platform_capabilities` | what a role can count on: `host`, `apt`, `apk`, `systemd`, `openrc`, `launchd`, `docker`, `ufw` |
+| `platform_defaults` | the profile's defaults: package manager, init system, SSH service name |
+
+A role that cannot work everywhere says so in `hosts/roles/<role>/platform.yml` (`requires: [host, apt, systemd]`). When a tag selects it on a platform that lacks one of those,
+`fleet_plan` skips it and logs which capability is missing, instead of failing in the middle of the role. A role with no `platform.yml` runs wherever a tag selects it, as
+before. Inside a container the Ansible facts describe the container, not the machine, so the container playbook states `platform_host` (and the Alpine bootstrap writes it into `vars.yml`).
+
+To support a new platform: add `hosts/platforms/<family>.yml`, then give the roles that are host-bound a `platform.yml`. Declarations are written by hand, because a role that mentions apt or
+systemd only conditionally may still work on a platform without them.
+
 ## ARM64
 
 Everything the roles install is multi-architecture, checked against the registries when the Oracle Ampere VPS was prepared:

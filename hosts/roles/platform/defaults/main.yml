@@ -1,0 +1,8 @@
+---
+# Input. `host`: this run changes the machine it runs on. `container`: Ansible runs inside a container that drives the host's Docker socket
+# (Unraid, and Alpine with the container reconciler), so only the Docker socket can be counted on. The Unraid playbook and the bootstrap set it.
+platform_runtime: host
+
+# Input. Name of the platform family when the facts cannot tell (inside a container they describe the container, not the machine): alpine, unraid, ...
+# Empty = detect from the facts.
+platform_host: ""

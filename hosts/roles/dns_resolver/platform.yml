@@ -1,0 +1,3 @@
+---
+# What this role needs from the platform (hosts/platforms/README.md). It changes the host and drives systemd services.
+requires: [host, systemd]
