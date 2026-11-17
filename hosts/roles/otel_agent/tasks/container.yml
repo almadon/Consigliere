@@ -1,0 +1,51 @@
+---
+# The collector as a container (hosts without apt and systemd: Alpine, Unraid, a container reconciler). Included from main.yml. The configuration and the compose file are
+# applied by safe_apply, so a bad one is rolled back and the run fails, as it is for the native service.
+- name: Create the collector's directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0750"
+  loop:
+    - "{{ otel_agent_container_dir }}"
+    - "{{ otel_agent_container_dir }}/storage"
+
+- name: Render the collector's configuration and compose file
+  ansible.builtin.set_fact:
+    _otel_agent_config_text: "{{ lookup('ansible.builtin.template', 'config.yaml.j2') }}"
+    _otel_agent_compose_text: "{{ lookup('ansible.builtin.template', 'otel-agent-compose.yml.j2') }}"
+
+- name: Check that the container name is free
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: guard_containers
+  vars:
+    docker_guard_containers: [otel-agent]
+    docker_guard_dir: "{{ otel_agent_container_dir }}"
+
+# The image has to be here before its own `validate` can run on the new configuration.
+- name: Pull the collector image
+  community.docker.docker_image:
+    name: "{{ otel_agent_image }}"
+    tag: "{{ otel_agent_version }}"
+    source: pull
+  register: _otel_agent_image_pull
+  when: not ansible_check_mode
+
+# The configuration is validated by the collector itself. The file safe_apply checks lives in the reconciler's own filesystem, which the host's Docker daemon cannot mount, so it
+# goes in by value (an environment variable), not by path. The validator also wants the state directory and the host path (root_path) to exist, so the throwaway container gets
+# empty ones.
+- name: Apply the configuration and the compose file safely
+  ansible.builtin.include_role:
+    name: safe_apply
+  vars:
+    safe_apply_name: otel-agent
+    safe_apply_files:
+      - {dest: "{{ otel_agent_container_dir }}/docker-compose.yml", content: "{{ _otel_agent_compose_text }}", mode: "0640"}
+      - dest: "{{ otel_agent_container_dir }}/config.yaml"
+        content: "{{ _otel_agent_config_text }}"
+        mode: "0644"
+        validate: "sh -c 'docker run --rm --tmpfs /var/lib/otelcol-contrib/storage --tmpfs {{ otel_agent_hostfs }} -e OTEL_CONFIG=\"$(cat %s)\" {{ otel_agent_image }}:{{ otel_agent_version }} validate --config=env:OTEL_CONFIG'"
+    safe_apply_restart: {kind: compose, project_src: "{{ otel_agent_container_dir }}", name: otel-agent}
+    safe_apply_force: "{{ _otel_agent_image_pull.changed | default(false) }}"
+  when: not ansible_check_mode

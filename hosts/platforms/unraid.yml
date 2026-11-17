@@ -6,3 +6,4 @@ capabilities: [docker]
 defaults:
   pkg_manager: none
   init: none
+  system_log: /var/log/syslog

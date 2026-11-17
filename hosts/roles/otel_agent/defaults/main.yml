@@ -1,8 +1,14 @@
 ---
-# OpenTelemetry Collector (contrib build, installed from the project's .deb and run by systemd as an unprivileged user) that ships this
+# OpenTelemetry Collector (contrib build; on hosts with apt and systemd installed from the project's .deb and run by systemd as an unprivileged user, elsewhere run as a container, see otel_agent_mode) that ships this
 # host's logs to Loki's native OTLP endpoint: the systemd journal, and the logs of every Docker container (json-file driver).
 # No secret needed: Loki takes logs only from the tailnet.
 otel_agent_version: "0.163.1"
+# How the collector runs: native (the .deb under systemd), container (the image under Docker, reading the host through mounts), or auto = native where the host has apt and systemd,
+# container everywhere else (Alpine, Unraid, a container reconciler). Switching a host from one to the other is not handled: remove the old one first.
+otel_agent_mode: auto
+otel_agent_image: otel/opentelemetry-collector-contrib
+# Container mode: where the compose file, the configuration and the collector's state (read offsets, the send queue) live on the host.
+otel_agent_container_dir: "{{ common_dir | default('/opt/common') }}/otel-agent"
 # Loki's OTLP endpoint (a DNS record for the Loki host's tailnet address). Set it in config/vars/group/feat_otel.yml.
 otel_agent_loki_url: ""
 # The host's name in Loki (label host_name). The fleet's short name by default.
@@ -10,6 +16,10 @@ otel_agent_host_name: "{{ inventory_hostname }}"
 # Journal entries at this priority or more severe: emerg, alert, crit, err, warning, notice, info, debug.
 otel_agent_journal: true
 otel_agent_journal_priority: info
+# The system log as a file, for a host without a journal (container mode): lines of the file in rfc3164 syslog format. The file comes from the platform profile
+# (/var/log/messages on Alpine, /var/log/syslog on Unraid); set otel_agent_system_log_files to read others. The syslog zone is otel_agent_syslog_timezone below.
+otel_agent_system_log: true
+otel_agent_system_log_files: []
 # Docker container logs. "auto" = when Docker is installed on the host.
 otel_agent_docker_logs: auto
 # Hard limits: the collector's own soft limit (MiB, drops data under pressure instead of growing) and systemd's ceiling.
@@ -44,6 +54,9 @@ otel_agent_otlp_listen: ""
 # Needs otel_agent_metrics_url. Beszel stays the deep dive; these are the at-a-glance numbers for every host.
 otel_agent_hostmetrics: false
 otel_agent_hostmetrics_interval: 60s
+# Container mode with host metrics: the host's root is mounted read-only here for the collector to read (its root_path). It is the widest thing the container is given;
+# leave host metrics off (the default) and nothing but the logs and the state directory is mounted.
+otel_agent_hostfs: /hostfs
 
 # Per-container metrics (docker_stats receiver): CPU, memory, network, block I/O, restarts and uptime of every container on this host, sent to
 # otel_agent_metrics_url (VictoriaMetrics). Needs Docker and otel_agent_metrics_url. The collector never touches Docker's socket itself: the role runs a

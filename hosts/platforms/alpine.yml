@@ -7,6 +7,7 @@ defaults:
   pkg_manager: apk
   init: openrc
   ssh_service: sshd
+  system_log: /var/log/messages     # BusyBox syslogd's file (the syslog OpenRC service)
 packages:
   docker: [docker, docker-cli-compose]
   tailscale: [tailscale]

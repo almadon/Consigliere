@@ -52,6 +52,8 @@ The layer is for hosts that run the framework's Ansible code, so it covers every
 
 **Windows** is not Ansible, so the layer's tasks cannot apply. It shares what is not code: the host table (with `os: windows` and `arch:`), the variable merge order, the tag manifests, sops and age for secrets, check-then-apply, and a role contract (a role returns what changed, honours a check pass and throws on failure). A Windows counterpart of the primitives would be PowerShell helpers for pinned installs, services and scheduled tasks; the bootstrap has these inline today and they are not abstracted.
 
+`otel_agent` is the one role with a native and a container form: native on a host with apt and systemd, a container (reading the host through mounts) everywhere else ([decision 27](decisions.md)).
+
 What is the same everywhere is the model: each host reconciles itself on a timer from the two repositories, and a role says what it needs before it runs.
 
 To support a new platform: add `hosts/platforms/<family>.yml`, then give the roles that are host-bound a `platform.yml`. Declarations are written by hand, because a role that mentions apt or

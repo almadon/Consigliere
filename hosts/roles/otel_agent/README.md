@@ -1,5 +1,11 @@
 # otel_agent
 
+- **Does:** ships the host's logs (the systemd journal, or the system log file where there is no journal; Docker container logs) and, optionally, metrics to Loki and VictoriaMetrics, as a systemd service where there is apt and systemd and as a container everywhere else.
+- **Owns settings:** this repo: the `otel_agent_*` defaults and the fleet's overrides.
+- **Keeps state:** read offsets and the send queue, so nothing is lost across restarts: `/var/lib/otelcol-contrib/storage` (container mode: `<common_dir>/otel-agent/storage`).
+- **Rolls back by:** `safe_apply`: the collector validates a new configuration first, the running files are kept as `.last-good`, and a change that does not leave it healthy is undone and fails the run.
+- **Exposes:** nothing inbound by default; optional listeners on the addresses you give (`otel_agent_otlp_listen`, `otel_agent_syslog_listeners`), and the read-only Docker proxy on `127.0.0.1` for container metrics.
+
 The [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/) (contrib build, from the project's `.deb`, version pinned in
 `otel_agent_version`, download verified against the release's `.sha256`) as a systemd service. It ships this host's logs to
 [Loki](../loki_server/README.md)'s native OTLP endpoint (`otel_agent_loki_url`, for example `http://lk.ctrl.a64.one:3100/otlp`):
@@ -43,7 +49,23 @@ Every line carries `host_name` (`otel_agent_host_name`, the fleet's short name).
 - **Host metrics (optional, `otel_agent_hostmetrics`):** the collector scrapes this host's CPU, memory, root-and-data filesystem use and load every minute
   (`otel_agent_hostmetrics_interval`) and sends them to `otel_agent_metrics_url`; cmdr shows them on the host cards. Container, tmpfs and pseudo filesystems are left out.
 - No secret is needed: Loki and VictoriaMetrics take data only from the tailnet.
-- Unraid hosts are not supported by this role (no systemd, no apt).
+- Where the collector runs (`otel_agent_mode`: `auto`, `native` or `container`): `auto` is native on a host with apt and systemd and a container on everything else (Alpine, Unraid, anything a container reconciler runs on). See below.
+
+## Container mode
+
+For hosts without apt and systemd the collector runs from the `otel/opentelemetry-collector-contrib` image (the same `otel_agent_version`), under Docker, and reads the host through mounts. It needs only the `docker` capability, so it runs under the container reconciler as the other container roles do.
+
+| What | How |
+|---|---|
+| System log | There is no journal, so the collector follows the system log file as plain syslog lines: `/var/log/messages` on Alpine (BusyBox's syslogd) and `/var/log/syslog` on Unraid, from the platform profile; `otel_agent_system_log_files` reads others and `otel_agent_system_log: false` turns it off. The program becomes the label `unit`, the rest the line. The time is when the line was read (the file is followed live). A line it cannot read is still delivered, as it is. |
+| Docker logs | `/var/lib/docker/containers` mounted read-only; the same labels as the native service. |
+| Host metrics | Off by default. With `otel_agent_hostmetrics: true` the host's root is mounted read-only at `otel_agent_hostfs` (`/hostfs`) and the collector's `root_path` points there. It is the widest thing the container is given. |
+| Container metrics | The same read-only Docker proxy as the native service. |
+| Privileges | Root inside the container (to read root-owned logs) with every capability dropped except `DAC_READ_SEARCH`, a read-only root filesystem, no new privileges, host networking (so `127.0.0.1` is the host), a memory limit of `otel_agent_memory_max`. |
+| Its own logs | `docker logs otel-agent` works; the container uses Docker's `local` log driver, so the collector neither ships nor follows itself. |
+| Applying a change | Through `safe_apply` (kind `compose`): the new configuration is validated by running the collector image's own `validate` on it, passed in by value, because the reconciler's temporary file is not a path the host's Docker can mount. A configuration the collector rejects stops the run and the running container keeps the good configuration. |
+
+Not handled: switching a host between native and container (remove the old one first). Not yet run: a real Alpine or Unraid host; the container mode is tested against the collector image with a sink (logs from a syslog file in three line styles, container logs and host metrics arrive with the right labels) and in `ci/otel-container.sh` (the role applied from an Alpine container driving the host's Docker: it comes up, stays up with a dead Loki address, a second run changes nothing, a bad configuration is refused). The collector logs a deprecation notice that the `hostmetrics` receiver is being renamed `host_metrics`; it applies to the native service too and is left as it is until the pinned version changes.
 
 Tested on a clean Debian 13 machine against Loki 3.7.8 with Docker and a running container: check, apply, check, apply (the last two
 change nothing); journal lines written after start and container lines arrived with the right labels.

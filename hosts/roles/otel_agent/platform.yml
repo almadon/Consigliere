@@ -1,3 +1,4 @@
 ---
-# What this role needs from the platform (hosts/platforms/README.md). It changes the host, installs with apt and drives systemd services.
-requires: [host, apt, systemd]
+# What this role needs from the platform (hosts/platforms/README.md). It runs as a systemd service from a .deb where there is apt and systemd, and as a container (all it needs is Docker)
+# everywhere else: the mode is chosen inside the role (otel_agent_mode).
+requires: [docker]

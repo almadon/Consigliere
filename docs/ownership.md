@@ -14,7 +14,7 @@ A role that sets something up and then leaves it to the app's own UI is a legiti
 | Docker engine, published-port guard | This repo | Rewritten every run | The guard is what keeps ufw meaningful | `docker` role | Package manager |
 | Traefik routes, headers, certificates | This repo | Rewritten every run, via `safe_apply` for service config | Routes are declared per host | Fleet `config/routes/<domain>.yml` | `<file>.last-good` next to each file |
 | ACME issuance | Cert Warden (this repo deploys it) | Issued once, fetched as files | DNS credentials live on one host | `certwarden_*` roles | Cert Warden's own store |
-| otel agent config | This repo | Rewritten every run, via `safe_apply` | The collector must never crash-loop silently | `otel_agent` defaults and fleet vars | `<file>.last-good` |
+| otel agent config | This repo | Rewritten every run, via `safe_apply`; a systemd service where there is apt and systemd, a container elsewhere | The collector must never crash-loop silently | `otel_agent` defaults and fleet vars | `<file>.last-good` |
 | Loki, VictoriaMetrics storage | The service | Data kept on a data disk | Data is not config | Retention in role vars | Per the fleet's backup jobs |
 | Grafana data sources and provisioned dashboards | This repo | Rewritten every run | Dashboards from git survive a rebuild | Fleet `assets/dashboards/*.json` | Git |
 | Grafana dashboards saved in the UI | You, in Grafana | Not touched | A UI edit is a deliberate act | Grafana | Grafana's database |

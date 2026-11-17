@@ -1,0 +1,17 @@
+---
+# The otel_agent role in container mode, applied the way the container reconciler applies it on Alpine and Unraid: Ansible in a container (ci/otel-in-container.sh) drives
+# the host's Docker. The collector's Loki address is a dead port on purpose: the agent keeps its queue and retries, it must stay up.
+- name: The otel_agent role as a container
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  vars:
+    platform_runtime: container
+    platform_host: alpine
+    common_dir: "{{ lookup('env', 'WORK') }}/common"
+    otel_agent_loki_url: http://127.0.0.1:9/otlp
+    otel_agent_host_name: ci-alpine
+    otel_agent_hostmetrics: false
+  roles:
+    - platform
+    - otel_agent

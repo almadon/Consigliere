@@ -4,10 +4,45 @@ extensions:
     directory: /var/lib/otelcol-contrib/storage
 
 receivers:
-{% if otel_agent_journal | bool %}
+{% if _otel_agent_journal %}
   journald:
     priority: {{ otel_agent_journal_priority }}
     storage: file_storage
+{% endif %}
+{% if _otel_agent_system_logs | length > 0 %}
+  # The system log of a host without a journal: syslog lines in a file ("Nov 17 12:05:09 host sshd[777]: message"; BusyBox's syslogd adds "facility.level" before the program).
+  # Not syslog_parser: that expects the <PRI> prefix of syslog on the wire, which a file does not have. The time is the time the line was read (the file is followed live).
+  # A line this cannot read is still delivered, as it is.
+  file_log/system:
+    include: {{ _otel_agent_system_logs | to_json }}
+    include_file_path: false
+    start_at: end
+    storage: file_storage
+    operators:
+      - type: regex_parser
+        regex: '^(?P<ts>\w{3}\s+\d+\s+\d{2}:\d{2}:\d{2})\s+(?P<hostname>\S+)\s+(?:(?P<facility>[a-z0-9]+\.[a-z]+)\s+)?(?P<unit>[^\s:\[]+)(?:\[(?P<pid>\d+)\])?:\s*(?P<message>.*)$'
+        on_error: send_quiet
+      - type: move
+        from: attributes.message
+        to: body
+        if: 'attributes.message != nil'
+        on_error: send_quiet
+      - type: remove
+        field: attributes.ts
+        if: 'attributes.ts != nil'
+        on_error: send_quiet
+      - type: remove
+        field: attributes.hostname
+        if: 'attributes.hostname != nil'
+        on_error: send_quiet
+      - type: remove
+        field: attributes.facility
+        if: 'attributes.facility != nil'
+        on_error: send_quiet
+      - type: remove
+        field: attributes.pid
+        if: 'attributes.pid != nil'
+        on_error: send_quiet
 {% endif %}
 {% if _otel_agent_docker %}
   file_log/docker:
@@ -43,6 +78,9 @@ receivers:
 {% if otel_agent_hostmetrics | bool %}
   hostmetrics:
     collection_interval: {{ otel_agent_hostmetrics_interval }}
+{% if _otel_agent_hostfs | length > 0 %}
+    root_path: {{ _otel_agent_hostfs | to_json }}
+{% endif %}
     scrapers:
       cpu:
         metrics:
@@ -126,7 +164,7 @@ processors:
 {% for k, v in otel_agent_attributes.items() %}
       - {key: {{ k | to_json }}, value: {{ v | to_json }}, action: upsert}
 {% endfor %}
-{% if otel_agent_journal | bool %}
+{% if _otel_agent_journal %}
   # A journal entry arrives with its fields as the body; keep the message as the body and the unit as the attribute "unit".
   transform/journald:
     error_mode: ignore
@@ -167,10 +205,16 @@ exporters:
 service:
   extensions: [file_storage]
   pipelines:
-{% if otel_agent_journal | bool %}
+{% if _otel_agent_journal %}
     logs/journal:
       receivers: [journald]
       processors: [memory_limiter, transform/journald, resource, batch]
+      exporters: [otlp_http/loki]
+{% endif %}
+{% if _otel_agent_system_logs | length > 0 %}
+    logs/system:
+      receivers: [file_log/system]
+      processors: [memory_limiter, resource, batch]
       exporters: [otlp_http/loki]
 {% endif %}
 {% if _otel_agent_docker %}

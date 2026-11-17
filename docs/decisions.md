@@ -64,7 +64,7 @@ Numbered, never reused. A reversed decision gets a new entry that supersedes the
 
 ## 14. A mirror outage must not stop the whole reconcile
 
-**Chosen.** The baseline's apt step is now three tasks: refresh the package lists (a failure is reported, not fatal), say so when it failed, then install the baseline packages without forcing a refresh. A `baseline_apt_retries` of `null` now removes the drop-in instead of leaving it. **Why.** On the first day of the `Acquire::Retries "0"` stopgap (decision 8), ampere's reconcile failed at "Install baseline packages": its cloud provider's Ubuntu mirror returned 503 for every index file for over two minutes, and the single apt task stopped every role after it. **Cost.** A host whose lists are stale will install packages from them; the install still fails if something it needs is truly missing. **Revisit if** a stale cache ever causes a wrong install. Decision 8's stopgap is no longer needed on the hosts checked (all on a fixed apt); setting `baseline_apt_retries: null` in the fleet removes it.
+**Chosen.** The baseline's apt step is now three tasks: refresh the package lists (a failure is reported, not fatal), say so when it failed, then install the baseline packages without forcing a refresh. A `baseline_apt_retries` of `null` now removes the drop-in instead of leaving it. **Why.** On the first day of the `Acquire::Retries "0"` stopgap (decision 8), a small ARM VPS's reconcile failed at "Install baseline packages": its cloud provider's Ubuntu mirror returned 503 for every index file for over two minutes, and the single apt task stopped every role after it. **Cost.** A host whose lists are stale will install packages from them; the install still fails if something it needs is truly missing. **Revisit if** a stale cache ever causes a wrong install. Decision 8's stopgap is no longer needed on the hosts checked (all on a fixed apt); setting `baseline_apt_retries: null` in the fleet removes it.
 
 ## 15. One access policy for Windows remote access; SSH by firewall, not by bind address
 
@@ -170,3 +170,14 @@ Numbered, never reused. A reversed decision gets a new entry that supersedes the
 **Rejected.** `unarchive` (GNU-tar assumptions, awkward on busybox). Trusting a checksum file fetched from the same release as the archive without saying so: allowed (`checksum_url`) but named in the interface, so the choice is visible.
 
 **Revisit when** a role needs `artifact` for real (then the daemon primitive is designed with it), or when an archive format other than tar.gz or a bare binary is needed.
+
+## 27. The collector on hosts without apt and systemd runs as a container, not as a native port
+
+**Chosen.** `otel_agent` has a second mode: on a platform without apt and systemd (Alpine, Unraid, a container reconciler) it runs the collector image under Docker and reads the host through read-only mounts, with the system log taken from a file instead of the journal. `otel_agent_mode: auto` picks native where it can, so every Debian and Ubuntu host runs exactly what it ran before (checked by rendering the old and new configuration template for the same variables: byte for byte the same). The role now needs only the `docker` capability. This replaces the idea of a `daemon` primitive (a unit or an OpenRC script with a user and limits) for this role.
+
+**Cost.** A root container with host networking and a read-only view of the host's logs (and, with host metrics on, of the whole filesystem) is a wider trust surface than an unprivileged systemd service; the container drops every capability but one and is read-only, and the host mount is opt-in. Logs from a plain file have the time they were read, not the time written, and a line format the parser does not know is delivered unparsed. Switching a host between the two modes is not handled. The configuration holds a table of container names, so it changes when containers come and go (as before); the collector's own container is left out of that table, or each apply would recreate it and change the table again, forever.
+
+**Rejected.** A native OpenRC port: it needs a daemon primitive, the collector's user and group, a hand-written init script and a tarball install, all for one role. The collector with Docker's socket: the read-only proxy stays. Reading the host's `/` by default: only with host metrics on.
+
+**Revisit when** a second role needs a long-running native service on a host without systemd (then the daemon primitive is worth designing), or when the container mode has run on a real Alpine or Unraid host long enough to trust it.
+

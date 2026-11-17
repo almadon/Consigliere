@@ -18,3 +18,12 @@ jobs:
 
       - name: ${{ matrix.image }}
         run: ci/run-matrix.sh ${{ matrix.image }}
+
+  # The otel_agent role as a container, applied from an Alpine container that drives the runner's Docker (what the container reconciler does on Alpine and Unraid).
+  otel-container:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: otel_agent in container mode
+        run: ci/otel-container.sh

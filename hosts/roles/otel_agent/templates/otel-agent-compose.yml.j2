@@ -1,0 +1,35 @@
+# Managed by Ansible (hosts/roles/otel_agent) -- edits here get overwritten on the next reconciliation run.
+# The OpenTelemetry Collector as a container, for hosts without apt and systemd (Alpine, Unraid): it reads the host through read-only mounts and ships to Loki and
+# VictoriaMetrics exactly as the native service does. Root inside the container (to read root-owned logs) but with every capability dropped except the one that
+# lets root read them, a read-only root filesystem and no new privileges. Host networking so 127.0.0.1 is the host (the Docker proxy, the syslog and OTLP listeners).
+services:
+  otel-agent:
+    image: {{ otel_agent_image }}:{{ otel_agent_version }}
+    container_name: otel-agent
+    restart: always
+    user: "0:0"
+    network_mode: host
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add: [DAC_READ_SEARCH]
+    mem_limit: {{ otel_agent_memory_max | lower }}
+    # Its own log stays with Docker (`docker logs otel-agent` works) and is not the json-file the collector reads: the collector must not ship or follow itself.
+    logging:
+      driver: local
+      options: {max-size: 10m, max-file: "3"}
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - {{ otel_agent_container_dir }}/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - {{ otel_agent_container_dir }}/storage:/var/lib/otelcol-contrib/storage
+{% if _otel_agent_docker %}
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+{% endif %}
+{% for d in _otel_agent_system_logs | map('dirname') | unique | sort %}
+      - {{ d }}:{{ d }}:ro
+{% endfor %}
+{% if _otel_agent_hostfs | length > 0 %}
+      # Only when host metrics are on: the whole host, read-only, for CPU, memory, load and filesystem numbers (the collector's root_path points here).
+      - /:{{ _otel_agent_hostfs }}:ro,rslave
+{% endif %}
