@@ -2,7 +2,3 @@
 - name: Reload systemd for docker
   ansible.builtin.systemd:
     daemon_reload: true
-
-- name: Refresh the package index after the Docker repo changed
-  ansible.builtin.apt:
-    update_cache: true

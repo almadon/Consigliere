@@ -1,0 +1,20 @@
+name: platforms
+
+# The platform layer on a real Debian, Ubuntu and Alpine (ci/run-matrix.sh runs each in a container): detection, the package and repository tasks, and that a second run changes nothing.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  matrix:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["debian:13", "ubuntu:24.04", "alpine:3.22"]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: ${{ matrix.image }}
+        run: ci/run-matrix.sh ${{ matrix.image }}

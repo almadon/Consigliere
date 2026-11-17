@@ -1,3 +1,5 @@
 ---
-# What this role needs from the platform (hosts/platforms/README.md). It changes the host, installs with apt and drives systemd services.
-requires: [host, apt, systemd]
+# What this role needs from the platform (hosts/platforms/README.md). It changes the host. Its apt-only parts (the apt retry setting, apt lists, unattended upgrades) and
+# its systemd-only parts (journal limits, the reconcile unit's drop-in) are guarded inside the role by the apt and systemd capabilities, so it runs on any host with a package
+# manager and an init system.
+requires: [host]

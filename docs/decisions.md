@@ -140,3 +140,13 @@ Numbered, never reused. A reversed decision gets a new entry that supersedes the
 **Rejected.** Tagging hosts with the domains they serve: one domain's routes are usually split across hosts (public and internal), so a host tag would mean all or nothing for a file; `via` per route with a file default covers both. Deriving each host's `cert:` tag from the files in this step: the tag also selects roles and secret grants at planning time, before the routes are read, so for now the files name the certificate and the role checks it agrees with the host.
 
 **Revisit when** the check is more of a chore than a help (then derive the certificate from the files, which means teaching the planner to read them), or when a route needs different settings on each of the hosts that serve it.
+
+## 24. Package, repository and service tasks in the platform role; roles degrade by capability
+
+**Chosen.** The platform role has three tasks every platform answers (`tasks_from: package`, `repo`, `service`), driven by the profile: apt, apk or the generic module for packages; the vendor's key and source file on apt (moved from the docker and tailscale roles, behaviour unchanged) and the community repository on Alpine; `systemd` or `service` for services, with the profile's `packages:` and `services:` maps giving each platform's names. `docker` and `tailscale` use them and declare `requires: [host, package, service]`; `baseline` declares only `host` and guards its apt-only parts (retry setting, lists, unattended upgrades) and its systemd-only parts by capability, so it runs on a host with a different package manager and init. The sshd reload handler has an OpenRC variant. A matrix in `ci/` runs the platform layer in Debian, Ubuntu and Alpine containers on every push.
+
+**Cost.** One more layer between a role and `apt`, so a Debian-only reader has to look in `hosts/roles/platform/tasks/`. The Alpine paths (community repository, `conf.d` ordering for docker, the OpenRC handler) are tested only in a container, not on a long-lived Alpine host, until one runs the reconciler on the host itself (decision 18). The UDP GRO tuning and the firewall stay systemd and ufw only.
+
+**Rejected.** `ansible.builtin.package` for everything: it cannot refresh an index or tell apt to update on install, which tailscale relies on. A per-distribution copy of each role: that is the Debian-only shape this removes.
+
+**Revisit when** a platform needs a task the three do not cover (a repository with a different mechanism, a service with a different state model), or when the matrix gets slow enough to matter.

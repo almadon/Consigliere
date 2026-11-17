@@ -19,6 +19,18 @@ baseline_packages:
   - unattended-upgrades
   - apt-listchanges
 
+# The same, by apk, on an Alpine host (Alpine's names; ufw and unattended-upgrades are Debian's and have no counterpart here).
+baseline_packages_apk:
+  - sudo
+  - curl
+  - gnupg
+  - ca-certificates
+  - git
+  - jq
+  - rsync
+  - htop
+  - tzdata
+
 # Acquire::Retries for apt. 0 = a failed download is not retried, which closes CVE-2026-109518
 # (retry-driven package swap, fixed in apt 2.4.15 / 2.6.2 / 2.8.4 / 3.0.4 and later). This is a
 # stopgap taken from secondary reports, not from the Debian/Ubuntu advisories, which only say to

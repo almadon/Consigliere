@@ -1,0 +1,33 @@
+---
+# apk: Alpine's own community repository holds docker, tailscale and most of what the roles install, so there is no vendor key or source to add: only make sure the
+# `community` repository is enabled in /etc/apk/repositories (it is commented out in some images).
+- name: Work out the Alpine release for the repository URL
+  ansible.builtin.set_fact:
+    _platform_apk_release: "{{ (platform_version.full | default('')).split('.')[:2] | join('.') }}"
+
+- name: Is the community repository enabled?
+  ansible.builtin.command: grep -Eq '^[^#]*/community/?$' /etc/apk/repositories
+  register: _platform_apk_community
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Enable the community repository
+  ansible.builtin.lineinfile:
+    path: /etc/apk/repositories
+    line: "https://dl-cdn.alpinelinux.org/alpine/v{{ _platform_apk_release }}/community"
+    state: present
+  register: _platform_repo_apk_line
+  when:
+    - platform_repo.apk.community | default(true) | bool
+    - _platform_apk_community.rc != 0
+    - _platform_apk_release | length > 0
+
+- name: Note whether the repository changed
+  ansible.builtin.set_fact:
+    platform_repo_changed: "{{ _platform_repo_apk_line.changed | default(false) }}"
+
+- name: Refresh the package index after the repository changed
+  community.general.apk:
+    update_cache: true
+  when: platform_repo_changed | bool

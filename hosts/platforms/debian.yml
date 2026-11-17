@@ -2,11 +2,20 @@
 # Debian and Ubuntu: the full profile (Ansible on the host, systemd timer, apt).
 family: debian
 tier: full
-capabilities: [host, apt, systemd, docker, ufw]
+capabilities: [host, apt, systemd, docker, ufw, package, service]
 defaults:
   pkg_manager: apt
   init: systemd
   ssh_service: ssh
+# Logical names a role asks for (platform: tasks_from package / service), mapped to what this platform calls them. A name with no entry is used as it is, which is right
+# for the many packages that are called the same everywhere (git, curl, jq).
+packages:
+  docker: [docker-ce, docker-ce-cli, containerd.io, docker-compose-plugin]
+  tailscale: [tailscale]
+services:
+  docker: docker
+  tailscale: tailscaled
+  ssh: ssh
 # How to read the installed version of a tool a role may need (platform_tool_version, tasks_from: tool_version). Printed alone on stdout.
 tools:
   apt: "dpkg-query -W -f='${Version}' apt"

@@ -1,69 +1,38 @@
 ---
-# deb822 .sources file + an armored key, written with plain file modules: no gpg or
-# apt-key needed on the host (Debian 13 has neither by default), and it is the layout
-# Docker's own instructions use, so a host that already follows them stays unchanged.
-- name: Is the Docker apt source already set up another way?
+# The package repository and the install go through the platform layer (roles/platform: tasks_from repo and package). On apt that is Docker's own repository, a deb822 .sources
+# file plus an armored key written with plain file modules (the layout Docker's instructions use, so a host that already follows them stays unchanged); on Alpine it is the
+# community repository, which has docker.
+- name: Add the Docker package repository
   ansible.builtin.include_role:
-    name: baseline
-    tasks_from: apt_foreign_source
+    name: platform
+    tasks_from: repo
   vars:
-    baseline_apt_source_host: download.docker.com
-    baseline_apt_our_files: [/etc/apt/sources.list.d/docker.sources]
-    baseline_apt_our_keyrings: [/etc/apt/keyrings/docker.asc]
+    platform_repo:
+      host: download.docker.com
+      apk:
+        community: true
+      apt:
+        sources_file: /etc/apt/sources.list.d/docker.sources
+        keyring: /etc/apt/keyrings/docker.asc
+        keyring_dir: /etc/apt/keyrings
+        key_url: "https://download.docker.com/linux/{{ ansible_facts['distribution'] | lower }}/gpg"
+        source:
+          content: |
+            Types: deb
+            URIs: https://download.docker.com/linux/{{ ansible_facts['distribution'] | lower }}
+            Suites: {{ ansible_facts['distribution_release'] }}
+            Components: stable
+            Architectures: {{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'amd64' }}
+            Signed-By: /etc/apt/keyrings/docker.asc
 
-- name: Create the apt keyrings directory
-  ansible.builtin.file:
-    path: /etc/apt/keyrings
-    state: directory
-    mode: "0755"
-
-# Fetched once, when it is missing. get_url on an old existing file would report "changed" in every check pass (it cannot
-# download then, so it assumes the server copy is newer), which makes drift reports noisy. To rotate the key, delete the file.
-- name: Is the Docker GPG key already there?
-  ansible.builtin.stat:
-    path: /etc/apt/keyrings/docker.asc
-  register: _docker_key_file
-
-- name: Add Docker GPG key
-  ansible.builtin.get_url:
-    url: "https://download.docker.com/linux/{{ ansible_facts['distribution'] | lower }}/gpg"
-    dest: /etc/apt/keyrings/docker.asc
-    mode: "0644"
-  register: _docker_key
-  when:
-    - _baseline_apt_foreign | length == 0
-    - not _docker_key_file.stat.exists
-
-- name: Add Docker apt repo
-  ansible.builtin.copy:
-    dest: /etc/apt/sources.list.d/docker.sources
-    content: |
-      Types: deb
-      URIs: https://download.docker.com/linux/{{ ansible_facts['distribution'] | lower }}
-      Suites: {{ ansible_facts['distribution_release'] }}
-      Components: stable
-      Architectures: {{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'amd64' }}
-      Signed-By: /etc/apt/keyrings/docker.asc
-    owner: root
-    group: root
-    mode: "0644"
-  register: _docker_repo
-  notify: Refresh the package index after the Docker repo changed
-  when: _baseline_apt_foreign | length == 0
-
-- name: Pick up the new repo before installing from it
-  ansible.builtin.meta: flush_handlers
-
-- name: Install Docker CE
-  ansible.builtin.apt:
-    name:
-      - docker-ce
-      - docker-ce-cli
-      - containerd.io
-      - docker-compose-plugin
-    state: present
-  # In a check run on a new host the repo files above are only simulated, so apt can't see the packages.
-  when: not ansible_check_mode or not (_docker_key.changed | default(false) or _docker_repo.changed | default(false))
+- name: Install Docker
+  ansible.builtin.include_role:
+    name: platform
+    tasks_from: package
+  vars:
+    platform_package: docker
+  # In a check run on a new host the repo files above are only simulated, so the package manager can't see the packages.
+  when: not ansible_check_mode or not (platform_repo_changed | default(false) | bool)
 
 - name: Is Docker installed?
   ansible.builtin.stat:
@@ -82,6 +51,7 @@
     path: /etc/systemd/system/docker.service.d
     state: directory
     mode: "0755"
+  when: "'systemd' in platform_capabilities"
 
 - name: Order docker after tailscaled
   ansible.builtin.copy:
@@ -92,12 +62,25 @@
       Wants=tailscaled.service
     mode: "0644"
   notify: Reload systemd for docker
+  when: "'systemd' in platform_capabilities"
+
+# The same ordering on OpenRC: start docker after tailscale, and ask for it to be started.
+- name: Order docker after tailscale (OpenRC)
+  ansible.builtin.lineinfile:
+    path: /etc/conf.d/docker
+    regexp: '^#?{{ item }}='
+    line: '{{ item }}="tailscale"'
+    create: true
+    mode: "0644"
+  loop: [rc_after, rc_want]
+  when: "'openrc' in platform_capabilities"
 
 - name: Enable + start docker
-  ansible.builtin.systemd:
-    name: docker
-    enabled: true
-    state: started
+  ansible.builtin.include_role:
+    name: platform
+    tasks_from: service
+  vars:
+    platform_service: docker
 
 - name: Add users to docker group
   ansible.builtin.user:

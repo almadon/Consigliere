@@ -1,0 +1,70 @@
+---
+# The platform layer on a real distribution, run by ci/in-container.sh inside a container (Debian, Ubuntu, Alpine). It checks that the platform is recognised, that the package
+# and repository primitives work on it, and (the script runs this twice) that they do nothing the second time.
+- name: The platform layer on {{ lookup('env', 'EXPECT_FAMILY') }}
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  vars:
+    expect_family: "{{ lookup('env', 'EXPECT_FAMILY') }}"
+    expect_pkg_manager: "{{ lookup('env', 'EXPECT_PKG_MANAGER') }}"
+  tasks:
+    - name: Work out the platform
+      ansible.builtin.include_role:
+        name: platform
+
+    - name: The platform is recognised
+      ansible.builtin.assert:
+        that:
+          - platform_family == expect_family
+          - platform_runtime_mode == 'host'
+          - platform_defaults.pkg_manager == expect_pkg_manager
+          - "'package' in platform_capabilities"
+          - "'service' in platform_capabilities"
+          - platform_version.full | length > 0
+          - platform_arch in ['amd64', 'arm64']
+        quiet: true
+
+    - name: Install packages through the platform layer (a plain name and a logical one)
+      ansible.builtin.include_role:
+        name: platform
+        tasks_from: package
+      vars:
+        platform_package: [jq, git]
+        platform_package_update: true
+
+    - name: Add a vendor repository through the platform layer (Tailscale's)
+      ansible.builtin.include_role:
+        name: platform
+        tasks_from: repo
+      vars:
+        platform_repo:
+          host: pkgs.tailscale.com
+          apk:
+            community: true
+          apt:
+            sources_file: /etc/apt/sources.list.d/tailscale.list
+            keyring: /usr/share/keyrings/tailscale-archive-keyring.gpg
+            key_url: "https://pkgs.tailscale.com/stable/{{ ansible_facts['distribution'] | lower }}/{{ ansible_facts['distribution_release'] }}.noarmor.gpg"
+            source:
+              url: "https://pkgs.tailscale.com/stable/{{ ansible_facts['distribution'] | lower }}/{{ ansible_facts['distribution_release'] }}.tailscale-keyring.list"
+
+    - name: What the repository left behind
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /etc/apt/sources.list.d/tailscale.list
+        - /usr/share/keyrings/tailscale-archive-keyring.gpg
+      register: _matrix_apt_files
+      when: platform_defaults.pkg_manager == 'apt'
+
+    - name: Debian and Ubuntu have the key and the source file
+      ansible.builtin.assert:
+        that: _matrix_apt_files.results | map(attribute='stat.exists') | min
+        quiet: true
+      when: platform_defaults.pkg_manager == 'apt'
+
+    - name: Alpine has the community repository enabled
+      ansible.builtin.command: grep -Eq '^[^#]*/community/?$' /etc/apk/repositories
+      changed_when: false
+      when: platform_defaults.pkg_manager == 'apk'

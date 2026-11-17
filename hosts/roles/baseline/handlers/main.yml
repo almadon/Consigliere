@@ -3,7 +3,8 @@
 # on SIGHUP, cannot bind port 22 because systemd's socket holds it ("fatal: Cannot bind any address"), exits, and the service stays stopped until the next
 # connection starts it. So: with the socket active restart the service (the socket keeps the port, and sessions survive: KillMode=process); otherwise
 # reload, falling back to a restart; and in every case end with sshd running.
-- name: Reload sshd
+- name: Reload sshd (systemd)
+  listen: Reload sshd
   ansible.builtin.shell: |
     set -e
     if systemctl is-active --quiet ssh.socket; then
@@ -15,4 +16,18 @@
   args:
     executable: /bin/bash
   changed_when: true
-  when: not ansible_check_mode
+  when:
+    - "'systemd' in platform_capabilities"
+    - not ansible_check_mode
+
+# OpenRC (Alpine): no socket activation, so a reload is safe; fall back to a restart, and in every case end with sshd running.
+- name: Reload sshd (OpenRC)
+  listen: Reload sshd
+  ansible.builtin.shell: |
+    set -e
+    rc-service sshd reload || rc-service sshd restart
+    rc-service sshd status >/dev/null || rc-service sshd start
+  changed_when: true
+  when:
+    - "'openrc' in platform_capabilities"
+    - not ansible_check_mode

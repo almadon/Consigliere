@@ -1,0 +1,29 @@
+---
+# Enables and starts a service on this platform's init system (systemd, OpenRC). Used as
+#   include_role: {name: platform, tasks_from: service}   with   vars: {platform_service: docker}
+# Inputs:
+#   platform_service          a logical name from the profile's `services:` map (tailscale -> tailscaled on Debian, tailscale on Alpine) or the service's own name
+#   platform_service_enabled  start at boot (default true)
+#   platform_service_state    started (default), stopped, restarted, reloaded
+# Changes the host. A change that is only systemd (a unit's drop-in, a timer) belongs to a task guarded by the `systemd` capability, not here.
+- name: Work out the platform if that has not been done
+  ansible.builtin.include_tasks: main.yml
+  when: platform_runtime_mode is not defined
+
+- name: Work out the service name for this platform
+  ansible.builtin.set_fact:
+    _platform_service_name: "{{ (_platform_profile.services | default({})).get(platform_service, platform_service) }}"
+
+- name: "Enable and start a service on systemd: {{ _platform_service_name }}"
+  ansible.builtin.systemd:
+    name: "{{ _platform_service_name }}"
+    enabled: "{{ platform_service_enabled | default(true) | bool }}"
+    state: "{{ platform_service_state | default('started') }}"
+  when: "'systemd' in platform_capabilities"
+
+- name: "Enable and start a service on another init system: {{ _platform_service_name }}"
+  ansible.builtin.service:
+    name: "{{ _platform_service_name }}"
+    enabled: "{{ platform_service_enabled | default(true) | bool }}"
+    state: "{{ platform_service_state | default('started') }}"
+  when: "'systemd' not in platform_capabilities"

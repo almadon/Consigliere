@@ -18,12 +18,15 @@
 - name: UDP GRO forwarding on the default-route interface
   when:
     - tailscale_udp_gro_tuning | bool
+    - "'systemd' in platform_capabilities"   # a systemd service applies it at boot, and hand-made units are retired: nothing of that without systemd
     - ansible_facts['virtualization_type'] | default('') not in ['lxc', 'docker', 'podman', 'openvz']
   block:
     - name: Install ethtool
-      ansible.builtin.apt:
-        name: ethtool
-        state: present
+      ansible.builtin.include_role:
+        name: platform
+        tasks_from: package
+      vars:
+        platform_package: ethtool
 
     - name: Which interface carries the default route
       ansible.builtin.shell: set -o pipefail && ip -o route get 1.1.1.1 | sed -n 's/.* dev \([^ ]*\).*/\1/p' | head -n1

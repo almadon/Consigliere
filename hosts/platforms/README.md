@@ -18,6 +18,21 @@ A role states what it needs in `hosts/roles/<role>/platform.yml`:
     requires: [host, apt, systemd]              # capabilities
     requires_version: {apt: ">=2.4,<2.6.2"}     # versions of tools on the host: comma-separated <op><version>
 
+### Package, repository and service tasks
+
+Roles do not call `apt` or `systemctl` for the things every platform has; they ask the platform role (`include_role: {name: platform, tasks_from: ...}`):
+
+| Task | Inputs | What it does |
+|---|---|---|
+| `package` | `platform_package` (a logical name, a plain package name, or a list), `platform_package_update` | Installs through apt, apk or the generic module. A logical name comes from the profile's `packages:` map (`docker` is `docker-ce`, `docker-ce-cli`, ... on Debian and `docker`, `docker-cli-compose` on Alpine); a name with no entry is used as it is. |
+| `repo` | `platform_repo` (`host`, and `apt:` / `apk:` settings) | Makes a vendor's repository available: key and source file on apt (a source set up another way is used instead of adding a second one), the community repository on Alpine. Sets `platform_repo_changed`. |
+| `service` | `platform_service` (a logical name or the service's own), `platform_service_enabled`, `platform_service_state` | Enables and starts it on systemd or OpenRC; the profile's `services:` map gives the platform's name (`tailscale` is `tailscaled` on Debian). |
+
+What only one init system has (a systemd unit's drop-in, a timer, an OpenRC `conf.d` line) stays in a task guarded by that capability (`'systemd' in platform_capabilities`), so a role degrades
+by capability instead of failing. The capabilities `package` and `service` say a platform has these primitives; a role that only needs them (docker, tailscale) declares `requires: [host, package, service]`.
+
+The matrix in `ci/` runs the platform layer for real on Debian, Ubuntu and Alpine in containers (`ci/run-matrix.sh`; CI does the same).
+
 ### Versions
 
 Platforms differ by release as well as by family (the apt retry vulnerability is in apt 2.4 and later but not in Debian 11's apt 2.2, and Ubuntu 24.04 is not Debian 12).

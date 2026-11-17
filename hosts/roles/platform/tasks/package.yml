@@ -1,0 +1,40 @@
+---
+# Installs packages through this platform's package manager (apt, apk, ...). Used as
+#   include_role: {name: platform, tasks_from: package}   with   vars: {platform_package: docker}
+# Inputs:
+#   platform_package         a logical name from the profile's `packages:` map (docker -> docker-ce, ... on Debian; docker, docker-cli-compose on Alpine), a plain package name
+#                            (used as it is when the profile has no entry for it), or a list of either
+#   platform_package_update  refresh the package index first (apt update_cache, apk update); default false
+# Changes the host. Idempotent. The platform facts come first if nothing has worked them out yet in this play.
+- name: Work out the platform if that has not been done
+  ansible.builtin.include_tasks: main.yml
+  when: platform_runtime_mode is not defined
+
+- name: Work out the package names for this platform
+  ansible.builtin.set_fact:
+    _platform_package_names: >-
+      {%- set out = [] -%}
+      {%- for n in ([platform_package] if platform_package is string else platform_package) -%}
+      {%- for p in (_platform_profile.packages | default({})).get(n, [n]) -%}{%- set _ = out.append(p) -%}{%- endfor -%}
+      {%- endfor -%}
+      {{ out | unique | list | to_json }}
+
+- name: Install packages (apt)
+  ansible.builtin.apt:
+    name: "{{ _platform_package_names | from_json }}"
+    state: present
+    update_cache: "{{ platform_package_update | default(false) | bool }}"
+  when: platform_defaults.pkg_manager | default('') == 'apt'
+
+- name: Install packages (apk)
+  community.general.apk:
+    name: "{{ _platform_package_names | from_json }}"
+    state: present
+    update_cache: "{{ platform_package_update | default(false) | bool }}"
+  when: platform_defaults.pkg_manager | default('') == 'apk'
+
+- name: Install packages (any other package manager the generic module knows)
+  ansible.builtin.package:
+    name: "{{ _platform_package_names | from_json }}"
+    state: present
+  when: platform_defaults.pkg_manager | default('') not in ['apt', 'apk']

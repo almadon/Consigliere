@@ -2,11 +2,18 @@
 # Alpine on the host itself (a later step: today Alpine is reconciled by a container, so only `docker` is offered, see hosts/bootstrap/alpine/).
 family: alpine
 tier: full
-capabilities: [host, apk, openrc, docker]
+capabilities: [host, apk, openrc, docker, package, service]
 defaults:
   pkg_manager: apk
   init: openrc
   ssh_service: sshd
+packages:
+  docker: [docker, docker-cli-compose]
+  tailscale: [tailscale]
+services:
+  docker: docker
+  tailscale: tailscale
+  ssh: sshd
 tools:
   apk: "apk --version | awk '{print $2}' | tr -d ,"
 versions: []

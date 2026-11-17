@@ -1,0 +1,25 @@
+---
+# Makes a vendor's package repository available, the way this platform's package manager wants it. Used as
+#   include_role: {name: platform, tasks_from: repo}   with   vars: {platform_repo: {...}}
+# platform_repo:
+#   host:        a string in the repository's URL, to recognise a source that was set up another way
+#   apt:         for apt platforms: {sources_file, keyring, [keyring_dir], key_url, source: {content: ...} or {url: ...}}
+#   apk:         for apk platforms: {community: true} (the repository is Alpine's own community repository; nothing is added)
+# Sets platform_repo_changed (a key or a source file was written or replaced), so the caller can skip an install that a check run cannot simulate.
+# Changes the host. See repo_apt.yml and repo_apk.yml.
+- name: Work out the platform if that has not been done
+  ansible.builtin.include_tasks: main.yml
+  when: platform_runtime_mode is not defined
+
+- name: Add the repository (apt)
+  ansible.builtin.include_tasks: repo_apt.yml
+  when: platform_defaults.pkg_manager | default('') == 'apt'
+
+- name: Add the repository (apk)
+  ansible.builtin.include_tasks: repo_apk.yml
+  when: platform_defaults.pkg_manager | default('') == 'apk'
+
+- name: Say so when this platform has no way to add the repository
+  ansible.builtin.fail:
+    msg: "platform {{ platform_family }} (package manager {{ platform_defaults.pkg_manager | default('unknown') }}) cannot add the repository {{ platform_repo.host | default('') }}"
+  when: platform_defaults.pkg_manager | default('') not in ['apt', 'apk']

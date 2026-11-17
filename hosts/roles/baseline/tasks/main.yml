@@ -1,61 +1,75 @@
 ---
-# CVE-2026-109518: an on-path attacker can use redirects and transient errors to make apt
-# retry a download and swap a verified package. It needs Acquire::Retries to be non-zero.
-# Done before the first apt call below, and independent of the unattended-upgrades switch
-# (a Proxmox node still needs it). 99 so that it is read last and wins over scripts.
-# baseline_apt_retries: a number sets it, null removes the drop-in, `auto` sets 0 only where the installed apt version is in baseline_apt_retries_vulnerable.
-- name: Read the installed apt version (baseline_apt_retries is auto)
+# Debian and Ubuntu only: apt, its retry setting and its package lists. (Alpine is below.)
+- name: Packages and apt settings (apt platforms)
+  when: "'apt' in platform_capabilities"
+  block:
+    # CVE-2026-109518: an on-path attacker can use redirects and transient errors to make apt
+    # retry a download and swap a verified package. It needs Acquire::Retries to be non-zero.
+    # Done before the first apt call below, and independent of the unattended-upgrades switch
+    # (a Proxmox node still needs it). 99 so that it is read last and wins over scripts.
+    # baseline_apt_retries: a number sets it, null removes the drop-in, `auto` sets 0 only where the installed apt version is in baseline_apt_retries_vulnerable.
+    - name: Read the installed apt version (baseline_apt_retries is auto)
+      ansible.builtin.include_role:
+        name: platform
+        tasks_from: tool_version
+      vars:
+        platform_tool: apt
+      when: baseline_apt_retries == 'auto'
+
+    - name: Decide whether the apt retries stopgap applies here
+      ansible.builtin.set_fact:
+        _baseline_apt_retries_apply: >-
+          {{ (baseline_apt_retries is not none and baseline_apt_retries != 'auto')
+             or (baseline_apt_retries == 'auto'
+                 and (platform_tool_versions['apt'] | default('') | platform_version_matches_any(baseline_apt_retries_vulnerable))) }}
+
+    - name: Disable apt download retries (stopgap for CVE-2026-109518)
+      when: _baseline_apt_retries_apply | bool
+      ansible.builtin.copy:
+        dest: /etc/apt/apt.conf.d/99consigliere-apt-retries
+        content: |
+          // Managed by Ansible (hosts/roles/baseline). Stopgap for CVE-2026-109518.
+          Acquire::Retries "{{ 0 if baseline_apt_retries == 'auto' else baseline_apt_retries }}";
+        owner: root
+        group: root
+        mode: "0644"
+
+    # With the setting off (null) the drop-in goes, and apt's own default (retry a few times) comes back.
+    - name: Remove the apt retries drop-in (the setting is off, or apt is not in a vulnerable range)
+      when: not (_baseline_apt_retries_apply | bool)
+      ansible.builtin.file:
+        path: /etc/apt/apt.conf.d/99consigliere-apt-retries
+        state: absent
+
+    # A mirror that is down (a 503 from the cloud provider's Ubuntu mirror stopped a whole reconcile on ampere) must not stop every role
+    # after this one. Packages that are already installed need no download, so refresh the lists if we can, say so if we cannot, and let the
+    # install below fail only if something it needs is really missing.
+    - name: Refresh the apt package lists
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      register: _baseline_apt_refresh
+      ignore_errors: true  # noqa: ignore-errors
+
+    - name: Say so when the package lists could not be refreshed
+      when: _baseline_apt_refresh is failed
+      ansible.builtin.debug:
+        msg: "apt could not refresh its package lists (mirror down?): {{ _baseline_apt_refresh.msg | default('no message') }}. Carrying on with the lists already on the host."
+
+    - name: Install baseline packages
+      ansible.builtin.apt:
+        name: "{{ baseline_packages }}"
+        state: present
+
+# The same packages by apk on an Alpine host (the apt ones above are Debian's names and tools).
+- name: Install baseline packages (apk)
   ansible.builtin.include_role:
     name: platform
-    tasks_from: tool_version
+    tasks_from: package
   vars:
-    platform_tool: apt
-  when: baseline_apt_retries == 'auto'
-
-- name: Decide whether the apt retries stopgap applies here
-  ansible.builtin.set_fact:
-    _baseline_apt_retries_apply: >-
-      {{ (baseline_apt_retries is not none and baseline_apt_retries != 'auto')
-         or (baseline_apt_retries == 'auto'
-             and (platform_tool_versions['apt'] | default('') | platform_version_matches_any(baseline_apt_retries_vulnerable))) }}
-
-- name: Disable apt download retries (stopgap for CVE-2026-109518)
-  when: _baseline_apt_retries_apply | bool
-  ansible.builtin.copy:
-    dest: /etc/apt/apt.conf.d/99consigliere-apt-retries
-    content: |
-      // Managed by Ansible (hosts/roles/baseline). Stopgap for CVE-2026-109518.
-      Acquire::Retries "{{ 0 if baseline_apt_retries == 'auto' else baseline_apt_retries }}";
-    owner: root
-    group: root
-    mode: "0644"
-
-# With the setting off (null) the drop-in goes, and apt's own default (retry a few times) comes back.
-- name: Remove the apt retries drop-in (the setting is off, or apt is not in a vulnerable range)
-  when: not (_baseline_apt_retries_apply | bool)
-  ansible.builtin.file:
-    path: /etc/apt/apt.conf.d/99consigliere-apt-retries
-    state: absent
-
-# A mirror that is down (a 503 from the cloud provider's Ubuntu mirror stopped a whole reconcile on ampere) must not stop every role
-# after this one. Packages that are already installed need no download, so refresh the lists if we can, say so if we cannot, and let the
-# install below fail only if something it needs is really missing.
-- name: Refresh the apt package lists
-  ansible.builtin.apt:
-    update_cache: true
-    cache_valid_time: 3600
-  register: _baseline_apt_refresh
-  ignore_errors: true  # noqa: ignore-errors
-
-- name: Say so when the package lists could not be refreshed
-  when: _baseline_apt_refresh is failed
-  ansible.builtin.debug:
-    msg: "apt could not refresh its package lists (mirror down?): {{ _baseline_apt_refresh.msg | default('no message') }}. Carrying on with the lists already on the host."
-
-- name: Install baseline packages
-  ansible.builtin.apt:
-    name: "{{ baseline_packages }}"
-    state: present
+    platform_package: "{{ baseline_packages_apk }}"
+    platform_package_update: true
+  when: "'apk' in platform_capabilities"
 
 - name: Set timezone (only when baseline_timezone is set; otherwise leave it alone)
   community.general.timezone:
@@ -66,47 +80,51 @@
   ansible.builtin.import_tasks: hostname.yml
   when: baseline_short_hostname | bool
 
-# --- unattended upgrades ----------------------------------------------------
-- name: Turn on the periodic apt update + unattended upgrade
-  when: baseline_unattended_upgrades_manage | bool
-  ansible.builtin.copy:
-    dest: /etc/apt/apt.conf.d/20auto-upgrades
-    content: |
-      APT::Periodic::Update-Package-Lists "1";
-      APT::Periodic::Unattended-Upgrade "1";
-    owner: root
-    group: root
-    mode: "0644"
+# Debian and Ubuntu only: unattended-upgrades and the apt timers.
+- name: Unattended upgrades (apt platforms)
+  when: "'apt' in platform_capabilities"
+  block:
+    # --- unattended upgrades ----------------------------------------------------
+    - name: Turn on the periodic apt update + unattended upgrade
+      when: baseline_unattended_upgrades_manage | bool
+      ansible.builtin.copy:
+        dest: /etc/apt/apt.conf.d/20auto-upgrades
+        content: |
+          APT::Periodic::Update-Package-Lists "1";
+          APT::Periodic::Unattended-Upgrade "1";
+        owner: root
+        group: root
+        mode: "0644"
 
-# A drop-in instead of editing the vendor's 50unattended-upgrades: apt reads
-# apt.conf.d in order and the last value wins, so this needs no particular
-# contents (or even the package) to exist first, and survives package upgrades.
-- name: Configure unattended-upgrades (reboot, cleanup, extra origins)
-  when: baseline_unattended_upgrades_manage | bool
-  ansible.builtin.copy:
-    dest: /etc/apt/apt.conf.d/52consigliere-unattended-upgrades
-    content: |
-      // Managed by Ansible (hosts/roles/baseline)
-      Unattended-Upgrade::Automatic-Reboot "{{ baseline_unattended_upgrades_auto_reboot | lower }}";
-      Unattended-Upgrade::Automatic-Reboot-Time "{{ baseline_unattended_upgrades_reboot_time }}";
-      Unattended-Upgrade::Remove-Unused-Dependencies "{{ baseline_unattended_upgrades_remove_unused | lower }}";
-      Unattended-Upgrade::Remove-New-Unused-Dependencies "{{ baseline_unattended_upgrades_remove_unused | lower }}";
-      {% for o in baseline_unattended_upgrades_extra_origins %}
-      Unattended-Upgrade::Origins-Pattern:: "{{ o }}";
-      {% endfor %}
-    owner: root
-    group: root
-    mode: "0644"
+    # A drop-in instead of editing the vendor's 50unattended-upgrades: apt reads
+    # apt.conf.d in order and the last value wins, so this needs no particular
+    # contents (or even the package) to exist first, and survives package upgrades.
+    - name: Configure unattended-upgrades (reboot, cleanup, extra origins)
+      when: baseline_unattended_upgrades_manage | bool
+      ansible.builtin.copy:
+        dest: /etc/apt/apt.conf.d/52consigliere-unattended-upgrades
+        content: |
+          // Managed by Ansible (hosts/roles/baseline)
+          Unattended-Upgrade::Automatic-Reboot "{{ baseline_unattended_upgrades_auto_reboot | lower }}";
+          Unattended-Upgrade::Automatic-Reboot-Time "{{ baseline_unattended_upgrades_reboot_time }}";
+          Unattended-Upgrade::Remove-Unused-Dependencies "{{ baseline_unattended_upgrades_remove_unused | lower }}";
+          Unattended-Upgrade::Remove-New-Unused-Dependencies "{{ baseline_unattended_upgrades_remove_unused | lower }}";
+          {% for o in baseline_unattended_upgrades_extra_origins %}
+          Unattended-Upgrade::Origins-Pattern:: "{{ o }}";
+          {% endfor %}
+        owner: root
+        group: root
+        mode: "0644"
 
-- name: Make sure the apt timers that drive it are enabled
-  when: baseline_unattended_upgrades_manage | bool
-  ansible.builtin.systemd:
-    name: "{{ item }}"
-    enabled: true
-    state: started
-  loop:
-    - apt-daily.timer
-    - apt-daily-upgrade.timer
+    - name: Make sure the apt timers that drive it are enabled
+      when: baseline_unattended_upgrades_manage | bool
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+      loop:
+        - apt-daily.timer
+        - apt-daily-upgrade.timer
 
 - name: Authorize the fleet's admin SSH keys for root
   ansible.posix.authorized_key:

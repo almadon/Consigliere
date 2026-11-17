@@ -1,52 +1,31 @@
 ---
-- name: Is the Tailscale apt source already set up another way?
+# The package repository and the install go through the platform layer (roles/platform: tasks_from repo and package). On apt that is Tailscale's own repository (a key and a
+# .list file, each fetched once when missing); on Alpine it is the community repository, which has tailscale.
+- name: Add the Tailscale package repository
   ansible.builtin.include_role:
-    name: baseline
-    tasks_from: apt_foreign_source
+    name: platform
+    tasks_from: repo
   vars:
-    baseline_apt_source_host: pkgs.tailscale.com
-    baseline_apt_our_files: [/etc/apt/sources.list.d/tailscale.list]
-    baseline_apt_our_keyrings: [/usr/share/keyrings/tailscale-archive-keyring.gpg]
+    platform_repo:
+      host: pkgs.tailscale.com
+      apk:
+        community: true
+      apt:
+        sources_file: /etc/apt/sources.list.d/tailscale.list
+        keyring: /usr/share/keyrings/tailscale-archive-keyring.gpg
+        key_url: "https://pkgs.tailscale.com/stable/{{ ansible_facts['distribution'] | lower }}/{{ ansible_facts['distribution_release'] }}.noarmor.gpg"
+        source:
+          url: "https://pkgs.tailscale.com/stable/{{ ansible_facts['distribution'] | lower }}/{{ ansible_facts['distribution_release'] }}.tailscale-keyring.list"
 
-- name: Add Tailscale apt repo + install
-  block:
-    # Fetched once, when missing: get_url on an old existing file reports "changed" in every check pass (it cannot download
-    # then, so it assumes the server copy is newer). To rotate the key or the list, delete the file.
-    - name: Are the Tailscale key and repo list already there?
-      ansible.builtin.stat:
-        path: "{{ item }}"
-      loop:
-        - /usr/share/keyrings/tailscale-archive-keyring.gpg
-        - /etc/apt/sources.list.d/tailscale.list
-      register: _tailscale_files
-
-    - name: Add Tailscale GPG key
-      ansible.builtin.get_url:
-        url: "https://pkgs.tailscale.com/stable/{{ ansible_facts['distribution'] | lower }}/{{ ansible_facts['distribution_release'] }}.noarmor.gpg"
-        dest: /usr/share/keyrings/tailscale-archive-keyring.gpg
-        mode: "0644"
-      register: _tailscale_key
-      when:
-        - _baseline_apt_foreign | length == 0
-        - not _tailscale_files.results[0].stat.exists
-
-    - name: Add Tailscale apt repo
-      ansible.builtin.get_url:
-        url: "https://pkgs.tailscale.com/stable/{{ ansible_facts['distribution'] | lower }}/{{ ansible_facts['distribution_release'] }}.tailscale-keyring.list"
-        dest: /etc/apt/sources.list.d/tailscale.list
-        mode: "0644"
-      register: _tailscale_repo
-      when:
-        - _baseline_apt_foreign | length == 0
-        - not _tailscale_files.results[1].stat.exists
-
-    - name: Install tailscale
-      ansible.builtin.apt:
-        name: tailscale
-        state: present
-        update_cache: true
-      # In a check run on a new host the repo files above are only simulated, so apt can't see the package.
-      when: not ansible_check_mode or not (_tailscale_key.changed | default(false) or _tailscale_repo.changed | default(false))
+- name: Install tailscale
+  ansible.builtin.include_role:
+    name: platform
+    tasks_from: package
+  vars:
+    platform_package: tailscale
+    platform_package_update: true
+  # In a check run on a new host the repo files above are only simulated, so the package manager can't see the package.
+  when: not ansible_check_mode or not (platform_repo_changed | default(false) | bool)
 
 - name: Is tailscale installed?
   ansible.builtin.stat:
@@ -58,10 +37,11 @@
   when: ansible_check_mode and not _tailscale_bin.stat.exists
 
 - name: Enable + start tailscaled
-  ansible.builtin.systemd:
-    name: tailscaled
-    enabled: true
-    state: started
+  ansible.builtin.include_role:
+    name: platform
+    tasks_from: service
+  vars:
+    platform_service: tailscale
 
 - name: Host settings Tailscale warns about (forwarding, UDP GRO)
   ansible.builtin.include_tasks: tuning.yml

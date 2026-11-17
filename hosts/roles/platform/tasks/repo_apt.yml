@@ -1,0 +1,75 @@
+---
+# apt: a vendor repository as a key file plus a source file, written with plain file modules (no gpg or apt-key needed on the host: Debian 13 has neither by default).
+# Moved here from the docker and tailscale roles, which both did this; the behaviour is theirs unchanged:
+#   - a source for the same repository that was set up another way (by hand, or by the vendor's script) is used and ours is not added, because two sources with different
+#     keys make apt refuse to read its list at all (baseline: apt_foreign_source.yml);
+#   - the key is fetched once, when it is missing (get_url on an old file would report "changed" in every check pass; to rotate a key, delete the file);
+#   - a source given as `content` is written every run (so it converges), one given as `url` is fetched once like the key.
+- name: Is this apt source already set up another way?
+  ansible.builtin.include_role:
+    name: baseline
+    tasks_from: apt_foreign_source
+  vars:
+    baseline_apt_source_host: "{{ platform_repo.host }}"
+    baseline_apt_our_files: ["{{ platform_repo.apt.sources_file }}"]
+    baseline_apt_our_keyrings: ["{{ platform_repo.apt.keyring }}"]
+
+- name: Create the apt keyrings directory
+  ansible.builtin.file:
+    path: "{{ platform_repo.apt.keyring_dir }}"
+    state: directory
+    mode: "0755"
+  when: platform_repo.apt.keyring_dir is defined
+
+- name: Are the key and the source file already there?
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ platform_repo.apt.keyring }}"
+    - "{{ platform_repo.apt.sources_file }}"
+  register: _platform_repo_files
+
+- name: Add the repository key
+  ansible.builtin.get_url:
+    url: "{{ platform_repo.apt.key_url }}"
+    dest: "{{ platform_repo.apt.keyring }}"
+    mode: "0644"
+  register: _platform_repo_key
+  when:
+    - _baseline_apt_foreign | length == 0
+    - not _platform_repo_files.results[0].stat.exists
+
+- name: Write the repository's source file
+  ansible.builtin.copy:
+    dest: "{{ platform_repo.apt.sources_file }}"
+    content: "{{ platform_repo.apt.source.content }}"
+    owner: root
+    group: root
+    mode: "0644"
+  register: _platform_repo_source_content
+  when:
+    - _baseline_apt_foreign | length == 0
+    - platform_repo.apt.source.content is defined
+
+- name: Fetch the repository's source file
+  ansible.builtin.get_url:
+    url: "{{ platform_repo.apt.source.url }}"
+    dest: "{{ platform_repo.apt.sources_file }}"
+    mode: "0644"
+  register: _platform_repo_source_url
+  when:
+    - _baseline_apt_foreign | length == 0
+    - platform_repo.apt.source.url is defined
+    - not _platform_repo_files.results[1].stat.exists
+
+- name: Note whether the repository changed
+  ansible.builtin.set_fact:
+    platform_repo_changed: >-
+      {{ (_platform_repo_key.changed | default(false)) or (_platform_repo_source_content.changed | default(false))
+         or (_platform_repo_source_url.changed | default(false)) }}
+
+# apt cannot see the new repository's packages until its index is refreshed.
+- name: Refresh the package index after the repository changed
+  ansible.builtin.apt:
+    update_cache: true
+  when: platform_repo_changed | bool
