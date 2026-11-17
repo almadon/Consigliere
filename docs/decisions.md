@@ -160,3 +160,13 @@ Numbered, never reused. A reversed decision gets a new entry that supersedes the
 **Rejected.** A schedule expressed in cron syntax for everyone: it would change every systemd host's units. An emulation of `Persistent=true` with a stamp file: one more thing to test and explain for jobs that do not need it. Rewriting the role scripts for POSIX sh: no host needs it.
 
 **Revisit when** a job needs a catch-up after downtime, or when a platform has a scheduler that is neither systemd nor cron.
+
+## 26. `artifact`: pinned downloads for programs that are not packages
+
+**Chosen.** A sixth primitive installs a program from a release archive (or a bare binary) at a pinned version: it downloads, verifies a SHA-256 digest, unpacks with `tar -xzf` (busybox and GNU tar both have it; Ansible's `unarchive` is unreliable on Alpine), copies the listed files, and remembers the version under `/var/lib/platform-artifacts/` so a later run downloads nothing. The digest is pinned in the data (`sha256`), or read from a URL (`checksum_url`) such as a release's own `<asset>.sha256`; exactly one is required, and a wrong digest stops the run (tested on Debian, Ubuntu and Alpine against a real release, with a deliberately wrong digest that must be refused).
+
+**Cost.** Pinning means updating a digest with each version. It is not yet used by a role: `otel_agent` installs the collector from its `.deb`, which also creates the `otelcol-contrib` user and ships its systemd unit, so a non-apt install needs more than a download. What is missing is a **daemon** primitive (a service definition rendered as a systemd unit or an OpenRC init script, with the user, the limits and the restart policy), which this survey did not list. It is the next step if the collector, or anything like it, must run on Alpine.
+
+**Rejected.** `unarchive` (GNU-tar assumptions, awkward on busybox). Trusting a checksum file fetched from the same release as the archive without saying so: allowed (`checksum_url`) but named in the interface, so the choice is visible.
+
+**Revisit when** a role needs `artifact` for real (then the daemon primitive is designed with it), or when an archive format other than tar.gz or a bare binary is needed.

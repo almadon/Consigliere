@@ -32,7 +32,7 @@ Releases and tool versions are part of it too: `platform_version` holds the dist
 (`requires_version: {apt: ">=2.4"}` in its `platform.yml`). `baseline_apt_retries: auto` is the first use: the apt retries stopgap applies only where the installed apt is in a vulnerable range.
 See `hosts/platforms/README.md`.
 
-Roles install packages, add vendor repositories, manage services, run jobs on a schedule and at boot through the platform role's `package`, `repo`, `service`, `schedule` and `boot_task` tasks, so the same role runs on Debian, Ubuntu and Alpine, and `ci/run-matrix.sh`
+Roles install packages, add vendor repositories, manage services, run jobs on a schedule and at boot, and install pinned release downloads through the platform role's `package`, `repo`, `service`, `schedule`, `boot_task` and `artifact` tasks, so the same role runs on Debian, Ubuntu and Alpine, and `ci/run-matrix.sh`
 checks that in containers (see `hosts/platforms/README.md`).
 
 To support a new platform: add `hosts/platforms/<family>.yml`, then give the roles that are host-bound a `platform.yml`. Declarations are written by hand, because a role that mentions apt or

@@ -1,0 +1,120 @@
+---
+# Installs a program from a release archive (or a single binary) at a pinned version, verified against a SHA-256 digest, for platforms where it is not a package.
+# Used as
+#   include_role: {name: platform, tasks_from: artifact}   with   vars: {platform_artifact: {...}}
+# platform_artifact:
+#   name         what it is (age); the installed version is remembered in /var/lib/platform-artifacts/<name>
+#   version      the version to have; installed again when this changes or an installed file is missing
+#   url          where to download it (build the architecture in with platform_arch: amd64, arm64)
+#   sha256       the archive's SHA-256 digest, pinned in the data (preferred)
+#   checksum_url ... or a URL whose content is the digest (a release's own <asset>.sha256), when pinning is not practical
+#   archive      tar.gz (default; extracted with `tar -xzf`, which busybox and GNU tar both have) or none (the download is the program)
+#   install      files to install: a list of {src (path inside the archive; omitted for archive: none), dest, mode (default 0755)}
+# Changes the host. Idempotent: nothing is downloaded when the version is already there.
+- name: Work out the platform if that has not been done
+  ansible.builtin.include_tasks: main.yml
+  when: platform_runtime_mode is not defined
+
+- name: Check the artifact is fully described
+  ansible.builtin.assert:
+    that:
+      - platform_artifact.name is match('^[A-Za-z0-9._-]+$')
+      - platform_artifact.version | string | length > 0
+      - platform_artifact.url is match('^https://')
+      - (platform_artifact.sha256 is defined) != (platform_artifact.checksum_url is defined)
+      - platform_artifact.sha256 is not defined or platform_artifact.sha256 is match('^[0-9a-f]{64}$')
+      - platform_artifact.install | length > 0
+      - (platform_artifact.archive | default('tar.gz')) in ['tar.gz', 'none']
+    fail_msg: "platform_artifact needs a name, a version, an https url, exactly one of sha256 (64 hex digits) or checksum_url, and a non-empty install list"
+    quiet: true
+
+- name: Which version is installed?
+  ansible.builtin.command: "cat /var/lib/platform-artifacts/{{ platform_artifact.name }}"
+  register: _platform_artifact_marker
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Are the installed files there?
+  ansible.builtin.stat:
+    path: "{{ item.dest }}"
+  loop: "{{ platform_artifact.install }}"
+  loop_control:
+    label: "{{ item.dest }}"
+  register: _platform_artifact_files
+
+- name: Work out whether it has to be installed
+  ansible.builtin.set_fact:
+    _platform_artifact_needed: >-
+      {{ (_platform_artifact_marker.rc | default(1)) != 0
+         or (_platform_artifact_marker.stdout | default('') | trim) != (platform_artifact.version | string)
+         or (_platform_artifact_files.results | map(attribute='stat.exists') | min) == false }}
+    _platform_artifact_archive: "/var/cache/platform-artifacts/{{ platform_artifact.url | basename }}"
+    _platform_artifact_stage: "/var/cache/platform-artifacts/{{ platform_artifact.name }}-{{ platform_artifact.version }}"
+
+- name: Make the directories for it
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop: [/var/lib/platform-artifacts, /var/cache/platform-artifacts]
+  when: _platform_artifact_needed | bool
+
+- name: Download it and check its digest
+  ansible.builtin.get_url:
+    url: "{{ platform_artifact.url }}"
+    dest: "{{ _platform_artifact_archive }}"
+    checksum: "sha256:{{ platform_artifact.sha256 | default(platform_artifact.checksum_url) }}"
+    mode: "0644"
+  when: _platform_artifact_needed | bool
+
+- name: Start from an empty staging directory
+  ansible.builtin.file:
+    path: "{{ _platform_artifact_stage }}"
+    state: "{{ item }}"
+    mode: "0755"
+  loop: [absent, directory]
+  when:
+    - _platform_artifact_needed | bool
+    - (platform_artifact.archive | default('tar.gz')) == 'tar.gz'
+    - not ansible_check_mode
+
+- name: Unpack it
+  ansible.builtin.command: "tar -xzf {{ _platform_artifact_archive | quote }} -C {{ _platform_artifact_stage | quote }}"
+  changed_when: true
+  when:
+    - _platform_artifact_needed | bool
+    - (platform_artifact.archive | default('tar.gz')) == 'tar.gz'
+    - not ansible_check_mode
+
+- name: Install the files
+  ansible.builtin.copy:
+    src: "{{ (_platform_artifact_stage ~ '/' ~ item.src) if (platform_artifact.archive | default('tar.gz')) == 'tar.gz' else _platform_artifact_archive }}"
+    dest: "{{ item.dest }}"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "{{ item.mode | default('0755') }}"
+  loop: "{{ platform_artifact.install }}"
+  loop_control:
+    label: "{{ item.dest }}"
+  when:
+    - _platform_artifact_needed | bool
+    - not ansible_check_mode
+
+- name: Remember the installed version
+  ansible.builtin.copy:
+    content: "{{ platform_artifact.version }}\n"
+    dest: "/var/lib/platform-artifacts/{{ platform_artifact.name }}"
+    mode: "0644"
+  when:
+    - _platform_artifact_needed | bool
+    - not ansible_check_mode
+
+- name: Remove the staging directory
+  ansible.builtin.file:
+    path: "{{ _platform_artifact_stage }}"
+    state: absent
+  when:
+    - _platform_artifact_needed | bool
+    - not ansible_check_mode
