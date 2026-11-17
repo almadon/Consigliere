@@ -14,7 +14,9 @@ services:
       - no-new-privileges:true
     cap_drop: [ALL]
     cap_add: [DAC_READ_SEARCH]
-    mem_limit: {{ otel_agent_memory_max | lower }}
+{% if _otel_agent_memory_limit | length > 0 %}
+    mem_limit: {{ _otel_agent_memory_limit | lower }}
+{% endif %}
     # Its own log stays with Docker (`docker logs otel-agent` works) and is not the json-file the collector reads: the collector must not ship or follow itself.
     logging:
       driver: local
@@ -30,6 +32,7 @@ services:
       - {{ d }}:{{ d }}:ro
 {% endfor %}
 {% if _otel_agent_hostfs | length > 0 %}
-      # Only when host metrics are on: the whole host, read-only, for CPU, memory, load and filesystem numbers (the collector's root_path points here).
-      - /:{{ _otel_agent_hostfs }}:ro,rslave
+      # Only when host metrics are on: the whole host, read-only, for CPU, memory, load and filesystem numbers (the collector's root_path points here). No propagation mode is
+      # named: for / Docker picks rslave where the host's root can do it and settles for less where it cannot (Unraid's), but an explicit rslave there is refused.
+      - /:{{ _otel_agent_hostfs }}:ro
 {% endif %}

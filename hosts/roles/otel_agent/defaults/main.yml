@@ -25,6 +25,7 @@ otel_agent_docker_logs: auto
 # Hard limits: the collector's own soft limit (MiB, drops data under pressure instead of growing) and systemd's ceiling.
 otel_agent_memory_limit_mib: 128
 otel_agent_memory_max: 256M
+# Container mode only: "" runs without a memory limit. Left as is, the limit is tried first and dropped on a host whose Docker cannot set one (an LXC without the memory controller).
 # Extra resource attributes on everything this host sends, for example {environment: lab}.
 otel_agent_attributes: {}
 # Where the host is, from the fleet's host table (its site: the provider or place, location: a city label, org), sent as the resource attributes site, location and org so dashboards

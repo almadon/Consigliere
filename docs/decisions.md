@@ -181,3 +181,13 @@ Numbered, never reused. A reversed decision gets a new entry that supersedes the
 
 **Revisit when** a second role needs a long-running native service on a host without systemd (then the daemon primitive is worth designing), or when the container mode has run on a real Alpine or Unraid host long enough to trust it.
 
+## 28. Container-mode settings are probed on the host, not assumed
+
+**Chosen.** The first real hosts for decision 27 (an Alpine LXC and an Unraid server) did not start the collector, for two reasons the local tests could not show: an LXC without the memory controller cannot apply `mem_limit`, and Unraid refuses an explicit `rslave` bind of `/` because its root is not a shared mount. The role now tries the memory limit by starting the collector binary once with it and leaves it out, with a note, when that fails; the host mount names no propagation mode (as the Arkeep agent's does), which Docker settles itself. Every run also brings the compose project up, so a start that failed once is retried and reported, not skipped because the files are already in place.
+
+**Cost.** One extra short container run per apply, and no memory cap on hosts that cannot have one. Without `rslave`, filesystems mounted after the collector starts are not seen until it restarts.
+
+**Rejected.** A fleet variable per host for the limit (it would have worked, but every new LXC would repeat the failure first). Probing the mount mode: `rprivate` for `/` is refused by Docker too, and the default already works.
+
+**Revisit when** a host needs the limit enforced (then fail instead of drop), or when mounts made after start must be seen.
+

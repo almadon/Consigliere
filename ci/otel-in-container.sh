@@ -46,4 +46,37 @@ sleep 5
 test "$(docker inspect -f '{{.State.Running}}' otel-agent 2>/dev/null)" = true || { echo "ERROR: the collector is not running after the rejected change" >&2; docker ps -a >&2; exit 1; }
 test "$(sha256sum "$DIR/config.yaml" | cut -d' ' -f1)" = "$SUM" || { echo "ERROR: the configuration file changed" >&2; exit 1; }
 ! grep -q unclosed "$DIR/config.yaml" || { echo "ERROR: the bad configuration reached the file" >&2; exit 1; }
+# A host whose Docker cannot set a memory limit (an LXC without the memory controller) must still get a running collector: the role tries the limit and leaves it out. A `docker`
+# that fails that probe stands in for such a host.
+echo "==> A Docker that refuses a memory limit: the collector still comes up, without one"
+docker rm -f otel-agent >/dev/null
+mkdir -p /tmp/shim
+cat > /tmp/shim/docker <<'SHIM'
+#!/bin/sh
+if [ "${1:-}" = run ]; then
+  case " $* " in
+    *" --memory "*) echo "docker: Error response from daemon: OCI runtime create failed: openat2 memory.max: no such file or directory (simulated)" >&2; exit 125 ;;
+  esac
+fi
+exec /usr/bin/docker "$@"
+SHIM
+chmod +x /tmp/shim/docker
+PATH=/tmp/shim:$PATH run -e otel_agent_hostmetrics=true -e otel_agent_metrics_url=http://127.0.0.1:9/otlp > /tmp/limits.log 2>&1 || { echo "ERROR: the run failed on a host without those features" >&2; tail -12 /tmp/limits.log >&2; exit 1; }
+grep -E "no memory limit" /tmp/limits.log | head -2 | cut -c1-200
+sleep 5
+test "$(docker inspect -f '{{.State.Running}}' otel-agent)" = true || { echo "ERROR: the collector is not running" >&2; docker logs otel-agent 2>&1 | tail -5 >&2; exit 1; }
+test "$(docker inspect -f '{{.HostConfig.Memory}}' otel-agent)" = 0 || { echo "ERROR: a memory limit was set anyway" >&2; exit 1; }
+! grep -q "mem_limit" "$DIR/docker-compose.yml" || { echo "ERROR: mem_limit is in the compose file" >&2; exit 1; }
+grep -q ":/hostfs:ro$" "$DIR/docker-compose.yml" || { echo "ERROR: the host mount is missing" >&2; exit 1; }
+echo "==> And on a host that can set one, the limit is used"
+run -e otel_agent_hostmetrics=true -e otel_agent_metrics_url=http://127.0.0.1:9/otlp > /tmp/full.log 2>&1 || { echo "ERROR: the run failed" >&2; tail -12 /tmp/full.log >&2; exit 1; }
+sleep 5
+test "$(docker inspect -f '{{.State.Running}}' otel-agent)" = true
+grep -q "mem_limit: 256m" "$DIR/docker-compose.yml" || { echo "ERROR: the limit is missing on a host that supports it" >&2; cat "$DIR/docker-compose.yml" >&2; exit 1; }
+# A first install whose start failed leaves the files in place: the next run must still bring the collector up, not report success with nothing running.
+echo "==> A collector that is not running is started by the next run, although no file changed"
+docker stop otel-agent >/dev/null
+run -e otel_agent_hostmetrics=true -e otel_agent_metrics_url=http://127.0.0.1:9/otlp > /tmp/restart.log 2>&1 || { echo "ERROR: the run failed" >&2; tail -12 /tmp/restart.log >&2; exit 1; }
+sleep 3
+test "$(docker inspect -f '{{.State.Running}}' otel-agent)" = true || { echo "ERROR: the stopped collector was not started" >&2; exit 1; }
 echo "==> OK"

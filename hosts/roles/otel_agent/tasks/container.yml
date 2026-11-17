@@ -10,11 +10,6 @@
     - "{{ otel_agent_container_dir }}"
     - "{{ otel_agent_container_dir }}/storage"
 
-- name: Render the collector's configuration and compose file
-  ansible.builtin.set_fact:
-    _otel_agent_config_text: "{{ lookup('ansible.builtin.template', 'config.yaml.j2') }}"
-    _otel_agent_compose_text: "{{ lookup('ansible.builtin.template', 'otel-agent-compose.yml.j2') }}"
-
 - name: Check that the container name is free
   ansible.builtin.include_role:
     name: docker
@@ -32,6 +27,31 @@
   register: _otel_agent_image_pull
   when: not ansible_check_mode
 
+# A memory limit is tried, not assumed: it needs the memory controller delegated to Docker's cgroup, and an LXC often has none (runc then fails with "memory.max: no such file"
+# and the collector never starts). The collector binary is started once with the limit; if that fails the limit is left out and a note says so. An explicit
+# otel_agent_memory_max: "" means no limit and skips the probe.
+- name: Try the memory limit on this host
+  ansible.builtin.command:
+    argv: [docker, run, --rm, --memory, "{{ otel_agent_memory_max | lower }}", --entrypoint, /otelcol-contrib, "{{ otel_agent_image }}:{{ otel_agent_version }}", --version]
+  register: _otel_agent_probe_memory
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode and otel_agent_memory_max | length > 0
+
+- name: Settle the memory limit
+  ansible.builtin.set_fact:
+    _otel_agent_memory_limit: "{{ '' if (_otel_agent_probe_memory.rc | default(0)) != 0 else otel_agent_memory_max }}"
+
+- name: Say that the limit was left out
+  ansible.builtin.debug:
+    msg: "no memory limit: Docker cannot set one here ({{ _otel_agent_probe_memory.stderr | default('') | trim | regex_replace('\\s+', ' ') | truncate(140) }})"
+  when: otel_agent_memory_max | length > 0 and _otel_agent_memory_limit == ''
+
+- name: Render the collector's configuration and compose file
+  ansible.builtin.set_fact:
+    _otel_agent_config_text: "{{ lookup('ansible.builtin.template', 'config.yaml.j2') }}"
+    _otel_agent_compose_text: "{{ lookup('ansible.builtin.template', 'otel-agent-compose.yml.j2') }}"
+
 # The configuration is validated by the collector itself. The file safe_apply checks lives in the reconciler's own filesystem, which the host's Docker daemon cannot mount, so it
 # goes in by value (an environment variable), not by path. The validator also wants the state directory and the host path (root_path) to exist, so the throwaway container gets
 # empty ones.
@@ -48,4 +68,14 @@
         validate: "sh -c 'docker run --rm --tmpfs /var/lib/otelcol-contrib/storage --tmpfs {{ otel_agent_hostfs }} -e OTEL_CONFIG=\"$(cat %s)\" {{ otel_agent_image }}:{{ otel_agent_version }} validate --config=env:OTEL_CONFIG'"
     safe_apply_restart: {kind: compose, project_src: "{{ otel_agent_container_dir }}", name: otel-agent}
     safe_apply_force: "{{ _otel_agent_image_pull.changed | default(false) }}"
+  when: not ansible_check_mode
+
+# safe_apply acts when the files change. A first install whose start failed leaves the files in place, so the next run would see nothing to do and report success with no
+# collector running. This makes sure it is up on every run (compose changes nothing when it already is) and fails, with Docker's reason, when it cannot start.
+- name: Make sure the collector is running
+  community.docker.docker_compose_v2:
+    project_src: "{{ otel_agent_container_dir }}"
+    project_name: otel-agent
+    state: present
+    pull: never
   when: not ansible_check_mode
