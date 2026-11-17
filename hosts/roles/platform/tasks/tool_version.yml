@@ -1,0 +1,27 @@
+---
+# Reads the installed version of one tool and remembers it in platform_tool_versions (a dict: tool -> version, empty when the tool is not there). Used through
+#   include_role: {name: platform, tasks_from: tool_version}  with  vars: {platform_tool: apt}
+# The command for each tool comes from the platform profile's `tools:` map. Changes nothing; also runs in check mode. In a container run the tools of the machine
+# are out of reach, so the version stays empty (and a version requirement is then unmet).
+# The platform facts come first if nothing has worked them out yet in this play.
+- name: Work out the platform if that has not been done
+  ansible.builtin.include_tasks: main.yml
+  when: platform_runtime_mode is not defined
+
+- name: "Read the version of {{ platform_tool }}"
+  ansible.builtin.shell: "{{ _platform_profile.tools[platform_tool] }} 2>/dev/null"
+  register: _platform_tool_out
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when:
+    - platform_runtime_mode == 'host'
+    - platform_tool in (_platform_profile.tools | default({}))
+    - platform_tool not in (platform_tool_versions | default({}))
+
+- name: "Remember the version of {{ platform_tool }}"
+  ansible.builtin.set_fact:
+    platform_tool_versions: >-
+      {{ (platform_tool_versions | default({}))
+         | combine({platform_tool: ((_platform_tool_out.stdout | default('')) | trim) if (_platform_tool_out.rc | default(1)) == 0 else ''}) }}
+  when: platform_tool not in (platform_tool_versions | default({}))

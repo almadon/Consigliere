@@ -9,19 +9,46 @@
   loop_control:
     label: "{{ item.key }}"
 
-# What the role needs from the platform: its platform.yml (`requires: [host, apt, systemd]`), if it has one. A role without one runs wherever a tag selects it.
+# What the role needs from the platform: its platform.yml, if it has one. A role without one runs wherever a tag selects it.
+#   requires: [host, apt, systemd]          capabilities (platform_capabilities)
+#   requires_version: {apt: ">=2.4"}        versions of tools on the host (platform_tool_versions; a spec is comma-separated <op><version>)
 - name: "Check what a role needs from this platform: {{ _fleet_item.name | default('') }}"
   ansible.builtin.set_fact:
+    fleet_plan_needs: >-
+      {{ (lookup('ansible.builtin.file', role_path ~ '/../' ~ _fleet_item.name ~ '/platform.yml', errors='ignore') | default('', true)) | from_yaml or {} }}
     fleet_plan_missing: >-
       {{ ((((lookup('ansible.builtin.file', role_path ~ '/../' ~ _fleet_item.name ~ '/platform.yml', errors='ignore') | default('', true)) | from_yaml)
            or {}).requires | default([])) | difference(platform_capabilities) }}
   when: _fleet_item.kind == 'role'
 
+- name: "Read the tool versions a role asks about: {{ _fleet_item.name | default('') }}"
+  ansible.builtin.include_role:
+    name: platform
+    tasks_from: tool_version
+  vars:
+    platform_tool: "{{ _fleet_tool }}"
+  loop: "{{ (fleet_plan_needs.requires_version | default({})).keys() | list }}"
+  loop_control:
+    loop_var: _fleet_tool
+  when: _fleet_item.kind == 'role'
+
+- name: "Check the tool versions a role asks about: {{ _fleet_item.name | default('') }}"
+  ansible.builtin.set_fact:
+    fleet_plan_missing: >-
+      {{ fleet_plan_missing + [_fleet_need.key ~ ' ' ~ _fleet_need.value ~ ' (found '
+         ~ (((platform_tool_versions | default({}))[_fleet_need.key] | default('')) or 'none') ~ ')'] }}
+  loop: "{{ (fleet_plan_needs.requires_version | default({})) | dict2items }}"
+  loop_control:
+    loop_var: _fleet_need
+  when:
+    - _fleet_item.kind == 'role'
+    - not ((platform_tool_versions | default({}))[_fleet_need.key] | default('') | platform_version_matches(_fleet_need.value))
+
 - name: "Skip a role this platform does not support: {{ _fleet_item.name | default('') }}"
   ansible.builtin.debug:
     msg: >-
-      Skipped role {{ _fleet_item.name }} (tag {{ _fleet_item.tag }}): it needs {{ fleet_plan_missing }}, which a {{ platform_family }} host
-      ({{ platform_runtime_mode }} run) does not offer. It offers {{ platform_capabilities }}.
+      Skipped role {{ _fleet_item.name }} (tag {{ _fleet_item.tag }}): this platform does not meet {{ fleet_plan_missing }}.
+      Platform: {{ platform_family }}{{ (' ' ~ platform_version.full) if (platform_version.full | default('')) else '' }}, {{ platform_runtime_mode }} run; it offers {{ platform_capabilities }}.
   when: _fleet_item.kind == 'role' and fleet_plan_missing | length > 0
 
 - name: "Role {{ _fleet_item.name | default('') }}"

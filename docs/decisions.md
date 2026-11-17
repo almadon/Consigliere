@@ -120,3 +120,13 @@ Numbered, never reused. A reversed decision gets a new entry that supersedes the
 **Rejected.** A separate `reconciler: container` attribute (one more name for what `os:` already says, and it would not feed the platform layer). Letting the table override the facts in a host run: a wrong entry would make a host run another platform's roles (apt on a Mac).
 
 **Revisit when** a platform can be reconciled either way (Alpine on the host with OpenRC, per decision 19's later steps): `os:` alone will not say which, and the table will need a second attribute or the scripts will need to ask the host.
+
+## 22. The platform layer knows releases and tool versions, compared the Debian way
+
+**Chosen.** The `platform` role also publishes `platform_version` (the distribution's name, full and major version, release name), a profile can carry release-specific overrides (`versions:`), and a role can require a version of a tool on the host (`requires_version` in its `platform.yml`, checked by the planner like a capability). Tool versions are read by a command from the profile's `tools:` map, only when something asks, and cached. Versions are compared by two filters in `hosts/plugins/filter/` that follow Debian Policy 5.6.12 (the ordering dpkg uses), tested in `hosts/tests/`. `baseline_apt_retries: auto` is the first user: the stopgap for the apt retry vulnerability applies only where the installed apt is in a listed vulnerable range.
+
+**Cost.** A Python plugin to maintain, and a version command per tool per platform. The vulnerable ranges for apt are a reading of secondary reports and are marked VERIFY; `auto` is opt-in, and the default (`0`) is unchanged. In a container run the release and the tools of the machine are unknown, so a version requirement is unmet there (a role that must run on a container host must not declare one).
+
+**Rejected.** Ansible's `version` test (wrong for `~`, epochs and distribution suffixes). Deciding by the distribution release alone: the vulnerability follows the apt package version, which differs by branch and can be updated or backported independently of the release. Reading every tool's version on every run: it costs a command per tool for nothing.
+
+**Revisit when** a platform needs a comparison dpkg's rules get wrong (Alpine's `-r` revisions are only approximated), or when reading versions costs enough to cache across runs.

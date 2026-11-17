@@ -3,9 +3,11 @@
 #   platform_family        debian | alpine | unraid | macos | unknown   (a profile file in hosts/platforms/)
 #   platform_arch          amd64 | arm64 | armv7 | the raw value
 #   platform_runtime_mode  host | container   (what this run can change)
+#   platform_version       {name, full, major, release} of the distribution (empty in a container run unless the host table gives os_version)
 #   platform_capabilities  what a role can count on, e.g. [host, apt, systemd, docker, ufw]
-#   platform_defaults      the profile's defaults (package manager, init, service names)
-# Changes nothing on the host. See hosts/platforms/README.md and docs/decisions.md, entry 19.
+#   platform_defaults      the profile's defaults (package manager, init, service names), after the release-specific overrides
+# Versions of tools (apt, systemd, ...) are read only when something asks: tasks_from: tool_version.
+# Changes nothing on the host. See hosts/platforms/README.md and docs/decisions.md, entries 19 and 22.
 - name: Detect the platform family from the facts
   ansible.builtin.set_fact:
     _platform_detected: >-
@@ -23,8 +25,8 @@
     _platform_raw: "{{ (platform_host | string) or ((os | default('') | string | lower) if platform_runtime == 'container' else '') or _platform_detected }}"
     _platform_wanted: "{{ {'ubuntu': 'debian', 'raspbian': 'debian'}.get(_platform_raw, _platform_raw) }}"
     _platform_candidates:
-      - "{{ role_path }}/../../platforms/{{ _platform_wanted }}.yml"
-      - "{{ role_path }}/../../platforms/unknown.yml"
+      - "{{ platform_profiles_dir }}/{{ _platform_wanted }}.yml"
+      - "{{ platform_profiles_dir }}/unknown.yml"
   tags: [always]
 
 - name: Publish the platform facts
@@ -35,6 +37,35 @@
       {{ {'x86_64': 'amd64', 'amd64': 'amd64', 'aarch64': 'arm64', 'arm64': 'arm64', 'armv7l': 'armv7'}.get(ansible_facts['architecture'] | default(''),
          ansible_facts['architecture'] | default('unknown')) }}
     platform_runtime_mode: "{{ 'container' if (platform_runtime == 'container' or _platform_profile.tier == 'container') else 'host' }}"
+  tags: [always]
+
+# The release of the distribution. In a container run the facts are the container's, not the host's, so only what the host table says (os_version) is known.
+- name: Publish the release of the distribution
+  ansible.builtin.set_fact:
+    platform_version:
+      name: "{{ (ansible_facts['distribution'] | default('')) if platform_runtime_mode == 'host' else (os | default('') | string) }}"
+      full: "{{ (ansible_facts['distribution_version'] | default('') | string) if platform_runtime_mode == 'host' else (os_version | default('') | string) }}"
+      major: "{{ (ansible_facts['distribution_major_version'] | default('') | string) if platform_runtime_mode == 'host' else ((os_version | default('') | string).split('.')[0]) }}"
+      release: "{{ (ansible_facts['distribution_release'] | default('') | string) if platform_runtime_mode == 'host' else '' }}"
+  tags: [always]
+
+# Release-specific differences, in the profile's `versions:` list: each entry has `when` (a spec such as ">=12" or ">=22.04,<26", matched against the release) and may add or
+# remove capabilities and override defaults. Entries apply in order; the first one whose spec fits does not stop the rest.
+- name: Apply the profile's release-specific overrides
+  ansible.builtin.set_fact:
+    _platform_profile: >-
+      {{ _platform_profile | combine({
+           'defaults': (_platform_profile.defaults | default({})) | combine(item.defaults | default({}), recursive=true),
+           'capabilities': (((_platform_profile.capabilities | default([])) | reject('in', item.capabilities_remove | default([])) | list)
+                            + (item.capabilities_add | default([]))) | unique | list }) }}
+  loop: "{{ _platform_profile.versions | default([]) }}"
+  loop_control:
+    label: "{{ item.when }}"
+  when: platform_version.full | platform_version_matches(item.when)
+  tags: [always]
+
+- name: Publish the defaults
+  ansible.builtin.set_fact:
     platform_defaults: "{{ _platform_profile.defaults | default({}) }}"
   tags: [always]
 

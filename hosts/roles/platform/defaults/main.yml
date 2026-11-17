@@ -1,8 +1,11 @@
 ---
 # Input. `host`: this run changes the machine it runs on. `container`: Ansible runs inside a container that drives the host's Docker socket
-# (Unraid, and Alpine with the container reconciler), so only the Docker socket can be counted on. The Unraid playbook and the bootstrap set it.
+# (Unraid, and Alpine with the container reconciler), so only the Docker socket can be counted on. The bootstrap and reconcile.sh (RECONCILE_RUNTIME) set it.
 platform_runtime: host
 
 # Input. Name of the platform family when the facts cannot tell (inside a container they describe the container, not the machine): alpine, unraid, ...
-# Empty = detect from the facts.
+# Empty = detect from the facts (host run) or from the host table's `os:` (container run).
 platform_host: ""
+
+# Where the profile files are. A fleet can point this at its own directory (copy a profile, change it) without touching the framework.
+platform_profiles_dir: "{{ role_path }}/../../platforms"

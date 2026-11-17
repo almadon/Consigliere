@@ -41,6 +41,9 @@ jobs:
       - name: yamllint
         run: yamllint .
 
+      - name: Python unit tests (platform version ordering)
+        run: python -m unittest discover -s hosts/tests -v
+
       - name: ansible-lint (hosts)
         run: ansible-lint hosts
 

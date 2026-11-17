@@ -28,6 +28,10 @@ The host table can say what a host is: `os:` (`debian`, `ubuntu`, `alpine`, `unr
 works them out from its facts and logs a line if the table disagrees. A container-reconciled host needs `os:`: its facts describe the container, and the fleet's scripts (`reconcile-now`, `fleet-run`) use
 it to pick how to reconcile the host. `os:` and `arch:` also become groups (`os_alpine`, `arch_amd64`), like the other table values.
 
+Releases and tool versions are part of it too: `platform_version` holds the distribution's release, a profile can override itself by release (`versions:`), and a role can require a tool version
+(`requires_version: {apt: ">=2.4"}` in its `platform.yml`). `baseline_apt_retries: auto` is the first use: the apt retries stopgap applies only where the installed apt is in a vulnerable range.
+See `hosts/platforms/README.md`.
+
 To support a new platform: add `hosts/platforms/<family>.yml`, then give the roles that are host-bound a `platform.yml`. Declarations are written by hand, because a role that mentions apt or
 systemd only conditionally may still work on a platform without them.
 

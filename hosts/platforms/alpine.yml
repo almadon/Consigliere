@@ -7,3 +7,6 @@ defaults:
   pkg_manager: apk
   init: openrc
   ssh_service: sshd
+tools:
+  apk: "apk --version | awk '{print $2}' | tr -d ,"
+versions: []

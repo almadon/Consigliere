@@ -7,3 +7,13 @@ defaults:
   pkg_manager: apt
   init: systemd
   ssh_service: ssh
+# How to read the installed version of a tool a role may need (platform_tool_version, tasks_from: tool_version). Printed alone on stdout.
+tools:
+  apt: "dpkg-query -W -f='${Version}' apt"
+  systemd: "systemctl --version | head -1 | awk '{print $2}'"
+  ssh: "ssh -V 2>&1 | sed -E 's/^OpenSSH_([0-9.]+).*/\\1/'"
+# Differences by release of the distribution (Debian 12, Ubuntu 24.04, ...), applied in order when `when` fits the release (platform_version.full):
+#   - when: ">=12"                    # a spec: comma-separated <op><version>, op one of >= <= > < == !=
+#     defaults: {some_default: value} # overrides platform_defaults (merged)
+#     capabilities_add: [...]         # and/or capabilities_remove: [...]
+versions: []
