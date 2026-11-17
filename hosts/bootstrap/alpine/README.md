@@ -8,7 +8,7 @@ It is meant for a small Docker host, for example a Proxmox LXC.
 
 ## What runs, and what does not
 
-Runs: the container-based roles that the host's tags select, through `hosts/site-unraid.yml` (the entry playbook for every host of this kind):
+Runs: the container-based roles that the host's tags select, through `hosts/site.yml` run with `RECONCILE_RUNTIME=container` (the same playbook every host uses: the platform layer skips what a container host cannot run):
 `prop: [beszel]` (the Beszel agent), `feat: [arkeep]` (the Arkeep agent), `feat: [arcane]` (the Arcane agent), and compose-based apps.
 
 Does not run: `baseline`, `tailscale`, `sops`, `docker`, `firewall` (you set up Docker and Tailscale once, below), and anything that is a native systemd

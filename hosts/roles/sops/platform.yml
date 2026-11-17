@@ -1,0 +1,3 @@
+---
+# What this role needs from the platform (hosts/platforms/README.md). It installs and changes things on the host itself (the container reconciler already carries sops).
+requires: [host]

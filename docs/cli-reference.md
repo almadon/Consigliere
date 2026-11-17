@@ -39,7 +39,8 @@ directory, runs **check first**, and applies only if the check succeeded. Everyt
 | `RECONCILE_PROFILE=1` | Print per-task timings, to find slow tasks |
 | `RECONCILE_WORKDIR` | Work directory (default `/opt/fleet-reconcile`) |
 | `RECONCILE_CRED_DIR` | Host credentials: deploy key, age key (default `/etc/fleet-reconcile`) |
-| `RECONCILE_PLAYBOOK` | Entry playbook (default `site.yml`; Unraid uses `site-unraid.yml`) |
+| `RECONCILE_PLAYBOOK` | Entry playbook (default `site.yml`) |
+| `RECONCILE_RUNTIME` | `container` when Ansible runs inside a container on the host's Docker socket (Unraid, Alpine); the older `RECONCILE_PLAYBOOK=site-unraid.yml` means the same |
 | `FLEET_CONFIG_SUBDIR` | Where config lives inside the fleet repo (default `config`) |
 | `ANSIBLE_EXTRA_ARGS` | Extra flags passed to `ansible-playbook` (word-split) |
 | `HEARTBEAT_URL`, `HEARTBEAT_FAIL_URL` | Pinged on success and on failure |

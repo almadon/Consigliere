@@ -198,9 +198,16 @@ fi
 # Tag manifests (what each util:/feat: tag runs): your config/tags/ first, then the
 # framework's hosts/tags/.
 EXTRA_VARS+=(-e "{\"fleet_tags_dirs\": [\"$CONF/tags\", \"$FRAMEWORK_DIR/hosts/tags\"]}")
-# RECONCILE_PLAYBOOK picks the entry playbook (default site.yml; Unraid uses site-unraid.yml). The
-# fleet's own file of that name, if it has one, wins over the framework's.
+# RECONCILE_PLAYBOOK picks the entry playbook (default site.yml). The fleet's own file of that name, if it has one, wins over the framework's.
+# RECONCILE_RUNTIME=container says Ansible runs inside a container on the host's Docker socket (Unraid, Alpine): `become` is off and only container roles run
+# (hosts/platforms/, decision 19). Container hosts set up before that name was used have RECONCILE_PLAYBOOK=site-unraid.yml: it is now site.yml run that way.
 PLAYBOOK_FILE="${RECONCILE_PLAYBOOK:-site.yml}"
+RUNTIME="${RECONCILE_RUNTIME:-}"
+if [ "$PLAYBOOK_FILE" = site-unraid.yml ] && [ ! -f "$CONF/site-unraid.yml" ]; then
+  PLAYBOOK_FILE=site.yml; RUNTIME=container
+  EXTRA_VARS+=(-e "platform_host=unraid")   # a platform_host in the host's vars.yml (ANSIBLE_EXTRA_ARGS, below) comes later and wins
+fi
+[ -z "$RUNTIME" ] || EXTRA_VARS+=(-e "platform_runtime=$RUNTIME")
 if [ -f "$CONF/$PLAYBOOK_FILE" ]; then
   cp "$CONF/$PLAYBOOK_FILE" "$RUN_DIR/site.yml"
 else

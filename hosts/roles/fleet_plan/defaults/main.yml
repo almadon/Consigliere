@@ -1,0 +1,4 @@
+---
+# The roles every host gets before its tags are read, in this order. Each is checked against what the platform offers (platform.yml), so on a host that
+# cannot run one (a container reconciler has no apt or systemd) it is skipped with a message instead of failing.
+fleet_plan_base_roles: [baseline, tailscale, sops, docker]

@@ -100,3 +100,13 @@ Numbered, never reused. A reversed decision gets a new entry that supersedes the
 **Revisit when** the capability list grows past about ten entries, when a role needs a version of a capability (systemd 252 or newer, say), or when a profile needs more than data (code per platform).
 
 **Next steps (not done in this change).** Merge `site-unraid.yml` into `site.yml` once the planner skips unsupported roles reliably; convert the apt-bound roles to package and service abstractions (baseline, docker, tailscale first); a CI matrix that runs the roles in Debian 13, Ubuntu 24.04 and Alpine containers; an `os:` attribute in the host table.
+
+## 20. One entry playbook; the container reconciler is `site.yml` with a runtime setting
+
+**Chosen.** `hosts/site-unraid.yml` is gone. `site.yml` serves every Linux-like host: `become` follows `platform_runtime`, and the base roles (baseline, tailscale, sops, docker: `fleet_plan_base_roles`) go through the same platform check as the roles the tags select, so a container host skips them with a message instead of being left out of a separate file by hand. `reconcile.sh` takes `RECONCILE_RUNTIME=container`, and still accepts `RECONCILE_PLAYBOOK=site-unraid.yml` as the same thing, so a host set up earlier (Unraid) needs no new bootstrap. The firewall step also checks the platform (needs `host` and `ufw`).
+
+**Cost.** Four extra skipped-role messages in a container host's log on every run. The base roles now run through `include_role` inside `fleet_plan` instead of `roles:`; handlers still run when the first play ends, as before. A fleet that kept its own `site-unraid.yml` is unaffected (its file still wins).
+
+**Rejected.** A `site-unraid.yml` that imports `site.yml`: reconcile.sh copies the chosen playbook to a run directory under the name `site.yml`, so it would import itself.
+
+**Revisit when** a platform needs a task in the first play that no role can express, or the skipped-role messages hide real output (then a quieter summary line instead).

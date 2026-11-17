@@ -15,7 +15,7 @@ socket and a folder.
 
 ## What runs
 
-`hosts/site-unraid.yml` runs only what the host's tags select (`feat: [arkeep]` is the Arkeep agent,
+`hosts/site.yml` (run with `RECONCILE_RUNTIME=container`) runs only what the host's tags select (`feat: [arkeep]` is the Arkeep agent,
 `prop: [beszel]` the Beszel agent, `util: [restic]` a restic REST server whose data lives on a user share), and only container-based roles are suitable. These are NOT run here, on
 purpose: baseline, tailscale, sops, docker and firewall (Unraid manages its own packages, Docker and
 network; the Tailscale plugin joins the tailnet). Roles that use systemd or apt (for example

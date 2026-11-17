@@ -1,0 +1,16 @@
+---
+# The base roles (fleet_plan_base_roles) through the same platform check as the roles the tags select. Included from site.yml's first play.
+- name: Work out the platform
+  ansible.builtin.include_role:
+    name: platform
+  tags: [always]
+
+# _fleet_item has the shape run_item.yml expects. A loop variable of its own (not `item`) keeps the name from being captured by the loops inside run_item.yml.
+- name: Run a base role if this platform supports it
+  ansible.builtin.include_tasks: run_item.yml
+  vars:
+    _fleet_item: {kind: role, name: "{{ _fleet_base_name }}", tag: base}
+  loop: "{{ fleet_plan_base_roles }}"
+  loop_control:
+    loop_var: _fleet_base_name
+    label: "{{ _fleet_base_name }}"

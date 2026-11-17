@@ -2,10 +2,14 @@
 # Entry point for both reconcile.sh (scheduled, on every host) and Semaphore
 # (on-demand / webhook-triggered). Keep this file boring - real logic lives
 # in the roles.
+#
+# One playbook for every Linux-like host. What a host can run is decided by the platform layer (hosts/platforms/, decision 19): a role that needs apt or systemd is
+# skipped, with a message, on a host that has neither (Unraid, Alpine with the container reconciler). In that case Ansible runs in a container, so `become` is off and
+# platform_runtime is `container` (reconcile.sh sets it for RECONCILE_RUNTIME=container, and for the older RECONCILE_PLAYBOOK=site-unraid.yml).
 
 - name: Fleet baseline + maintenance
   hosts: all
-  become: true
+  become: "{{ platform_runtime | default('host') != 'container' }}"
   pre_tasks:
     # Automatic OS groups (os_linux, os_linux_debian, os_darwin, os_darwin_macosx, ...)
     # so vars/group/os_<...>.yml and plays can target by OS with no table entry.
@@ -17,11 +21,12 @@
         - "os_{{ ansible_system | lower }}_{{ ansible_distribution | lower | replace(' ', '_') }}"
       changed_when: false
       tags: [always]
-  roles:
-    - baseline
-    - tailscale
-    - sops
-    - docker
+  tasks:
+    # baseline, tailscale, sops and docker (fleet_plan_base_roles), each checked against what the platform offers.
+    - name: Run the base roles this platform supports
+      ansible.builtin.include_role:
+        name: fleet_plan
+        tasks_from: base
 
 # What else runs is decided by tag manifests (hosts/tags/<dimension>/<value>.yml,
 # overridable and extendable in your fleet repo's config/tags/): each tag in the
@@ -30,7 +35,7 @@
 # a manifest. No edit to this file is needed.
 - name: Roles and tasks selected by tag manifests
   hosts: all
-  become: true
+  become: "{{ platform_runtime | default('host') != 'container' }}"
   # Facts from the first play stay available for the rest of the run; gathering them again costs a second or two per pass.
   gather_facts: false
   tasks:
