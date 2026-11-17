@@ -80,7 +80,7 @@
     - not ansible_check_mode
 
 - name: Unpack it
-  ansible.builtin.command: "tar -xzf {{ _platform_artifact_archive | quote }} -C {{ _platform_artifact_stage | quote }}"
+  ansible.builtin.command: "tar -xzf {{ _platform_artifact_archive | quote }} -C {{ _platform_artifact_stage | quote }}"  # noqa: command-instead-of-module (unarchive needs GNU tar; on busybox it fails)
   changed_when: true
   when:
     - _platform_artifact_needed | bool
