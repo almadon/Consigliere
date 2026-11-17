@@ -18,7 +18,10 @@
     file: "{{ lookup('ansible.builtin.first_found', _platform_candidates) }}"
     name: _platform_profile
   vars:
-    _platform_wanted: "{{ platform_host if (platform_host | length > 0) else _platform_detected }}"
+    # In order: platform_host (set by a container bootstrap or the entry playbook); in a container run the host table's `os` (its facts describe the container, not the machine);
+    # otherwise what the facts say. In a host run the table never overrides the facts: a wrong entry must not make a host run another platform's roles. Ubuntu uses the debian profile.
+    _platform_raw: "{{ (platform_host | string) or ((os | default('') | string | lower) if platform_runtime == 'container' else '') or _platform_detected }}"
+    _platform_wanted: "{{ {'ubuntu': 'debian', 'raspbian': 'debian'}.get(_platform_raw, _platform_raw) }}"
     _platform_candidates:
       - "{{ role_path }}/../../platforms/{{ _platform_wanted }}.yml"
       - "{{ role_path }}/../../platforms/unknown.yml"
@@ -40,4 +43,17 @@
   ansible.builtin.set_fact:
     platform_capabilities: >-
       {{ (_platform_profile.capabilities | intersect(['docker'])) if platform_runtime_mode == 'container' else _platform_profile.capabilities }}
+  tags: [always]
+
+# The host table (os:, arch:) is what the tooling uses before a host has ever run anything, so a disagreement is worth a line in the log. In a container run the
+# facts describe the container, so only the CPU can be compared.
+- name: Say when the host table disagrees with what this host reports
+  ansible.builtin.debug:
+    msg: >-
+      host table: {{ {'os': os | default('-'), 'arch': arch | default('-')} }}; this host reports family {{ _platform_detected }} ({{ platform_runtime_mode }} run)
+      and arch {{ platform_arch }}. Fix the entry in inventory/hosts.yml.
+  when: >-
+    (arch is defined and (arch | string) != platform_arch) or
+    (os is defined and platform_runtime_mode == 'host'
+     and {'ubuntu': 'debian', 'raspbian': 'debian'}.get(os | string | lower, os | string | lower) != _platform_detected)
   tags: [always]

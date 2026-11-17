@@ -110,3 +110,13 @@ Numbered, never reused. A reversed decision gets a new entry that supersedes the
 **Rejected.** A `site-unraid.yml` that imports `site.yml`: reconcile.sh copies the chosen playbook to a run directory under the name `site.yml`, so it would import itself.
 
 **Revisit when** a platform needs a task in the first play that no role can express, or the skipped-role messages hide real output (then a quieter summary line instead).
+
+## 21. `os` and `arch` in the host table; the table informs container hosts, the facts decide host runs
+
+**Chosen.** The host table takes two optional attributes, `os:` (debian, ubuntu, alpine, unraid, macos, windows) and `arch:` (amd64, arm64), which also become groups (`os_alpine`, `arch_amd64`). The fleet's scripts read `os:` to tell how a host is reconciled (a container for alpine and unraid, systemd otherwise), replacing the single `type: unraid` special case in `reconcile-now` and `fleet-run`. The `platform` role uses `os:` as the platform family only in a container run, where the facts describe the container; in a host run the facts win and a disagreement with the table is logged.
+
+**Cost.** One more thing to keep right in the table, for the hosts that need it. A container host with no `os:` is treated as a systemd host by the scripts (and `reconcile-now` fails on it with `systemctl: not found`, which is how this was found on the first Alpine host).
+
+**Rejected.** A separate `reconciler: container` attribute (one more name for what `os:` already says, and it would not feed the platform layer). Letting the table override the facts in a host run: a wrong entry would make a host run another platform's roles (apt on a Mac).
+
+**Revisit when** a platform can be reconciled either way (Alpine on the host with OpenRC, per decision 19's later steps): `os:` alone will not say which, and the table will need a second attribute or the scripts will need to ask the host.

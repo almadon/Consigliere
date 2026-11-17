@@ -24,16 +24,19 @@ service or needs apt, among them the OpenTelemetry agent (`feat: [otel]`: no hos
        lxc.cgroup2.devices.allow: c 10:200 rwm
        lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
 
-2. **In the fleet repo**: add the host to `config/inventory/hosts.yml` (the key is the host name, which must equal its Tailscale name) and push.
+2. **In the fleet repo**: add the host to `config/inventory/hosts.yml` (the key is the host name, which must equal its Tailscale name) and push. Give it `os: alpine` and
+   `arch: amd64` (or `arm64`): the platform layer and the fleet's scripts use them to know the host is reconciled by a container, not systemd.
 3. **On the Alpine host, as root** (Alpine has no bash or curl until installed; the script is plain `sh`):
 
        apk add --no-cache curl
        curl -fsSLO https://raw.githubusercontent.com/almadon/Consigliere/main/hosts/bootstrap/alpine/bootstrap-alpine.sh
        NODE_NAME=<name> FRAMEWORK_REPO_URL=https://github.com/almadon/Consigliere.git \
-       FLEET_CONFIG_REPO_URL=git@github.com:you/fleet.git sh bootstrap-alpine.sh
+       FLEET_CONFIG_REPO_URL=git@github.com:you/fleet.git \
+       SSH_AUTHORIZED_KEY='ssh-ed25519 AAAA... fleet admin' sh bootstrap-alpine.sh
 
-   The script installs Docker, Tailscale and a few tools with `apk` (the `community` repository must be enabled in `/etc/apk/repositories`), turns both
-   services on at boot, and **stops if the host is not on the tailnet yet** with the `tailscale up` line to run. It never asks for an auth key. Run it again
+   The script installs Docker, Tailscale, OpenSSH and a few tools with `apk` (the `community` repository must be enabled in `/etc/apk/repositories`), turns both
+   services on at boot, and **stops if the host is not on the tailnet yet** with the `tailscale up` line to run. It never asks for an auth key. It also turns sshd on and, if you pass `SSH_AUTHORIZED_KEY` (the fleet admin public key, the same one as `baseline_admin_ssh_keys`), allows it for root: a container host runs no
+   baseline role, so nothing else installs it and `reconcile-now` cannot reach the host without it. Run it again
    after joining. It then continues as the Unraid setup does: a read-only deploy key and an age key (printed; it waits for you), a check-only first run,
    and a prompt before the reconciler starts.
 4. **On your admin machine**: `scripts/access.sh add-host <name> <age-public-key>`, `sync`, commit, push.

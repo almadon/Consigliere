@@ -14,7 +14,8 @@
 # Safe to run again. It installs packages, turns the Docker and Tailscale services on at boot, and stops with instructions if the
 # host is not on the tailnet yet (joining is yours: an auth key is a credential, so this script never asks for one). The rest
 # (deploy key, age key, a check-only first run, then starting the reconciler) is bootstrap-unraid.sh.
-# Optional: CONSIGLIERE_DIR (default /opt/consigliere).
+# Optional: CONSIGLIERE_DIR (default /opt/consigliere); SSH_AUTHORIZED_KEY (a public key line) or SSH_AUTHORIZED_KEY_FILE: the fleet admin key, so the fleet's
+# tooling can reach this host over SSH (a container host runs no baseline role, so nothing else installs it).
 set -eu
 
 die() { echo "ERROR: $*" >&2; exit 1; }
@@ -24,10 +25,23 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 # ---- Packages -----------------------------------------------------------------------------------------------
 # docker and tailscale live in Alpine's community repository: it must be enabled in /etc/apk/repositories.
 echo "==> Installing packages"
-apk add --no-cache bash git curl jq openssh-client ca-certificates tzdata docker docker-cli-compose tailscale >/dev/null ||
+apk add --no-cache bash git curl jq openssh-client ca-certificates tzdata openssh docker docker-cli-compose tailscale >/dev/null ||
   die "apk could not install the packages. Is the community repository enabled? (/etc/apk/repositories needs a line ending in /community)"
 # A bind mount of a missing file would make Docker create a directory in its place; the reconciler mounts /etc/localtime.
 [ -e /etc/localtime ] || ln -s /usr/share/zoneinfo/UTC /etc/localtime
+
+# ---- SSH access ---------------------------------------------------------------------------------------------
+# sshd on, and the fleet's admin public key allowed for root (public keys are not secrets). scripts/reconcile-now.sh, scripts/fleet-run.sh and the audit reach the host this way.
+rc-update add sshd default >/dev/null 2>&1 || true
+rc-service sshd start >/dev/null 2>&1 || true
+key="${SSH_AUTHORIZED_KEY:-}"
+[ -z "$key" ] && [ -n "${SSH_AUTHORIZED_KEY_FILE:-}" ] && [ -r "$SSH_AUTHORIZED_KEY_FILE" ] && key="$(head -n1 "$SSH_AUTHORIZED_KEY_FILE")"
+if [ -n "$key" ]; then
+  mkdir -p /root/.ssh && chmod 700 /root/.ssh && touch /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys
+  grep -qxF "$key" /root/.ssh/authorized_keys || echo "$key" >> /root/.ssh/authorized_keys
+elif [ ! -s /root/.ssh/authorized_keys ]; then
+  echo "NOTE: no SSH key was installed for root. The fleet's tooling (reconcile-now, fleet-run) cannot reach this host until one is: re-run with SSH_AUTHORIZED_KEY='<the fleet admin public key>'." >&2
+fi
 
 # ---- Host name ----------------------------------------------------------------------------------------------
 # Until the host is on the tailnet, the fleet identifies it by this name (it must equal the key in hosts.yml).

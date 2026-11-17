@@ -24,6 +24,10 @@ A role that cannot work everywhere says so in `hosts/roles/<role>/platform.yml` 
 `fleet_plan` skips it and logs which capability is missing, instead of failing in the middle of the role. A role with no `platform.yml` runs wherever a tag selects it, as
 before. Inside a container the Ansible facts describe the container, not the machine, so the container playbook states `platform_host` (and the Alpine bootstrap writes it into `vars.yml`).
 
+The host table can say what a host is: `os:` (`debian`, `ubuntu`, `alpine`, `unraid`, `macos`, `windows`) and `arch:` (`amd64`, `arm64`). Both are optional for a host that runs Ansible itself, which
+works them out from its facts and logs a line if the table disagrees. A container-reconciled host needs `os:`: its facts describe the container, and the fleet's scripts (`reconcile-now`, `fleet-run`) use
+it to pick how to reconcile the host. `os:` and `arch:` also become groups (`os_alpine`, `arch_amd64`), like the other table values.
+
 To support a new platform: add `hosts/platforms/<family>.yml`, then give the roles that are host-bound a `platform.yml`. Declarations are written by hand, because a role that mentions apt or
 systemd only conditionally may still work on a platform without them.
 
