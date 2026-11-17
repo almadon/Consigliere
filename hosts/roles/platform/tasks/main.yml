@@ -9,8 +9,8 @@
 - name: Detect the platform family from the facts
   ansible.builtin.set_fact:
     _platform_detected: >-
-      {{ {'Debian': 'debian', 'Alpine': 'alpine', 'Darwin': 'macos'}.get(ansible_os_family | default(''),
-         (ansible_os_family | default('unknown')) | lower) }}
+      {{ {'Debian': 'debian', 'Alpine': 'alpine', 'Darwin': 'macos'}.get(ansible_facts['os_family'] | default(''),
+         (ansible_facts['os_family'] | default('unknown')) | lower) }}
   tags: [always]
 
 - name: Read the profile for it
@@ -29,8 +29,8 @@
     platform_family: "{{ _platform_profile.family }}"
     platform_tier: "{{ _platform_profile.tier }}"
     platform_arch: >-
-      {{ {'x86_64': 'amd64', 'amd64': 'amd64', 'aarch64': 'arm64', 'arm64': 'arm64', 'armv7l': 'armv7'}.get(ansible_architecture | default(''),
-         ansible_architecture | default('unknown')) }}
+      {{ {'x86_64': 'amd64', 'amd64': 'amd64', 'aarch64': 'arm64', 'arm64': 'arm64', 'armv7l': 'armv7'}.get(ansible_facts['architecture'] | default(''),
+         ansible_facts['architecture'] | default('unknown')) }}
     platform_runtime_mode: "{{ 'container' if (platform_runtime == 'container' or _platform_profile.tier == 'container') else 'host' }}"
     platform_defaults: "{{ _platform_profile.defaults | default({}) }}"
   tags: [always]

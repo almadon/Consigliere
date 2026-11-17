@@ -11,7 +11,7 @@
       - otel_agent_syslog_listeners | map(attribute='name') | list | unique | length == otel_agent_syslog_listeners | length
       - otel_agent_syslog_listeners | map(attribute='name') | select('match', '^[a-z0-9_]+$') | list | length == otel_agent_syslog_listeners | length
       - otel_agent_journal_priority in ['emerg', 'alert', 'crit', 'err', 'warning', 'notice', 'info', 'debug']
-      - ansible_architecture in ['x86_64', 'aarch64']
+      - ansible_facts['architecture'] in ['x86_64', 'aarch64']
     fail_msg: >-
       Set otel_agent_loki_url (Loki's OTLP address, for example http://lk.ctrl.a64.one:3100/otlp) in config/vars/group/feat_otel.yml.
       otel_agent_journal_priority is one of emerg, alert, crit, err, warning, notice, info, debug. The collector package exists for
@@ -72,14 +72,14 @@
     checksum: "sha256:https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v{{ otel_agent_version }}/otelcol-contrib_{{ otel_agent_version }}_linux_{{ _otel_agent_arch }}.deb.sha256"
     mode: "0644"
   vars:
-    _otel_agent_arch: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}"
+    _otel_agent_arch: "{{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'amd64' }}"
   when: _otel_agent_installed.stdout != otel_agent_version
   register: _otel_agent_deb
 
 # The package starts the service with its stock config; ours replaces it right after (the restart handler runs below).
 - name: Install the collector package
   ansible.builtin.apt:
-    deb: "/var/cache/otelcol-contrib_{{ otel_agent_version }}_{{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}.deb"
+    deb: "/var/cache/otelcol-contrib_{{ otel_agent_version }}_{{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'amd64' }}.deb"
     state: present
   when:
     - _otel_agent_installed.stdout != otel_agent_version

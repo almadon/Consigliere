@@ -34,12 +34,12 @@ Everything the roles install is multi-architecture, checked against the registri
 | Component | amd64 | arm64 |
 |---|---|---|
 | sops (pinned binary + checksum in `install-sops.sh`), Docker's apt repo, Tailscale's apt repo | yes | yes |
-| OpenTelemetry Collector `.deb` (`otel_agent`) | yes | yes (selected from `ansible_architecture`) |
+| OpenTelemetry Collector `.deb` (`otel_agent`) | yes | yes (selected from `ansible_facts['architecture']`) |
 | Arkeep agent, Beszel agent, Arcane agent, restic REST server, Muximux, Garage + web UI, Loki, Traefik, nginx | yes | yes |
 | Mailflow (`mailflow-frontend`, `mailflow-backend`), PostgreSQL 16, Redis 7 | yes | yes |
 
 Re-check an image before you add it: `docker manifest inspect <image:tag> | grep architecture`; a single-architecture image will not run on an ARM host.
-When a role downloads a binary itself it must choose by `ansible_architecture` (`x86_64` / `aarch64`) and verify a checksum, as `install-sops.sh` and
+When a role downloads a binary itself it must choose by `ansible_facts['architecture']` (`x86_64` / `aarch64`) and verify a checksum, as `install-sops.sh` and
 `otel_agent` do.
 
 ## Ansible on the host

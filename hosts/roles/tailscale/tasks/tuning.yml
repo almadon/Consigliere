@@ -18,7 +18,7 @@
 - name: UDP GRO forwarding on the default-route interface
   when:
     - tailscale_udp_gro_tuning | bool
-    - ansible_virtualization_type | default('') not in ['lxc', 'docker', 'podman', 'openvz']
+    - ansible_facts['virtualization_type'] | default('') not in ['lxc', 'docker', 'podman', 'openvz']
   block:
     - name: Install ethtool
       ansible.builtin.apt:

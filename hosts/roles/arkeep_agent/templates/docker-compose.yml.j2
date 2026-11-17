@@ -16,7 +16,7 @@ services:
       ARKEEP_SERVER_HTTP_ADDR: "{{ arkeep_agent_server_http_addr }}"
       ARKEEP_STATE_DIR: /var/lib/arkeep-agent
       ARKEEP_LOG_LEVEL: "{{ arkeep_agent_log_level }}"
-      TZ: "{{ ansible_date_time.tz | default('UTC') }}"
+      TZ: "{{ ansible_facts.date_time.tz | default('UTC') }}"
       # gRPC TLS: auto-enrollment (default) -- the agent calls the server's
       # HTTP API on first boot for a signed client cert, reused afterward.
     volumes:

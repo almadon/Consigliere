@@ -5,4 +5,4 @@
   ansible.builtin.command: "{{ role_path }}/../../bootstrap/install-sops.sh"
   register: _sops_install
   changed_when: "'INSTALLED' in _sops_install.stdout"
-  when: not ansible_check_mode and ansible_system == 'Linux'
+  when: not ansible_check_mode and ansible_facts['system'] == 'Linux'

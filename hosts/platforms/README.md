@@ -1,6 +1,6 @@
 # Platform profiles
 
-One file per platform family, read by the `platform` role. The role detects the family from the host's Ansible facts (`ansible_os_family`), or takes it from
+One file per platform family, read by the `platform` role. The role detects the family from the host's Ansible facts (`ansible_facts['os_family']`), or takes it from
 `platform_host` when Ansible runs inside a container and so sees the container instead of the machine (Unraid, Alpine with the container reconciler).
 
 | Key | Meaning |

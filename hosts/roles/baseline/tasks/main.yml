@@ -196,4 +196,4 @@
 
 - name: Reconciliation run priority and skipping of unchanged runs, and the journal's size
   ansible.builtin.include_tasks: systemd_limits.yml
-  when: ansible_service_mgr == 'systemd'
+  when: ansible_facts['service_mgr'] == 'systemd'

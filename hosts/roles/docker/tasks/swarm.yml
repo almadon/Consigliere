@@ -7,7 +7,7 @@
 - name: Init swarm on the manager
   community.docker.docker_swarm:
     state: present
-    advertise_addr: "{{ ansible_tailscale0.ipv4.address | default(ansible_default_ipv4.address) }}"
+    advertise_addr: "{{ ansible_facts.tailscale0.ipv4.address | default(ansible_facts.default_ipv4.address) }}"
   when: "'swarm_manager' in group_names"
 
 - name: Join swarm as worker

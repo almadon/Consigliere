@@ -26,7 +26,7 @@ services:
       ARKEEP_LOG_LEVEL: "{{ arkeep_server_log_level }}"
       ARKEEP_BASE_URL: "{{ arkeep_server_base_url }}"
       ARKEEP_UPDATE_CHECK: "{{ arkeep_server_update_check | lower }}"
-      TZ: "{{ ansible_date_time.tz | default('UTC') }}"
+      TZ: "{{ ansible_facts.date_time.tz | default('UTC') }}"
       # gRPC TLS: auto-PKI (default) -- the server generates its own CA and
       # cert under the data dir on first boot; agents auto-enroll with mTLS.
       # No external cert wired up here -- see Arkeep's own docs if that's needed.

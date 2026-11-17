@@ -8,7 +8,7 @@ zwave_js_ui_dir: /opt/zwave-js-ui
 zwave_js_ui_device: ""
 # Where the web UI (8091) and the Home Assistant websocket server (3000) listen. Neither has a password of its own until you switch authentication on in the UI, and the
 # websocket server never has one, so keep them on the LAN address of the VLAN Home Assistant is on, never a public one.
-zwave_js_ui_bind_address: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+zwave_js_ui_bind_address: "{{ ansible_facts.default_ipv4.address | default('127.0.0.1') }}"
 zwave_js_ui_ui_port: 8091
 zwave_js_ui_ws_port: 3000
 zwave_js_ui_memory_limit: 512m

@@ -17,8 +17,8 @@
       ansible.builtin.group_by:
         key: "{{ item }}"
       loop:
-        - "os_{{ ansible_system | lower }}"
-        - "os_{{ ansible_system | lower }}_{{ ansible_distribution | lower | replace(' ', '_') }}"
+        - "os_{{ ansible_facts['system'] | lower }}"
+        - "os_{{ ansible_facts['system'] | lower }}_{{ ansible_facts['distribution'] | lower | replace(' ', '_') }}"
       changed_when: false
       tags: [always]
   tasks:
