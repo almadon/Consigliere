@@ -1,4 +1,4 @@
-{#- The hosts for the page: the fleet's host table plus each host's routes (vars/routes/<host>.yml), straight from the repo. -#}
+{#- The hosts for the page: the fleet's host table plus each host's routes, straight from the repo: the per-domain route files (routes/<domain>.yml, by each route's `via`) and any per-host file (vars/routes/<host>.yml). -#}
 {%- set table = (_cmdr_hosts_raw.content | b64decode | from_yaml).all.hosts -%}
 {%- set locs = ((_cmdr_locations_raw.content | default('e30=') | b64decode) | from_yaml) or {} -%}
 {%- set routes_by_host = {} -%}
@@ -13,12 +13,14 @@
 {%- for name in table.keys() | sort -%}
 {%- set a = table[name] or {} -%}
 {%- set rts = [] -%}
-{%- for r in routes_by_host.get(name | lower, []) -%}
+{%- set zacc = namespace(items=[]) -%}
+{%- for z in (lookup('fleet_routes', name | lower, dirs=[cmdr_conf_dir ~ '/routes'])).zones -%}{%- for zr in z.routes -%}{%- set zacc.items = zacc.items + [dict(zr, _zone=z.name, _cert=(z.cert | default('', true)))] -%}{%- endfor -%}{%- endfor -%}
+{%- for r in routes_by_host.get(name | lower, []) + zacc.items -%}
 {%- set hs = r.host if (r.host is defined and r.host is not string) else ([r.host] if r.host is defined else []) -%}
 {%- set intern = namespace(on=(r.internal | default(false) | bool)) -%}
 {%- for hh in hs -%}{%- for d in cmdr_internal_domains -%}{%- if hh == d or hh.endswith('.' ~ d) -%}{%- set intern.on = true -%}{%- endif -%}{%- endfor -%}{%- endfor -%}
 {%- set _ = rts.append({'name': r.name | default(''), 'hosts': hs, 'backend': r.backend | default(''), 'profile': r.profile | default(''), 'internal': intern.on,
-                        'redirect': (r.redirect.to if r.redirect is defined else ''), 'rule': r.rule | default('')}) -%}
+                        'redirect': (r.redirect.to if r.redirect is defined else ''), 'rule': r.rule | default(''), 'zone': r._zone | default(''), 'cert': r._cert | default('')}) -%}
 {%- endfor -%}
 {%- set _ = out.append({'name': name, 'type': a.type | default(''), 'org': a.org | default(''), 'site': a.site | default(''), 'location': a.location | default(''), 'node': a.node | default(''), 'os': a.os | default(''), 'arch': a.arch | default(''), 'geo': a.geo | default((locs.get(a.location | default(''), {}) or {}).geo | default([])),
                         'util': a.util | default([]), 'feat': a.feat | default([]), 'prop': a.prop | default([]), 'cert': a.cert | default([]),

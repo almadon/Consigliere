@@ -3,7 +3,7 @@
 The fleet's control page: one place that shows every host, its status, and the way to every admin tool. It is the "what do I have, is it healthy, take me there"
 layer; the engines stay where they are (Arcane for containers, Arkeep for backups, Grafana and Loki for logs, Beszel for host metrics, Wazuh later).
 
-- **Hosts and routes come from the fleet repo**, read from the reconciler's checkout on this host (`inventory/hosts.yml` and `vars/routes/*.yml`), so the page
+- **Hosts and routes come from the fleet repo**, read from the reconciler's checkout on this host (`inventory/hosts.yml`, the per-domain route files `routes/<domain>.yml` and any per-host `vars/routes/*.yml`), so the page
   can never disagree with what is declared. Tag descriptions come from the tag manifests.
 - **Live status comes from Loki**, which already receives every host's journal: a host is *reporting* if it sent logs in the last 10 minutes; its last
   reconcile is the `ok= changed= failed=` recap of `fleet-reconcile.service`; the exposure table is the last `fleet-exposure-watch` scan. If Loki is
