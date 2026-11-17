@@ -26,11 +26,13 @@ set -euo pipefail
 # One entry point for every kind of host. Debian and Ubuntu continue below; the others hand over to
 # their own setup, because they cannot run this one (no apt, no systemd, or a different init):
 #   unraid  -> hosts/bootstrap/unraid/bootstrap-unraid.sh   (a self-scheduling container)
+#   alpine  -> hosts/bootstrap/alpine/bootstrap-alpine.sh   (installs Docker and Tailscale, then the same container)
 #   macos   -> macos/bootstrap/bootstrap.sh                 (launchd)
-# CONSIGLIERE_PROFILE=debian|unraid|macos overrides the detection.
+# CONSIGLIERE_PROFILE=debian|alpine|unraid|macos overrides the detection.
 detect_profile() {
   if [ -n "${CONSIGLIERE_PROFILE:-}" ]; then echo "$CONSIGLIERE_PROFILE"; return; fi
   if [ -f /etc/unraid-version ]; then echo unraid
+  elif [ -f /etc/alpine-release ]; then echo alpine
   elif [ "$(uname -s)" = Darwin ]; then echo macos
   elif [ -r /etc/os-release ] && grep -qiE '^ID(_LIKE)?=.*(debian|ubuntu)' /etc/os-release; then echo debian
   else echo unsupported
@@ -50,11 +52,12 @@ if [ "$PROFILE" != debian ]; then
   }
   case "$PROFILE" in
     unraid) echo "==> Unraid detected: using the container-based setup"; handoff hosts/bootstrap/unraid/bootstrap-unraid.sh ;;
+    alpine) echo "==> Alpine detected: using the container-based setup"; handoff hosts/bootstrap/alpine/bootstrap-alpine.sh ;;
     macos)  echo "==> macOS detected: using the launchd setup";          handoff macos/bootstrap/bootstrap.sh ;;
     *)
       echo "ERROR: this kind of host is not supported (profile: $PROFILE)." >&2
       [ -r /etc/os-release ] && echo "       OS: $(. /etc/os-release; echo "${PRETTY_NAME:-unknown}")" >&2
-      echo "       Supported: Debian and Ubuntu, Unraid, macOS. To force a profile: CONSIGLIERE_PROFILE=debian|unraid|macos" >&2
+      echo "       Supported: Debian and Ubuntu, Alpine, Unraid, macOS. To force a profile: CONSIGLIERE_PROFILE=debian|alpine|unraid|macos" >&2
       exit 1 ;;
   esac
 fi

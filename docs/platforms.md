@@ -4,6 +4,7 @@
 |---|---|
 | Debian 13, Debian 12 and **Ubuntu 24.04 or newer**, **x86_64** and **aarch64 (ARM64)** | Full: `bootstrap.sh` + the systemd timer (VPS, LXC, VM, bare metal, Oracle Ampere A1). Tested on Debian 13 (x86_64) and Ubuntu 24.04 (ARM64); Debian 12 takes the same path as Ubuntu below but has not been run |
 | Ubuntu 22.04 and older | Not supported: ansible-core 2.19 needs Python 3.11 or newer, and `install-ansible.sh` stops with that message |
+| Alpine (LXC or VM) | Docker and Tailscale from `apk`, then the same self-scheduling container as Unraid (`hosts/bootstrap/alpine/`); only container-based roles run there |
 | Unraid (7.x) | A self-scheduling container (`hosts/bootstrap/unraid/`); only container-based roles run there |
 | macOS | launchd agent (`macos/`) |
 

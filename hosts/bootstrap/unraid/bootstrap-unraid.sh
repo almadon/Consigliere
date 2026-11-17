@@ -21,7 +21,8 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 command -v docker >/dev/null || die "docker not found (is the Docker service enabled in Unraid's settings?)"
 docker info >/dev/null 2>&1 || die "the Docker daemon is not running (start the array and enable Docker first)"
 command -v git >/dev/null || die "git not found"
-[ -f /etc/unraid-version ] || echo "NOTE: /etc/unraid-version not found; continuing, but this script is written for Unraid." >&2
+# CONSIGLIERE_GENERIC is set by the Alpine setup (hosts/bootstrap/alpine/), which reuses this script on a plain Docker host.
+[ -f /etc/unraid-version ] || [ -n "${CONSIGLIERE_GENERIC:-}" ] || echo "NOTE: /etc/unraid-version not found; continuing, but this script is written for Unraid." >&2
 
 # On a terminal, show what will be used and let you change it.
 if [ -t 0 ]; then
@@ -45,7 +46,7 @@ NAME=consigliere-reconcile
 # host's tailnet name and address (its inventory key). Joining the tailnet stays the plugin's job.
 TS_CLI="$(readlink -f "$(command -v tailscale 2>/dev/null || true)" 2>/dev/null || true)"
 [ -x "$TS_CLI" ] && [ -S /var/run/tailscale/tailscaled.sock ] ||
-  die "the Tailscale CLI/socket was not found. Install Unraid's Tailscale plugin and join the tailnet (with a tagged auth key) first."
+  die "the Tailscale CLI/socket was not found. Install Tailscale (on Unraid: its plugin) and join the tailnet (with a tagged auth key) first."
 tailscale status >/dev/null 2>&1 || die "this server is not connected to the tailnet yet (tailscale status fails)"
 SELF="$(tailscale status --json | jq -r '.Self.HostName' | tr 'A-Z' 'a-z')"
 echo "==> This host is '$SELF' on the tailnet; its entry in the fleet's hosts.yml must use that name."

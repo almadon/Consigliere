@@ -77,3 +77,14 @@ Numbered, never reused. A reversed decision gets a new entry that supersedes the
 ## 17. The Arcane agent role knows both naming styles and fails when the agent will not stay up
 
 **Chosen.** Arcane 3 (the `next` images) reads only ARCANE_-prefixed settings (`ARCANE_AGENT`, `ARCANE_AGENT_TOKEN`, `ARCANE_MANAGER_API_URL`, `ARCANE_AGENT_TRANSPORT`) and refuses to start on the old names; Arcane 2 and earlier read the old names. `arcane_agent_env_prefixed`, worked out from `arcane_agent_version`, picks the style, and the old `poll` transport becomes `auto` in the new style. After starting the container the role now fails the run if the agent is not running, is restarting, or has restarted five times or more. **Why.** On 2026-11-06 the fleet moved all six agents to `agent:next` with the old names, so every agent crash-looped (about 8,500 restarts each) for six days with every reconcile reporting success, because `docker compose up` succeeded. The change was not verified after the reconcile; it was marked as an unchecked guess and then not checked. **Cost.** A new container waits 15 seconds in the run that creates it. `latest` is assumed to be the old style until the variable is set. **Rejected.** Pinning a tag (Arcane updates its own agents from its UI and an older agent refuses a newer database); checking only that `docker compose up` succeeded. **Revisit when** `latest` becomes Arcane 3.
+
+## 18. Alpine hosts use the container reconciler, not native Alpine support
+
+**Chosen.** An Alpine host (the first is a Proxmox LXC Docker host) gets Docker and Tailscale from `apk` through `hosts/bootstrap/alpine/bootstrap-alpine.sh`, and is then reconciled the way Unraid is: one container runs `reconcile.sh` through the Docker socket (`hosts/site-unraid.yml`). `bootstrap.sh` detects Alpine and hands over.
+
+**Cost.** Only container-based roles run. There is no host baseline, no firewall role, no `tailscale` role (joining the tailnet is done by hand once), and no OpenTelemetry agent, because that one is a native systemd service. The host's own updates are not scheduled.
+
+**Rejected.** Native Alpine support (Ansible on the host, an OpenRC or cron loop, Alpine branches in about 15 roles that use apt or systemd). It would give full parity, but it touches roles that every Debian host runs, for one small host.
+
+**Revisit when** a second or third Alpine host needs host-level logs or metrics, or when the OpenTelemetry role can run as a container.
+
