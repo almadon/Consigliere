@@ -1,0 +1,7 @@
+---
+# Collections the hosts need newer than the operating system's Ansible bundle ships. reconcile.sh installs these under its work directory (first in the collections path)
+# when this file changes; a failed download only warns and the bundle's own copy is used. Pin exact versions: a host runs what is written here, not whatever is newest.
+collections:
+  # 2.1.0 and earlier (what Debian 13's and Ubuntu's bundles carry) import from ansible.module_utils._text in authorized_key, sysctl and mount; ansible-core 2.24 removes it.
+  - name: ansible.posix
+    version: "2.2.2"

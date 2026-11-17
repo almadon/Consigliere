@@ -221,6 +221,22 @@ if [ "${RECONCILE_PROFILE:-0}" = 1 ]; then
 fi
 
 # Framework roles first; the fleet's own roles (if any) are also available.
+# Collections newer than the operating system's Ansible bundle ships (hosts/requirements-hosts.yml). Installed under the work directory and put first in the collections path,
+# only when that file changes (its checksum is the marker). A failed download is reported and the bundle's own copy is used: Galaxy being unreachable must not stop a reconcile.
+COLLECTIONS_DIR="$WORKDIR/collections"
+REQ_HOSTS="$FRAMEWORK_DIR/hosts/requirements-hosts.yml"
+if [ -f "$REQ_HOSTS" ] && command -v ansible-galaxy >/dev/null 2>&1; then
+  want="$(sha256sum "$REQ_HOSTS" | cut -d' ' -f1)"
+  if [ "$(cat "$COLLECTIONS_DIR/.requirements.sha" 2>/dev/null || true)" != "$want" ]; then
+    echo "==> Installing the collections the hosts need (hosts/requirements-hosts.yml)"
+    if ansible-galaxy collection install -r "$REQ_HOSTS" -p "$COLLECTIONS_DIR" >/dev/null 2>&1; then
+      echo "$want" > "$COLLECTIONS_DIR/.requirements.sha"
+    else
+      echo "WARNING: could not install the collections in hosts/requirements-hosts.yml; using the ones that came with Ansible" >&2
+    fi
+  fi
+  [ -d "$COLLECTIONS_DIR/ansible_collections" ] && export ANSIBLE_COLLECTIONS_PATH="$COLLECTIONS_DIR${ANSIBLE_COLLECTIONS_PATH:+:$ANSIBLE_COLLECTIONS_PATH}"
+fi
 export ANSIBLE_ROLES_PATH="$FRAMEWORK_DIR/hosts/roles${CONF:+:$CONF/roles}"
 export ANSIBLE_CONFIG="$FRAMEWORK_DIR/hosts/ansible.cfg"
 
