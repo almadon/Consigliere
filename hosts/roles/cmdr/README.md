@@ -34,6 +34,7 @@ browser against the real fleet repo; not yet on the fleet.
 ## The page
 
 - **Look:** charcoal and brass, mono type for anything you could type; follows the system light/dark setting (button in the header overrides, remembered per browser).
+- **OS and CPU:** a host with `os:` (debian, ubuntu, alpine, unraid, ...) and `arch:` (amd64, arm64) in the host table shows them as chips on its card and in its details; click one to see every host that shares it. Hosts without them show nothing (an optional attribute).
 - **Runs on:** an `lxc` or `vm` host with `node: <host name>` shows "on <node>" on its card (a link when the node is itself in the host table) and in its details.
 - **Map:** hosts with coordinates appear on a world map; the coordinates belong to the place, so a host names its `location:` in the host table and the fleet's `inventory/locations.yml` maps that name to `geo: [latitude, longitude]` (a host's own `geo:` still overrides it) (offline outline, no tile server), coloured by status; hosts at the same place share a marker. Hover for the
   hosts, click to open one, drag and scroll to explore. Optional arcs show where telemetry (otel agents to the Loki host) and backups (Arkeep agents to the server) flow. A host's `location` and `site` also show on its card. A location is a clickable value like the others: click it, on a card or in a map popup, to show only that place's hosts, and hovering it lights the matching marker and cards.

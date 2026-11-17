@@ -33,7 +33,7 @@
 
   // One look per attribute value everywhere it appears (card, drawer, filter): the same site, place, org or Proxmox node is the same colour, so
   // relationships show without reading. Hovering one lights every other card that shares it; clicking filters the host list to it.
-  const ATTR = { site: 'site', location: 'place', org: 'org', node: 'on' };
+  const ATTR = { site: 'site', location: 'place', org: 'org', node: 'on', os: 'os', arch: 'cpu' };
   const attrKey = (kind, value) => kind + ':' + value;
   function relate(key, on) {
     for (const el of document.querySelectorAll('.attr, .mk')) if (el.dataset.attr === key) { el.classList.toggle('hl', on); const c = el.closest('.card'); if (c) c.classList.toggle('rel', on); }
@@ -110,7 +110,7 @@
     }
     if (state.attr && !(host[state.attr.kind] === state.attr.value || (state.attr.kind === 'node' && host.name === state.attr.value))) return false;
     if (!state.q) return true;
-    const hay = [host.name, host.type, host.org, host.site, host.location, ...(host.util || []), ...(host.feat || []), host.node, ...(host.prop || []), ...(host.cert || []),
+    const hay = [host.name, host.type, host.os, host.arch, host.org, host.site, host.location, ...(host.util || []), ...(host.feat || []), host.node, ...(host.prop || []), ...(host.cert || []),
       ...(host.routes || []).flatMap((r) => r.hosts || [])].join(' ').toLowerCase();
     return state.q.toLowerCase().split(/\s+/).every((w) => hay.includes(w));
   }
@@ -207,7 +207,7 @@
       onkeydown: (e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openHost(host.name); } } },
       h('div', { class: 'row head' }, h('span', { class: 'dot ' + hh.dot, title: hh.dot === 'ok' ? 'Sending logs to Loki' : hh.dot === 'bad' ? 'No logs for 10 minutes' : 'Status unknown' }),
         h('span', { class: 'name' }, host.name), typeTag(host)),
-      host.location || host.site || host.org || nodeOf(host) ? h('div', { class: 'attrs', title: 'Place, provider (site), organisation and Proxmox node from the host table' }, attr('location', host.location), attr('site', host.site), attr('org', host.org), attr('node', nodeOf(host))) : null,
+      host.location || host.site || host.org || host.os || host.arch || nodeOf(host) ? h('div', { class: 'attrs', title: 'Place, provider (site), organisation, operating system, CPU and Proxmox node from the host table' }, attr('location', host.location), attr('site', host.site), attr('org', host.org), attr('os', host.os), attr('arch', host.arch), attr('node', nodeOf(host))) : null,
       h('div', { class: 'stat', title: 'The last reconcile run: the host applying the fleet repo to itself' }, h('span', { class: 'dot ' + hh.rec.cls }), h('span', null, hh.rec.text)),
       meters(host),
       body ? h('div', { class: 'cbody' }, body) : null,
@@ -241,7 +241,7 @@
       h('div', { class: 'note' }, 'Paste into a terminal in the fleet repo checkout. cmdr itself never runs anything on a host.'),
       h('h2', null, 'Details'),
       h('table', null,
-        kv('Type', typeTag(host)), kv('Organisation', attr('org', host.org) || ''), kv('Site (provider)', attr('site', host.site) || ''), kv('Location', attr('location', host.location) || ''), nodeOf(host) ? kv('Runs on (Proxmox node)', attr('node', host.node)) : null,
+        kv('Type', typeTag(host)), kv('Operating system', attr('os', host.os) || ''), kv('CPU', attr('arch', host.arch) || ''), kv('Organisation', attr('org', host.org) || ''), kv('Site (provider)', attr('site', host.site) || ''), kv('Location', attr('location', host.location) || ''), nodeOf(host) ? kv('Runs on (Proxmox node)', attr('node', host.node)) : null,
         kv(kindLabel('util'), tags(host.util, 'util')), kv(kindLabel('feat'), tags(host.feat, 'feat')), kv(kindLabel('prop'), tags(host.prop, 'prop')),
         kv('Certificates', (host.cert || []).join(', ') || 'none'), kv('Public ports (fw)', (host.fw || []).join(', ') || 'none (tailnet only)')),
       h('h2', null, 'Routes'),
