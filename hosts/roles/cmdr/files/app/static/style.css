@@ -137,6 +137,13 @@ button.b.done{border-color:var(--ok);color:var(--ok)}
 .exp td,.exp th{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
 .exp tr:last-child td{border-bottom:0}.exp th{color:var(--mute);font:600 11px var(--mono);letter-spacing:.1em;text-transform:uppercase}
 .sev-alert{color:var(--bad);font-weight:600}.sev-warn{color:var(--warn);font-weight:600}.sev-info{color:var(--mute)}
+.doms{display:grid;gap:10px}
+.dom>summary{cursor:pointer;display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 14px;border:1px solid var(--line);border-radius:14px;background:var(--panel);list-style:none}
+.dom[open]>summary{border-bottom-left-radius:0;border-bottom-right-radius:0;border-bottom-color:transparent}
+.dom>summary::before{content:"▸";color:var(--gold)}.dom[open]>summary::before{content:"▾"}
+.dom .dn{font:600 14px var(--mono)}
+.dom .exp{border-top-left-radius:0;border-top-right-radius:0;border-top:0;box-shadow:none}
+.linkbtn{background:none;border:0;padding:0;font:inherit;color:var(--gold);cursor:pointer;text-decoration:underline dotted}
 .empty{color:var(--mute);padding:16px;border:1px dashed var(--line2);border-radius:12px}
 .foot{color:var(--mute);font:11.5px var(--mono);text-align:center;padding:0 0 24px}
 .skel{height:92px;border-radius:14px;background:linear-gradient(90deg,var(--panel) 25%,var(--panel2) 50%,var(--panel) 75%) 0 0/200% 100%;animation:sh 1.3s linear infinite;border:1px solid var(--line)}

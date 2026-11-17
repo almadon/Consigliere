@@ -328,6 +328,47 @@
     if (!window.CmdrMap) return;
     window.CmdrMap.render($('map'), { h, attr, relate, hosts: state.data.hosts, health: hostHealth, layers: state.mapLayers, view: state.mapView, open: openHost, again: renderMap });
   }
+  // Every route the fleet serves, grouped by domain: the files under config/routes/ (one per domain, each naming its certificate and which host serves each route).
+  // Follows the same search and filters as the host cards. A route that two hosts serve is one row per host. Routes that are not in a domain file (an older per-host
+  // variable) are grouped last.
+  function renderDomains() {
+    const q = state.q.trim().toLowerCase();
+    const OTHER = 'Not in a domain file';
+    const zones = new Map();
+    for (const host of state.data.hosts) {
+      if (state.types.size && !state.types.has(host.type || '?')) continue;
+      if (state.attr && !(host[state.attr.kind] === state.attr.value || (state.attr.kind === 'node' && host.name === state.attr.value))) continue;
+      for (const r of host.routes || []) {
+        const names = r.hosts && r.hosts.length ? r.hosts : [r.rule || r.name];
+        if (q && ![...names, r.name, r.backend, r.zone, host.name].join(' ').toLowerCase().includes(q)) continue;
+        const z = r.zone || OTHER;
+        if (!zones.has(z)) zones.set(z, { cert: r.cert || '', rows: [] });
+        zones.get(z).rows.push({ host, r, names });
+      }
+    }
+    const total = [...zones.values()].reduce((n, z) => n + z.rows.length, 0);
+    const keys = [...zones.keys()].sort((a, b) => (a === OTHER) - (b === OTHER) || a.localeCompare(b));
+    const group = (k) => {
+      const z = zones.get(k);
+      z.rows.sort((a, b) => a.names[0].localeCompare(b.names[0]) || a.host.name.localeCompare(b.host.name));
+      const by = [...new Set(z.rows.map((x) => x.host.name))];
+      const link = (n) => /^[A-Za-z0-9.-]+$/.test(n) ? h('a', { href: safeUrl('https://' + n), target: '_blank', rel: 'noopener' }, n) : h('span', { class: 'mono' }, n);
+      return h('details', { class: 'dom', open: q ? true : false },
+        h('summary', null, h('span', { class: 'dn' }, k), z.cert ? pair('dc', 'cert', z.cert, null, 'The certificate that covers these names (from the domain file); each host that serves them must fetch it.') : null,
+          h('span', { class: 'mute' }, `${z.rows.length} route${z.rows.length === 1 ? '' : 's'} · served by ${by.join(', ')}`)),
+        h('div', { class: 'exp' }, h('table', null,
+          h('tr', null, h('th', null, 'Name'), h('th', null, 'Route'), h('th', null, 'Backend'), h('th', null, 'Served by'), h('th', null, 'Exposure')),
+          z.rows.map(({ host, r, names }) => h('tr', null,
+            h('td', null, names.flatMap((n, i) => [i ? ', ' : null, link(n)])),
+            h('td', { class: 'mono' }, r.name),
+            h('td', { class: 'mono mute' }, r.redirect ? 'redirect → ' + r.redirect : r.backend),
+            h('td', null, h('button', { class: 'linkbtn', type: 'button', title: 'Open this host', onclick: () => openHost(host.name) }, host.name)),
+            h('td', null, exposureBadge(!!r.internal)))))));
+    };
+    $('domains').replaceChildren(
+      h('div', { class: 'bar' }, h('h2', null, 'Domains'), h('span', { class: 'note' }, total ? `${total} route${total === 1 ? '' : 's'} in ${keys.length} domain${keys.length === 1 ? '' : 's'}. Which host serves a route is set in config/routes/<domain>.yml.` : '')),
+      keys.length ? h('div', { class: 'doms' }, keys.map(group)) : h('div', { class: 'empty' }, 'No routes match.'));
+  }
   function renderExposure() {
     const rows = state.data.exposure || [];
     $('exposure').replaceChildren(h('div', { class: 'bar' }, h('h2', null, 'Public exposure')),
@@ -339,7 +380,7 @@
   }
   function render() {
     const d = state.data;
-    renderStrip(); renderMap(); renderTools(); renderChips(); renderKey(); renderExposure(); requestAnimationFrame(markMore);
+    renderStrip(); renderMap(); renderTools(); renderChips(); renderKey(); renderDomains(); renderExposure(); requestAnimationFrame(markMore);
     const list = sorted(d.hosts.filter(matches));
     const g = $('hosts');
     g.className = 'grid' + (state.view === 'list' ? ' list' : '');
