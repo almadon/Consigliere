@@ -5,6 +5,7 @@ services:
     image: tecnativa/docker-socket-proxy:{{ otel_agent_docker_proxy_version }}
     container_name: otel-docker-proxy
     environment:
+      - LOG_LEVEL={{ otel_agent_docker_proxy_log_level }}
       - EVENTS=1
       - PING=1
       - VERSION=1
