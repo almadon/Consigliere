@@ -20,8 +20,8 @@
             if (item.name if item is mapping else item) not in (_certwarden_agent_all_certs | map(attribute='name'))
             else []) }}
   loop: >-
-    {{ (query('ansible.builtin.varnames', '^certwarden_agent_certs(_.*)?$')
-        | map('extract', vars) | flatten) + (cert | default([])) }}
+    {{ (query('ansible.builtin.vars', *query('ansible.builtin.varnames', '^certwarden_agent_certs(_.*)?$'))
+        | flatten) + (cert | default([])) }}
 
 - name: Check the certificate list before names are used in file paths
   ansible.builtin.set_fact:

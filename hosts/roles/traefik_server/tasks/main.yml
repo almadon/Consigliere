@@ -3,8 +3,8 @@
   ansible.builtin.set_fact:
     _traefik_server_sources: "{{ query('ansible.builtin.varnames', '^traefik_server_routes(_.*)?$') | sort }}"
     _traefik_server_routes: >-
-      {{ query('ansible.builtin.varnames', '^traefik_server_routes(_.*)?$')
-         | map('extract', vars) | flatten }}
+      {{ query('ansible.builtin.vars', *query('ansible.builtin.varnames', '^traefik_server_routes(_.*)?$'))
+         | flatten }}
 
 - name: Show which variable each route comes from
   ansible.builtin.debug:
@@ -15,7 +15,7 @@
          if _traefik_server_sources | length == 0 else
          ('Traefik routes on this host (' ~ (_traefik_server_routes | length) ~ '): '
           ~ (_traefik_server_sources
-             | zip(_traefik_server_sources | map('extract', vars) | map('map', attribute='name') | map('join', ', '))
+             | zip(query('ansible.builtin.vars', *_traefik_server_sources) | map('map', attribute='name') | map('join', ', '))
              | map('join', ' = ') | join('; '))) }}
 
 - name: Summarise the routes for validation

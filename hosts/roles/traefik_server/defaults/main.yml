@@ -123,9 +123,9 @@ traefik_server_certs_dir: "{{ common_dir | default('/opt/common') }}/certs"
 # (plain names or {name: ...} entries).
 traefik_server_certificates: >-
   {{ ((cert | default([]))
-      + (query('ansible.builtin.varnames', '^certwarden_agent_certs(_.*)?$') | map('extract', vars) | flatten
+      + (query('ansible.builtin.vars', *query('ansible.builtin.varnames', '^certwarden_agent_certs(_.*)?$')) | flatten
          | selectattr('name', 'defined') | map(attribute='name') | list)
-      + (query('ansible.builtin.varnames', '^certwarden_agent_certs(_.*)?$') | map('extract', vars) | flatten
+      + (query('ansible.builtin.vars', *query('ansible.builtin.varnames', '^certwarden_agent_certs(_.*)?$')) | flatten
          | reject('mapping') | list)) | unique | list }}
 
 # Entry point names, matching the static traefik.yml in geotraefik.
