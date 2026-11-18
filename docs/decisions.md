@@ -191,3 +191,13 @@ Numbered, never reused. A reversed decision gets a new entry that supersedes the
 
 **Revisit when** a host needs the limit enforced (then fail instead of drop), or when mounts made after start must be seen.
 
+## 29. In an LXC, host metrics from a container are left out, not corrected
+
+**Chosen.** In container mode on an LXC the collector's CPU, memory and load describe the machine the LXC runs on (65 GB and the neighbours' load on a 1 GiB LXC), because lxcfs virtualizes `/proc` only for processes in the LXC's own cgroup and a Docker container inside gets the kernel's view, whether `/` is mounted or the lxcfs files are bound over it (tried: it still read the kernel's). The role compares the Docker daemon's memory (the lxcfs view) with what the reconciler container reads, and when the first is under 90% of the second it drops the cpu, memory and load scrapers and says so. Filesystem metrics stay.
+
+**Cost.** An LXC has no CPU, memory or load numbers in cmdr or the dashboards until something else supplies them (a native collector cannot run there without apt and systemd; Beszel's agent already reports them). A host with a deliberately smaller Docker view for another reason would lose them too.
+
+**Rejected.** Mounting the lxcfs files into the collector (the reader's cgroup, not the mount, decides the view, and the memory controller is not delegated to Docker's cgroup in this LXC, so no limit is visible). Showing the wrong numbers with a caveat.
+
+**Revisit when** the collector can run inside the LXC's own cgroup, or lxcfs exposes the limit to nested containers.
+

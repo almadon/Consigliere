@@ -82,6 +82,7 @@ receivers:
     root_path: {{ _otel_agent_hostfs | to_json }}
 {% endif %}
     scrapers:
+{% if not (_otel_agent_proc_virtual | default(false) | bool) %}
       cpu:
         metrics:
           system.cpu.utilization: {enabled: true}
@@ -89,6 +90,7 @@ receivers:
         metrics:
           system.memory.utilization: {enabled: true}
       load: {}
+{% endif %}
       filesystem:
         metrics:
           system.filesystem.utilization: {enabled: true}

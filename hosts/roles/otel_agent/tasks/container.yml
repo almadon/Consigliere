@@ -47,6 +47,30 @@
     msg: "no memory limit: Docker cannot set one here ({{ _otel_agent_probe_memory.stderr | default('') | trim | regex_replace('\\s+', ' ') | truncate(140) }})"
   when: otel_agent_memory_max | length > 0 and _otel_agent_memory_limit == ''
 
+# In an LXC the container's own /proc files (meminfo, stat, loadavg, uptime) are lxcfs views, and a Docker container inside it sees the kernel's instead, with or without the host
+# mounted: CPU, memory and load would describe the machine the LXC runs on, not the LXC. The Docker daemon runs inside the LXC and sees the lxcfs view, so when its idea of the
+# memory is far below what this container (the reconciler) reads from the kernel, the host's own CPU, memory and load are left out of the collector's metrics (the
+# filesystem numbers are still right) and a note says so.
+- name: Ask Docker how much memory it thinks the host has
+  ansible.builtin.command: docker info --format '{% raw %}{{.MemTotal}}{% endraw %}'
+  register: _otel_agent_docker_memtotal
+  changed_when: false
+  failed_when: false
+  when: otel_agent_hostmetrics | bool and not ansible_check_mode
+
+- name: Notice a host whose /proc is virtualized
+  ansible.builtin.set_fact:
+    _otel_agent_proc_virtual: >-
+      {{ (_otel_agent_docker_memtotal.stdout | default('') | trim) is match('^[0-9]+$')
+         and (_otel_agent_docker_memtotal.stdout | trim | int) < (ansible_facts.memtotal_mb | default(0) | int) * 1048576 * 0.9 }}
+
+- name: Say that the host's CPU, memory and load are left out
+  ansible.builtin.debug:
+    msg: >-
+      host metrics: this host's /proc is virtualized (an LXC): Docker reports {{ (_otel_agent_docker_memtotal.stdout | trim | int / 1048576) | round | int }} MiB, the kernel
+      {{ ansible_facts.memtotal_mb }} MiB. A container would read the machine the LXC runs on, so CPU, memory and load are not collected here; filesystem is.
+  when: _otel_agent_proc_virtual | bool
+
 - name: Render the collector's configuration and compose file
   ansible.builtin.set_fact:
     _otel_agent_config_text: "{{ lookup('ansible.builtin.template', 'config.yaml.j2') }}"

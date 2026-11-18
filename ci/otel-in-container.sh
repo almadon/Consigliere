@@ -53,6 +53,7 @@ docker rm -f otel-agent >/dev/null
 mkdir -p /tmp/shim
 cat > /tmp/shim/docker <<'SHIM'
 #!/bin/sh
+if [ "${1:-}" = info ] && [ -n "${FAKE_LXC:-}" ]; then echo 1073741824; exit 0; fi
 if [ "${1:-}" = run ]; then
   case " $* " in
     *" --memory "*) echo "docker: Error response from daemon: OCI runtime create failed: openat2 memory.max: no such file or directory (simulated)" >&2; exit 125 ;;
@@ -79,4 +80,14 @@ docker stop otel-agent >/dev/null
 run -e otel_agent_hostmetrics=true -e otel_agent_metrics_url=http://127.0.0.1:9/otlp > /tmp/restart.log 2>&1 || { echo "ERROR: the run failed" >&2; tail -12 /tmp/restart.log >&2; exit 1; }
 sleep 3
 test "$(docker inspect -f '{{.State.Running}}' otel-agent)" = true || { echo "ERROR: the stopped collector was not started" >&2; exit 1; }
+# In an LXC the Docker daemon sees the container's memory (1 GiB here) while this container reads the kernel's: CPU, memory and load would be the neighbour's, so they are left out.
+echo "==> An LXC-like host (Docker's memory far below the kernel's): CPU, memory and load are not collected, the filesystem still is"
+FAKE_LXC=1 PATH=/tmp/shim:$PATH run -e otel_agent_hostmetrics=true -e otel_agent_metrics_url=http://127.0.0.1:9/otlp > /tmp/lxc.log 2>&1 || { echo "ERROR: the run failed" >&2; tail -12 /tmp/lxc.log >&2; exit 1; }
+grep -E "virtualized" /tmp/lxc.log | head -1 | cut -c1-200
+! grep -q "system.memory.utilization" "$DIR/config.yaml" && ! grep -qE "^      (cpu|load):" "$DIR/config.yaml" && grep -q "system.filesystem.utilization" "$DIR/config.yaml" || { echo "ERROR: wrong scrapers for a virtualized /proc" >&2; exit 1; }
+echo "==> A normal host keeps them"
+run -e otel_agent_hostmetrics=true -e otel_agent_metrics_url=http://127.0.0.1:9/otlp > /tmp/normal.log 2>&1 || { echo "ERROR: the run failed" >&2; tail -12 /tmp/normal.log >&2; exit 1; }
+grep -q "system.memory.utilization" "$DIR/config.yaml" && grep -qE "^      cpu:" "$DIR/config.yaml" || { echo "ERROR: memory and CPU are missing on a normal host" >&2; exit 1; }
+sleep 3
+test "$(docker inspect -f '{{.State.Running}}' otel-agent)" = true
 echo "==> OK"
