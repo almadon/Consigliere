@@ -9,7 +9,9 @@ python3 -m venv --system-site-packages /tmp/venv
 export PATH=/tmp/venv/bin:$PATH ANSIBLE_COLLECTIONS_PATH=/tmp/collections ANSIBLE_CONFIG=/repo/hosts/ansible.cfg ANSIBLE_ROLES_PATH=/repo/hosts/roles ANSIBLE_NOCOLOR=1
 ansible-galaxy collection install -r hosts/requirements.yml -p /tmp/collections >/dev/null
 DIR="$WORK/common/otel-agent"
-cleanup() { docker rm -f otel-agent >/dev/null 2>&1 || true; }
+# The files this container wrote into $WORK belong to root and are mode 0750: on a Linux runner the script that started this container (a different user) could not delete them,
+# and its cleanup failed the job after the test had passed. Opening the modes lets it.
+cleanup() { docker rm -f otel-agent >/dev/null 2>&1 || true; chmod -R a+rwX "$WORK" 2>/dev/null || true; }
 trap cleanup EXIT
 run() { ansible-playbook -i localhost, ci/otel-container.yml "$@"; }
 
