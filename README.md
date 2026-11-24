@@ -23,6 +23,15 @@ A host's table entry lists tags such as `util: [traefik]` or `feat: [otel]`. Eac
 
 **Look elsewhere when** you need dynamic autoscaling, thousands of nodes, or a hosted control plane with a vendor behind it.
 
+## Getting started
+
+1. Create your private fleet repo from [consigliere-fleet-template](https://github.com/almadon/consigliere-fleet-template) ("Use this template", private).
+2. Describe a host in `config/inventory/hosts.yml`, keyed by its Tailscale hostname.
+3. On the new host, as root, run `hosts/bootstrap/bootstrap.sh`. It installs git and Ansible, clones this repo, grants the host a read-only deploy key for your fleet repo, runs one reconcile, and installs the timer.
+4. Give the host its secrets from your admin machine: `scripts/access.sh add-host <name> <age key>`, then `sync`, then push.
+
+The host generates its own age key; nothing secret is copied to it. Tailscale auth keys are never stored: `bootstrap.sh` prompts for one.
+
 ## What Consigliere manages, and what it does not
 
 This is the contract. If a thing is in the first table, edit it in git and let the reconciler apply it; a hand edit is reverted on the next run. If it is in the second, Consigliere leaves it alone, so a change there is made where it lives and is not undone.
@@ -73,15 +82,6 @@ The full table, with the mechanism and rollback for each row, is [docs/ownership
 | 6. Applications | `stacks/` and Arcane | Your containers |
 
 Two rules keep this readable. The **host table** (`config/inventory/hosts.yml` in your fleet repo) is the one place that says what a machine is, keyed by its Tailscale name. Settings live in one file per scope: `config/vars/group/<group>.yml`, `config/vars/host/<host>.yml` and `config/vars/routes/<host>.yml`, which the reconciler gives each host as a merged `host_vars/<host>/` directory.
-
-## Getting started
-
-1. Create your private fleet repo from [consigliere-fleet-template](https://github.com/almadon/consigliere-fleet-template) ("Use this template", private).
-2. Describe a host in `config/inventory/hosts.yml`, keyed by its Tailscale hostname.
-3. On the new host, as root, run `hosts/bootstrap/bootstrap.sh`. It installs git and Ansible, clones this repo, grants the host a read-only deploy key for your fleet repo, runs one reconcile, and installs the timer.
-4. Give the host its secrets from your admin machine: `scripts/access.sh add-host <name> <age key>`, then `sync`, then push.
-
-The host generates its own age key; nothing secret is copied to it. Tailscale auth keys are never stored: `bootstrap.sh` prompts for one.
 
 ## Reconciling
 

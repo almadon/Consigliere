@@ -1,6 +1,6 @@
 # State
 
-What is true right now, including what does not work. This file has an expiry: delete it when it stops being edited, rather than let it become a misleading history. Last reviewed 2026-11-17.
+What is true right now, including what does not work. This file has an expiry: delete it when it stops being edited, rather than let it become a misleading history. Last reviewed 2026-11-24.
 
 ## Works
 
@@ -15,7 +15,7 @@ What is true right now, including what does not work. This file has an expiry: d
 - **`safe_apply` covers three roles** (`otel_agent`, `forgejo_runner`, `zwave_js_ui`). Other roles that own a service's config still write a file and restart, with no automatic restore after a bad config. See [decisions.md](decisions.md) #3.
 - **Role READMEs are not all on the contract block** from [ownership.md](ownership.md); 25 of 43 roles have a README at all.
 - **macOS and Windows are not on the platform layer.** macOS has its own small playbook; Windows is a separate PowerShell reconciler, run on one VM only, with its `ssh` and `tailscale` roles and the MinGit and Tailscale installers not yet run on a host and no ARM64 Windows tried ([windows-host.md](windows-host.md)).
-- **Alpine hosts run only container-based roles in practice.** The host-level roles pass the matrix in a container, but no Alpine host reconciles natively (no bootstrap for it), so `wazuh_agent`, `firewall` (ufw) and `dns_resolver` do not run there (`otel_agent` runs there as a container). `otel_agent` has a container mode for these hosts (decision 27); it has been tested against the collector image and from an Alpine container driving the host's Docker, not on a real Alpine or Unraid host.
+- **Alpine hosts run only container-based roles in practice.** The host-level roles pass the matrix in a container, but no Alpine host reconciles natively (no bootstrap for it), so `wazuh_agent`, `firewall` (ufw) and `dns_resolver` do not run there (`otel_agent` runs there as a container). `otel_agent` has a container mode for these hosts (decision 27). It runs on an Unraid host and on a Proxmox LXC in the maintainer's fleet, and was tested against the collector image and from an Alpine container driving the host's Docker. It has not run on a real Alpine host.
 - **cron cannot catch up a missed run** (systemd's `Persistent=true`), so on a host without systemd a job missed while it was off waits for the next schedule.
 - **Provisioning is not built.** Hosts must exist before Consigliere can configure them.
 - **Wazuh** (`stacks/wazuh/` and the Wazuh roles) has not been run against a live host. The submodule is pinned to `v4.14.7` as of 2026-08-21; `main` tracks an unreleased 5.x line, so recheck before deploying. **VERIFY**
@@ -26,7 +26,7 @@ What is true right now, including what does not work. This file has an expiry: d
 ## Unverified
 
 - The calendar translator (systemd to cron) is tested on the forms the fleet uses and refuses the rest; it has not seen a fleet value outside those.
-- The `platforms` CI workflow had passed for earlier merges when this was written; the run for the latest commit was still going.
+- The `otel-container` job in the `platforms` CI workflow failed on the three merges that introduced container mode, because the test could not delete files its container had written as root. A fix is on the `otel-lxc-hostmetrics` branch and has not yet run on a real runner. **VERIFY**
 - The reconcile speedups in the [changelog](../CHANGELOG.md) were reasoned from a profile of one pass on one host; the end-to-end saving on a scheduled run has not been measured yet.
 
 ## What earlier notes got wrong
