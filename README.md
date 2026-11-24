@@ -134,6 +134,10 @@ Nothing sensitive is committed to this repo, ever. Secrets live in your fleet re
 
 Pushes to `main` are what hosts apply, so the lint gate (`ansible-lint` and `yamllint` in `.github/workflows/lint.yml`) is the change-approval step: review pull requests like deployments. The project follows the [conformIT](https://github.com/almadon/conformIT) engineering standard; conventions for people and agents are in [AGENTS.md](AGENTS.md).
 
+## Credits
+
+Consigliere is mostly glue around other people's software, and none of it would work without them. The ones every fleet leans on: [Ansible](https://github.com/ansible/ansible) applies the configuration, [Tailscale](https://tailscale.com) joins the hosts, [sops](https://github.com/getsops/sops) and [age](https://github.com/FiloSottile/age) keep the secrets, [Docker](https://docs.docker.com/engine/) runs the containers, [Traefik](https://github.com/traefik/traefik) is the edge proxy, and [Cert Warden](https://github.com/gregtwallace/certwarden) issues the certificates. Observability rests on the [OpenTelemetry Collector](https://github.com/open-telemetry/opentelemetry-collector-contrib), [Loki](https://github.com/grafana/loki), [VictoriaMetrics](https://github.com/VictoriaMetrics/VictoriaMetrics) and [Grafana](https://github.com/grafana/grafana). The full list, with what each is used for, its licence and links, is in [docs/credits.md](docs/credits.md).
+
 ## License
 
 [MIT](LICENSE).
