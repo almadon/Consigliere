@@ -291,7 +291,7 @@ def collector():
             collect()
         else:
             with LOCK:
-                STATUS.update({"updated": int(time.time()), "ok": False, "error": "no Loki configured"})
+                STATUS.update({"updated": int(time.time()), "ok": False, "error": "no Loki address is set (cmdr_loki_url is empty)"})
         WAKE.wait(INTERVAL)
         WAKE.clear()
 
@@ -440,7 +440,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         try:
             ep = discovery()["authorization_endpoint"]
         except Exception as e:  # noqa: BLE001
-            return self.send(502, f"identity provider unreachable: {type(e).__name__}".encode())
+            return self.send(502, f"The identity provider could not be reached ({type(e).__name__}). Wait a minute and sign in again.".encode())
         challenge = b64(hashlib.sha256(verifier.encode()).digest())
         params = urllib.parse.urlencode({"response_type": "code", "client_id": CLIENT_ID, "redirect_uri": URL + "/auth/callback", "scope": "openid profile email groups",
                                          "state": state, "nonce": nonce, "code_challenge": challenge, "code_challenge_method": "S256"})
@@ -467,7 +467,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         name = info.get("name") or info.get("preferred_username") or info.get("email") or info.get("sub", "?")
         print(json.dumps({"event": "login", "user": name, "role": role or "denied"}), flush=True)
         if not role:
-            return self.send(403, b"<!doctype html><meta charset=utf-8><title>No access</title><p>You are signed in but not in a group that may use this page.", "text/html; charset=utf-8")
+            return self.send(403, b"<!doctype html><meta charset=utf-8><title>No access</title><p>You are signed in, but your account is not in a group that may use this page. Ask a fleet admin to add you to an allowed group, then sign in again.", "text/html; charset=utf-8")
         picture = safe_picture(info.get("picture") or idt.get("picture"))
         sess = sign({"name": name, "role": role, "picture": picture, "exp": time.time() + SESSION_TTL})
         self.redirect(tmp["next"], [self.set_cookie("cmdr_session", sess, SESSION_TTL, SAMESITE), self.set_cookie("cmdr_oidc", "", 0)])

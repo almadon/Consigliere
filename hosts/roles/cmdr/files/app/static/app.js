@@ -388,7 +388,7 @@
     $('v-grid').setAttribute('aria-pressed', String(state.view !== 'list')); $('v-list').setAttribute('aria-pressed', String(state.view === 'list'));
     $('sort').value = state.sort;
     const b = $('banner');
-    if (!d.status.ok) { b.hidden = false; b.textContent = 'Live status is incomplete: ' + (d.status.error || 'not collected yet') + '. Inventory and links below are from the fleet repo and still correct.'; } else b.hidden = true;
+    if (!d.status.ok) { b.hidden = false; b.textContent = 'Live status is incomplete (' + (d.status.error || 'not collected yet') + '). Check that Loki is reachable from this host, then press Refresh. The hosts, routes and links below come from the fleet repo and are still correct.'; } else b.hidden = true;
     const initials = (d.user.name || '?').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
     const pic = d.user.picture ? h('img', { class: 'avatar', src: d.user.picture, alt: '', referrerpolicy: 'no-referrer', onerror: (e) => e.currentTarget.replaceWith(h('span', { class: 'avatar', 'aria-hidden': 'true' }, initials)) }) : null;
     $('user').replaceChildren(pic || h('span', { class: 'avatar', 'aria-hidden': 'true' }, initials), h('span', { class: 'hide-s' }, d.user.name + ' · ' + d.user.role), h('a', { href: '/auth/logout' }, 'sign out'));
@@ -447,9 +447,9 @@
     try {
       const r = await fetch('/api/refresh', { method: 'POST', credentials: 'same-origin', headers: { 'X-Cmdr': '1' } });
       if (r.status === 429) toast('Just refreshed: give it a few seconds');
-      else if (!r.ok) toast('Refresh failed (' + r.status + ')');
+      else if (!r.ok) toast('Refresh failed (' + r.status + '). Try again in a moment');
       else { toast('Reading live status…'); await new Promise((ok) => setTimeout(ok, 2500)); await load(); }
-    } catch (e) { toast('Refresh failed: ' + e.message); }
+    } catch (e) { toast('Refresh failed: ' + e.message + '. Try again in a moment'); }
     b.removeAttribute('aria-busy');
   }
   async function load() {
@@ -459,7 +459,7 @@
       state.data = await r.json();
       render();
     } catch (e) {
-      const b = $('banner'); b.hidden = false; b.textContent = 'Could not load the fleet data: ' + e.message;
+      const b = $('banner'); b.hidden = false; b.textContent = 'Could not load the fleet data (' + e.message + '). Reload the page. If it keeps happening, read the cmdr container log on its host.';
     }
   }
 
