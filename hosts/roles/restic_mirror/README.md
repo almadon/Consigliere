@@ -12,6 +12,12 @@ on a schedule (a systemd timer, or cron where there is no systemd: the platform 
   and the run prints its public key. Put it in `restic_server_mirror_keys` for the source
   host (e.g. `config/vars/host/<the source host>.yml`); the source then accepts that key only for a
   read-only `rrsync` of its data directory.
+- **Pinning the source's SSH host key.** Set `restic_mirror_source_host_keys` (on the mirror host, for example in `config/vars/host/<the mirror host>.yml`)
+  to the source's public key: the line from `/etc/ssh/ssh_host_ed25519_key.pub` on the source, read on the source itself. The role writes it to
+  `/root/.ssh/restic_mirror_known_hosts` and the mirror then trusts only that key, matched by the source's name so a new tailnet address does not
+  matter. If the source's keys later change (it was rebuilt, or its host keys were regenerated), the run stops, the failure alert says why, and the
+  fix is to confirm the new key on the source and put it in the fleet; nobody has to log in to the mirror host. Without it the mirror trusts the
+  first key it sees and refuses a changed one with a plain ssh error, which is easy to miss.
 - The mirror's own REST server is a standby: restore from it by pointing restic at it.
 - Corruption on the source would be copied too. Run `restic check --read-data` against
   the source now and then.

@@ -16,14 +16,25 @@ log="$(mktemp)"; trap 'rm -f "$log"' EXIT
 # peer if its tailnet address changes (a re-tagged node gets a new one).
 src="$(tailscale ip -4 {{ restic_mirror_source }} 2>/dev/null | head -n1)"
 src="${src:-{{ restic_mirror_source }}}"
+{% if restic_mirror_source_host_keys | length > 0 %}
+# Pinned: only the keys in restic_mirror_source_host_keys count, matched by the source's name whatever address it has now.
+ssh_hostkey_opts="-o HostKeyAlias={{ restic_mirror_source }} -o UserKnownHostsFile=/root/.ssh/restic_mirror_known_hosts -o GlobalKnownHostsFile=/dev/null -o StrictHostKeyChecking=yes"
+{% else %}
+ssh_hostkey_opts="-o StrictHostKeyChecking=accept-new"
+{% endif %}
 if rsync -a --numeric-ids --partial --ignore-existing --exclude='locks/' \
 {% for x in restic_mirror_excludes %}
     --exclude={{ x | quote }} \
 {% endfor %}
-    -e "ssh -i /root/.ssh/restic_mirror -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
+    -e "ssh -i /root/.ssh/restic_mirror -o IdentitiesOnly=yes $ssh_hostkey_opts" \
     "root@${src}:/" "{{ restic_mirror_dest_dir }}/" >"$log" 2>&1; then
   echo "mirror ok"
 else
-  notify "restic mirror FAILED" "{{ inventory_hostname }} <- {{ restic_mirror_source }}: $(tail -n 15 "$log")"
+  hint=""
+  if grep -qE 'HOST IDENTIFICATION HAS CHANGED|Host key verification failed' "$log"; then
+    hint="{{ restic_mirror_source }}'s SSH host key is not the one on record{% if restic_mirror_source_host_keys | length > 0 %} (restic_mirror_source_host_keys in the fleet){% endif %}. If {{ restic_mirror_source }} was rebuilt or its keys regenerated, read the new key on {{ restic_mirror_source }} itself (ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub), confirm it is the one you expect, and update the fleet. "
+    echo "$hint" >&2
+  fi
+  notify "restic mirror FAILED" "{{ inventory_hostname }} <- {{ restic_mirror_source }}: ${hint}$(tail -n 15 "$log")"
   cat "$log" >&2; exit 1
 fi

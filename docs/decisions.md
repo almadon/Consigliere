@@ -201,3 +201,7 @@ Numbered, never reused. A reversed decision gets a new entry that supersedes the
 
 **Revisit when** the collector can run inside the LXC's own cgroup, or lxcfs exposes the limit to nested containers.
 
+
+## 30. The restic mirror can pin its source's SSH host key
+
+**Chosen.** `restic_mirror_source_host_keys` takes the source host's public keys. When it is set, the mirror's `known_hosts` is a managed file matched by the source's name (`HostKeyAlias`), and the script connects with `StrictHostKeyChecking=yes`, so only those keys count and a new tailnet address does not matter. A changed key stops the run and the failure message says what to check and where to update it. **Why.** One host's keys were regenerated and the mirror, which trusted the first key it saw and then refused any change, failed every night for three weeks without anyone knowing. The alert path that should have reported it was not installed either. **Cost.** A source that is rebuilt now needs its new key put in the fleet before the mirror works again, which is the point, but it is one more thing to remember. **Rejected.** `StrictHostKeyChecking=no` (trusts a changed key, which defeats the check); fetching the key from the source at run time (that is the same trust-on-first-use the pin replaces). **Left as it was.** With no keys set, the old accept-new behaviour stays, so existing fleets are unaffected until they opt in. **Revisit if** other roles that reach hosts over SSH want the same pin; the helper could then move into the platform layer.

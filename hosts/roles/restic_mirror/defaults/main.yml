@@ -13,3 +13,9 @@ restic_mirror_randomized_delay: 15min
 # Paths (relative to the source's data dir, rsync --exclude syntax) the mirror must not copy, for example /.pbs/ when the source's
 # disk also holds something that is not a restic repository.
 restic_mirror_excludes: []
+# The source host's public SSH host keys, pinned. One entry per key, as in /etc/ssh/ssh_host_*_key.pub on the source (the type and the key;
+# a trailing comment is ignored). With at least one entry, the mirror trusts only these keys: a source whose key has changed (rebuilt,
+# keys regenerated) stops the run, with a failure alert that says so, instead of being trusted. Keys are matched by the source's name, not
+# its address, so a new tailnet address does not matter. Empty keeps the older behaviour: the first key seen is trusted, and a key that
+# later changes stops the run with a plain ssh error. Pin the ED25519 key at least.
+restic_mirror_source_host_keys: []

@@ -18,6 +18,34 @@
     state: directory
     mode: "0700"
 
+- name: Check that the pinned host keys are public keys
+  ansible.builtin.assert:
+    that: restic_mirror_source_host_keys | map('trim') | select('match', '^(ssh-[a-z0-9]+|ecdsa-sha2-[a-z0-9]+) AAAA') | list | length == restic_mirror_source_host_keys | length
+    fail_msg: >-
+      restic_mirror_source_host_keys must hold lines like "ssh-ed25519 AAAA..." (the contents of /etc/ssh/ssh_host_ed25519_key.pub on
+      {{ restic_mirror_source }}), nothing else.
+    quiet: true
+
+# Matched by the source's name (the script connects with HostKeyAlias), so the file stays right when the source's tailnet address changes.
+- name: Pin the source's SSH host keys
+  when: restic_mirror_source_host_keys | length > 0
+  ansible.builtin.copy:
+    dest: /root/.ssh/restic_mirror_known_hosts
+    owner: root
+    group: root
+    mode: "0600"
+    content: |
+      # Managed by Ansible (hosts/roles/restic_mirror). The SSH host keys of {{ restic_mirror_source }}, from the fleet.
+      {% for k in restic_mirror_source_host_keys %}
+      {{ restic_mirror_source }} {{ (k | trim).split()[0:2] | join(' ') }}
+      {% endfor %}
+
+- name: Remove the pinned host keys when none are set any more
+  when: restic_mirror_source_host_keys | length == 0
+  ansible.builtin.file:
+    path: /root/.ssh/restic_mirror_known_hosts
+    state: absent
+
 - name: Create the mirror's SSH key (once)
   ansible.builtin.command:
     cmd: ssh-keygen -q -t ed25519 -N "" -C "restic-mirror@{{ inventory_hostname }}" -f /root/.ssh/restic_mirror
