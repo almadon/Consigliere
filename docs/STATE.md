@@ -26,7 +26,7 @@ What is true right now, including what does not work. This file has an expiry: d
 ## Unverified
 
 - The calendar translator (systemd to cron) is tested on the forms the fleet uses and refuses the rest; it has not seen a fleet value outside those.
-- The `otel-container` job in the `platforms` CI workflow failed on the three merges that introduced container mode, because the test could not delete files its container had written as root. A fix is on the `otel-lxc-hostmetrics` branch and has not yet run on a real runner. **VERIFY**
+- The `otel-container` job in the `platforms` CI workflow failed on the three merges that introduced container mode, because the test could not delete files its container had written as root. The fix (`2655bad`) is on `main`, and the job passed on a real runner for the docs pull request that followed it.
 - The reconcile speedups in the [changelog](../CHANGELOG.md) were reasoned from a profile of one pass on one host; the end-to-end saving on a scheduled run has not been measured yet.
 
 ## What earlier notes got wrong
