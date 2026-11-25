@@ -15,6 +15,8 @@ import relay  # noqa: E402
 
 KEY = "k" * 32
 CLIENT = os.path.join(HERE, "..", "roles", "notify_client", "templates", "fleet-notify.j2")
+# fleet-notify is a bash script that sends with curl. A bare image may have neither; the notify_client role installs both on a host.
+needs_client_tools = unittest.skipUnless(shutil.which("bash") and shutil.which("curl"), "needs bash and curl")
 
 
 def serve(handler):
@@ -64,7 +66,7 @@ class RelayTest(unittest.TestCase):
             env["FLEET_NOTIFY_TAG"] = tag
         return subprocess.run(["bash", script, *args], env=env, capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=60)
 
-    @unittest.skipUnless(shutil.which("curl"), "needs curl")
+    @needs_client_tools
     def test_alert_reaches_home_assistant(self):
         r = self.notify("disk full", 'volume "a" & b=c\nsecond line')
         self.assertEqual(r.returncode, 0, r.stderr)
@@ -73,13 +75,13 @@ class RelayTest(unittest.TestCase):
         self.assertEqual(data, {"title": "[host1] disk full", "message": 'volume "a" & b=c\nsecond line', "target": ["person.alex"],
                                 "priority": "high", "force_resend": True})
 
-    @unittest.skipUnless(shutil.which("curl"), "needs curl")
+    @needs_client_tools
     def test_tags_set_priority_and_unknown_is_loud(self):
         self.notify("a", "b", tag="info")
         self.notify("a", "b", tag="something-new")
         self.assertEqual([c[2]["priority"] for c in FakeHomeAssistant.calls], ["low", "high"])
 
-    @unittest.skipUnless(shutil.which("curl"), "needs curl")
+    @needs_client_tools
     def test_failures_are_visible_to_the_caller(self):
         FakeHomeAssistant.status = 401
         refused = self.notify("a", "b")
@@ -92,7 +94,7 @@ class RelayTest(unittest.TestCase):
         self.assertNotEqual(down.returncode, 0)
         self.assertIn("could not be reached", down.stderr)
 
-    @unittest.skipUnless(shutil.which("curl"), "needs curl")
+    @needs_client_tools
     def test_wrong_key_and_no_relay(self):
         self.assertIn("wrong or missing key", self.notify("a", "b", key="x" * 32).stderr)
         self.assertEqual(FakeHomeAssistant.calls, [])

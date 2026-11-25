@@ -25,9 +25,10 @@
     quiet: true
   no_log: true
 
-- name: Make sure curl is installed
+# fleet-notify is a bash script and sends with curl; Alpine has neither by default.
+- name: Make sure bash and curl are installed
   ansible.builtin.package:
-    name: curl
+    name: [bash, curl]
     state: present
 
 - name: Write the relay address and key (a secret)
