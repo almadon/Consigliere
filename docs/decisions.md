@@ -205,3 +205,25 @@ Numbered, never reused. A reversed decision gets a new entry that supersedes the
 ## 30. The restic mirror can pin its source's SSH host key
 
 **Chosen.** `restic_mirror_source_host_keys` takes the source host's public keys. When it is set, the mirror's `known_hosts` is a managed file matched by the source's name (`HostKeyAlias`), and the script connects with `StrictHostKeyChecking=yes`, so only those keys count and a new tailnet address does not matter. A changed key stops the run and the failure message says what to check and where to update it. **Why.** One host's keys were regenerated and the mirror, which trusted the first key it saw and then refused any change, failed every night for three weeks without anyone knowing. The alert path that should have reported it was not installed either. **Cost.** A source that is rebuilt now needs its new key put in the fleet before the mirror works again, which is the point, but it is one more thing to remember. **Rejected.** `StrictHostKeyChecking=no` (trusts a changed key, which defeats the check); fetching the key from the source at run time (that is the same trust-on-first-use the pin replaces). **Left as it was.** With no keys set, the old accept-new behaviour stays, so existing fleets are unaffected until they opt in. **Revisit if** other roles that reach hosts over SSH want the same pin; the helper could then move into the platform layer.
+
+## 31. Proposed: fleet-notify delivers through Home Assistant Supernotify, with Pushover underneath
+
+**Status: proposed. Nothing is wired yet.** The direction is the maintainer's, relayed by the projects coordinator; the points below marked VERIFY or "to decide" are open.
+
+**Direction.** `fleet-notify` stays the one thing hosts and roles call, so no caller changes. Its backend moves from Apprise to Home Assistant's Supernotify integration. Because most of what Consigliere reports on is what Home Assistant runs on, two things go straight to Pushover instead: alerts that must always arrive (a failed backup, Home Assistant being down), and any alert Home Assistant did not accept. Pushover's emergency priority repeats until acknowledged; no equivalent was found in Supernotify (**VERIFY**).
+
+**Recommended: call Home Assistant directly, not through Novak's gateway.** The gateway is one more service, on infrastructure these alerts report on. Its `notify.py` already makes the call this needs, `POST /api/services/supernotify/notify` with `title`, `message`, a person entity as `target`, `priority` and `delivery_selection: explicit`; its comment records that this was checked against a live install. It was read here, not re-run.
+
+**How hosts reach it: to decide.** Neither option is as narrow as we would like.
+
+| Option | For | Against |
+|---|---|---|
+| REST service call with a token of a dedicated non-admin user | A rejected call returns an HTTP error, so the Pushover fallback can trigger | As far as we know Home Assistant tokens have no per-service scope, so a token read from any host could call other services (**VERIFY**) |
+| Webhook that runs one automation | No token on any host; the webhook can only do what the automation does | We believe Home Assistant answers 200 even for an unknown webhook or a failing automation (**VERIFY**), which would hide exactly the failures the fallback exists for |
+| Either, sent from one relay host that holds the credential | One place to protect and rotate | The relay is a single point of failure, so hosts still need the direct Pushover fallback |
+
+A success from either one means Home Assistant took the request, not that a phone got it, which is why the must-arrive alerts do not depend on it.
+
+**Also open.** Supernotify's version requirements (v2.14 is reported to need a recent Home Assistant and Python 3.13, **VERIFY**).
+
+**Cost.** Two delivery paths to test instead of one, and a Pushover credential still on the hosts. **Until this is settled** the current Apprise-based `fleet-notify` stays as it is, and nobody needs to set up the Apprise panel further. **Revisit if** Supernotify gains repeat-until-acknowledged, or Home Assistant gains scoped tokens.
