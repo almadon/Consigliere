@@ -208,7 +208,7 @@ Numbered, never reused. A reversed decision gets a new entry that supersedes the
 
 ## 31. fleet-notify delivers through Home Assistant Supernotify
 
-**Status: direction decided, connection method open. Nothing is wired yet.**
+**Status: decided. Nothing is wired yet.**
 
 **Chosen.** `fleet-notify` stays the one thing hosts and roles call, so no caller changes. Its backend moves from Apprise to Home Assistant's Supernotify integration. **Why.** Novak already uses Supernotify to dispatch notifications, so people, phones and delivery rules are kept in one place.
 
@@ -218,16 +218,10 @@ Numbered, never reused. A reversed decision gets a new entry that supersedes the
 
 **Call Home Assistant directly, not through Novak's gateway.** The gateway is one more service, on infrastructure these alerts report on. Its `notify.py` already makes the call this needs, `POST /api/services/supernotify/notify` with `title`, `message`, a person entity as `target`, `priority` and `delivery_selection: explicit`; its comment records that this was checked against a live install. It was read here, not re-run.
 
-**How hosts reach it: open.** Neither option is as narrow as we would like.
+**How hosts reach it: a REST service call with a token, held by one relay host.** The token belongs to a dedicated non-admin Home Assistant user. Hosts send their alert to the relay with a key of their own; only the relay holds the token and calls Home Assistant. **Why.** A rejected call returns an HTTP error, so the relay can pass the failure back and the caller can log it, which matters with no second path. One place holds the token, to protect and rotate. **Cost.** As far as we know Home Assistant tokens have no per-service scope, so whoever gets the token from the relay can call other services (**VERIFY**). The relay is one more thing that has to be up. A success means Home Assistant took the request, not that a phone got it.
 
-| Option | For | Against |
-|---|---|---|
-| REST service call with a token of a dedicated non-admin user | A rejected call returns an HTTP error, so the caller knows | As far as we know Home Assistant tokens have no per-service scope, so a token read from any host could call other services (**VERIFY**) |
-| Webhook that runs one automation | No token on any host; the webhook can only do what the automation does | We believe Home Assistant answers 200 even for an unknown webhook or a failing automation (**VERIFY**), so a lost alert would look sent. With no second path, that is the worst way to fail |
-| Either, sent from one relay host that holds the credential | One place to protect and rotate | One more thing that has to be up |
+**Rejected: a webhook that runs one automation.** It puts no token anywhere and can only do what the automation does. But we believe Home Assistant answers 200 even for an unknown webhook or a failing automation (**VERIFY**), so a lost alert would look sent. **Rejected: the token on every host,** which is as many places to steal it from as there are hosts.
 
-A success from either means Home Assistant took the request, not that a phone got it.
-
-**Also open.** Supernotify's version requirements (v2.14 is reported to need a recent Home Assistant and Python 3.13, **VERIFY**).
+**Still open.** Supernotify's version requirements (v2.14 is reported to need a recent Home Assistant and Python 3.13, **VERIFY**).
 
 **Until it is wired** the current Apprise-based `fleet-notify` stays in the code. **Revisit if** a missed alert during a Home Assistant outage costs something; an optional second path that a fleet can point anywhere would be the thing to add.
