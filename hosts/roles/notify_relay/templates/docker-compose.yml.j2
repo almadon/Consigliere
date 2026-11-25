@@ -1,0 +1,31 @@
+# Managed by Ansible (hosts/roles/notify_relay) -- edits here get overwritten on the next reconciliation run.
+services:
+  notify-relay:
+    image: {{ notify_relay_image }}
+    container_name: notify-relay
+    init: true
+    restart: unless-stopped
+    user: "65534:65534"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    command: ["python", "-u", "/app/relay.py"]
+    labels:
+      # Changes when the code does, so compose recreates the container and safe_apply checks it.
+      fleet.code-sha: "{{ lookup('ansible.builtin.file', 'relay.py') | hash('sha256') }}"
+      fleet.secrets-sha: "{{ (notify_relay_ha_token ~ notify_client_key) | hash('sha256') }}"
+    # The token and the key. Kept out of this file, whose contents can show up in a diff.
+    env_file:
+      - {{ notify_relay_dir }}/secrets.env
+    ports:
+      - "{{ notify_relay_bind_address }}:{{ notify_relay_port }}:8080"
+    environment:
+      PORT: "8080"
+      RELAY_HA_URL: {{ notify_relay_ha_url | to_json | replace('$', '$$') }}
+      RELAY_ACTION: {{ notify_relay_action | to_json }}
+      RELAY_TARGETS: {{ notify_relay_targets | to_json | to_json | replace('$', '$$') }}
+      RELAY_PRIORITIES: {{ notify_relay_priorities | to_json | to_json | replace('$', '$$') }}
+    volumes:
+      - {{ notify_relay_dir }}/app:/app:ro

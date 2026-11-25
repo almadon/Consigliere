@@ -2,6 +2,10 @@
 
 What changed and why, including reverts. Dates are absolute.
 
+## 2026-11-25
+
+- **Notification relay (decision 31).** New `util: [notify_relay]` and `feat: [notify]`: `fleet-notify` posts to one relay host, which holds the Home Assistant token and calls Supernotify. It exits non-zero when the alert is not accepted. Nothing uses it until a fleet adds the tags; `feat: [apprise]` is unchanged. Not yet run against a real Home Assistant.
+
 ## 2026-11-17
 
 - **Host metrics from an LXC.** In container mode on an Alpine LXC the collector reported the Proxmox machine's CPU, memory and load as the LXC's (lxcfs shows the LXC its own `/proc`, but a Docker container inside it reads the kernel's, even through the `/hostfs` mount). They are now left out where the Docker daemon's memory is far below the kernel's, with a note in the run; filesystem metrics stay. A normal host and every systemd host are unchanged (the native render is byte-identical). Unraid's numbers were right all along: the memory states of the collector overlap, so they do not add up to the total, but the utilization that cmdr and the dashboards use is.

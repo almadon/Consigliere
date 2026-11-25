@@ -1,0 +1,7 @@
+---
+# fleet-notify through the notification relay (feat: notify). See docs/decisions.md #31.
+# The relay's address as hosts reach it over the tailnet, for example http://relayhost:8087
+notify_client_url: ""
+# Put in front of every title so you can tell hosts apart.
+notify_client_title_prefix: "{{ inventory_hostname }}"
+# Secret notify.client holds notify_client_key, the same value the relay has.

@@ -1,0 +1,48 @@
+---
+- name: Check the settings
+  ansible.builtin.assert:
+    that:
+      - notify_client_url is match('^https?://')
+      - "'feat_apprise' not in group_names"
+    fail_msg: >-
+      Set notify_client_url (the relay's address) in config/vars/group/feat_notify.yml. A host takes feat: notify or feat: apprise, not both:
+      each installs /usr/local/bin/fleet-notify.
+    quiet: true
+
+- name: Load the relay key (secret notify.client)
+  ansible.builtin.include_role:
+    name: load_secrets
+  vars:
+    load_secrets_scopes: [notify.client]
+
+- name: Require a real key
+  ansible.builtin.assert:
+    that:
+      - notify_client_key is defined
+      - notify_client_key | length >= 24
+      - "'CHANGEME' not in notify_client_key"
+    fail_msg: The secret notify.client needs notify_client_key, 24 characters or more.
+    quiet: true
+  no_log: true
+
+- name: Make sure curl is installed
+  ansible.builtin.package:
+    name: curl
+    state: present
+
+- name: Write the relay address and key (a secret)
+  ansible.builtin.copy:
+    content: "{{ {'endpoint': notify_client_url | trim('/'), 'key': notify_client_key} | to_json }}\n"
+    dest: /etc/fleet-notify.json
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Install the fleet-notify helper
+  ansible.builtin.template:
+    src: fleet-notify.j2
+    dest: /usr/local/bin/fleet-notify
+    owner: root
+    group: root
+    mode: "0755"

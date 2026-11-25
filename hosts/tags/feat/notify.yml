@@ -1,0 +1,5 @@
+---
+description: "fleet-notify through the notification relay to Home Assistant Supernotify (needs the notify.client secret; replaces feat: apprise on the host)"
+order: 20
+roles: [notify_client]
+secrets: [notify.client]

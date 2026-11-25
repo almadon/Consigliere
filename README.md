@@ -48,7 +48,7 @@ This is the contract. If a thing is in the first table, edit it in git and let t
 | Backups | The Arkeep server and agents, the restic REST target and mirror | `arkeep_*`, `restic_*` |
 | Security | The Wazuh agents and the manager's kernel setting | `wazuh_*` |
 | Consoles | Cmdr (the fleet console), Muximux tiles, Homarr and its sign-in gate | `cmdr`, `muximux`, `homarr` |
-| Shared services | Garage S3, Apprise notifications and run reports, scheduled apt and compose updates, Forgejo runner | `garage`, `apprise`, `apt_updates`, `compose_updates`, `forgejo_runner` |
+| Shared services | Garage S3, notifications (Apprise, or a relay to Home Assistant Supernotify) and run reports, scheduled apt and compose updates, Forgejo runner | `garage`, `apprise`, `apt_updates`, `compose_updates`, `forgejo_runner` |
 | Secrets access | Who can decrypt which secret, derived from tags | `config/secrets/`, `scripts/access.sh` in the fleet repo |
 | Platforms | What kind of machine each host is (Debian, Ubuntu, Alpine, Unraid), so a role runs only where it can: capabilities, releases, tool versions, and portable package, repository, service, schedule, boot and download tasks | `hosts/platforms/`, the `platform` role, `os:` and `arch:` in the host table |
 | Windows hosts (experimental) | Clock, Windows Update policy, Defender, firewall, Remote Desktop, OpenSSH and Tailscale, from a pull-only PowerShell reconciler | `windows/`, `windows_*` variables |
@@ -111,7 +111,7 @@ Nothing sensitive is committed to this repo, ever. Secrets live in your fleet re
 | Backups | `arkeep_server`, `arkeep_agent`, [`restic_server`](hosts/roles/restic_server/README.md), `restic_mirror`, `pbs_server` |
 | Security | `wazuh_agent`, `wazuh_server` |
 | Consoles | [`cmdr`](hosts/roles/cmdr/README.md), [`muximux`](hosts/roles/muximux/README.md), [`homarr`](hosts/roles/homarr/README.md) |
-| Shared services | [`garage`](hosts/roles/garage/README.md), `apprise`, `apprise_server`, `apt_updates`, `compose_updates`, `semaphore_server`, [`forgejo_runner`](hosts/roles/forgejo_runner/README.md), `zwave_js_ui` |
+| Shared services | [`garage`](hosts/roles/garage/README.md), `apprise`, `apprise_server`, [`notify_relay`, `notify_client`](hosts/roles/notify_relay/README.md), `apt_updates`, `compose_updates`, `semaphore_server`, [`forgejo_runner`](hosts/roles/forgejo_runner/README.md), `zwave_js_ui` |
 | Containers | `arcane_server`, `arcane_agent` |
 | Internals | `fleet_plan` (reads tag manifests), `load_secrets`, `safe_apply` (validate, keep a copy, apply, health-check, restore) |
 

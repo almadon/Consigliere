@@ -1,0 +1,18 @@
+---
+# The notification relay (util: notify_relay): the one host that holds a Home Assistant token and passes the fleet's alerts to Supernotify.
+# See README.md and docs/decisions.md #31.
+notify_relay_image: "python:3.13-alpine"
+notify_relay_dir: /opt/notify-relay
+# Published on the tailnet address only, so alerts cross the network inside Tailscale's encryption.
+notify_relay_port: 8087
+notify_relay_bind_address: "{{ tailscale_ipv4 | default('127.0.0.1', true) }}"
+# Home Assistant as this host reaches it, for example http://homeassistant.example.com:8123
+notify_relay_ha_url: ""
+# Who Supernotify should tell: person entities, for example [person.alex]
+notify_relay_targets: []
+# The Home Assistant action that is called (domain/service).
+notify_relay_action: supernotify/notify
+# fleet-notify's tag to a Supernotify priority. A tag that is not listed is sent at the alert priority.
+notify_relay_priorities: {alert: high, info: low}
+# Secrets: notify.relay holds notify_relay_ha_token (a long-lived token of a dedicated non-admin user);
+# notify.client holds notify_client_key (24 characters or more), which hosts and this relay share.
