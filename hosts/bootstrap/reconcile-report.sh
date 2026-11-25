@@ -10,7 +10,7 @@
 # Needs: RUN_LOG (the run's captured output), RECONCILE_MODE, and a state directory (RECONCILE_STATE_DIR, default WORKDIR).
 
 _notify() {  # _notify <tag> <title> <body>
-  FLEET_NOTIFY_TAG="$1" timeout 30 fleet-notify "$2" "$(printf '%s' "$3" | cut -c1-900)" >/dev/null 2>&1 || true
+  FLEET_NOTIFY_TAG="$1" timeout 30 fleet-notify "$2" "$(printf '%s' "$3" | cut -c1-900)" >/dev/null 2>&1 || echo "ALERT NOT SENT (fleet-notify failed): $2" >&2
 }
 
 # Where to send the run summary as syslog (host:port, TCP), for hosts with no journal for the log collector to read (Unraid): RECONCILE_SYSLOG in the environment, or
@@ -50,7 +50,10 @@ syslog_recap() {  # syslog_recap <exit status>
 report_run() {  # report_run <exit status>
   local rc="$1" log="${RUN_LOG:-}" state="${RECONCILE_STATE_DIR:-${WORKDIR:-/tmp}}/notify-state"
   syslog_recap "$rc" || true
-  command -v fleet-notify >/dev/null 2>&1 || return 0
+  if ! command -v fleet-notify >/dev/null 2>&1; then
+    [ "$rc" -eq 0 ] || echo "ALERT NOT SENT (fleet-notify is not installed): reconcile failed with exit status $rc" >&2
+    return 0
+  fi
   local now sig prev_sig prev_ts detail changed names
   now="$(date +%s)"
   if [ "$rc" -ne 0 ]; then

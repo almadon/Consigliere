@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 # Managed by Ansible (hosts/roles/compose_updates). docker compose pull + up -d, then notify.
 set -uo pipefail
-notify() { command -v fleet-notify >/dev/null 2>&1 && fleet-notify "$1" "$2" || true; }
+# An alert that cannot be sent says so in the journal: a silent miss once hid a failing job for weeks.
+notify() {
+  if ! command -v fleet-notify >/dev/null 2>&1; then echo "ALERT NOT SENT (fleet-notify is not installed): $1" >&2
+  elif ! fleet-notify "$1" "$2"; then echo "ALERT NOT SENT (fleet-notify failed): $1" >&2
+  fi
+}
 
 exec 9>/run/fleet-compose-update.lock
 flock -n 9 || { echo "another run is in progress"; exit 0; }
