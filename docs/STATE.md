@@ -23,6 +23,8 @@ What is true right now, including what does not work. This file has an expiry: d
 - **Dependency hygiene**: `.github/dependabot.yml` now sets a cooldown (added 2026-10-28). Base images in `console/Dockerfile` float on `node:24-alpine`, and `requirements-ci.txt` is unpinned. conformIT's cooldown rule ([its decision #26](https://github.com/almadon/conformIT)) flags the last two, and they are not fixed.
 - **conformIT audit** (2026-10-28): after this change 18 pass, 9 warn, 2 fail. The two fails are false positives of the scanner: `git@github.com:` clone-URL syntax read as email addresses, and example tailnet placeholders in `console/.env.example` read as private hostnames. Neither is a real address.
 
+- **Accessibility** is below conformIT's floor or untested for both web interfaces. cmdr's current options are listed in [its README](../hosts/roles/cmdr/README.md#accessibility); the console in `console/` has not been assessed.
+
 ## Unverified
 
 - The calendar translator (systemd to cron) is tested on the forms the fleet uses and refuses the rest; it has not seen a fleet value outside those.
