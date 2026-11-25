@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# conformIT: Conventional Commits check.
+# See docs/commit-style.md. Bypass once with: git commit --no-verify
+#
+# Portable to bash 3.2 (macOS system bash): no mapfile, no associative arrays.
+set -uo pipefail
+
+MSG_FILE="$1"
+
+# Non-comment lines only.
+CLEAN="$(grep -v '^#' "$MSG_FILE")"
+
+SUBJECT="$(printf '%s\n' "$CLEAN" | sed -n '1p')"
+
+if [ -z "$(printf '%s' "$CLEAN" | tr -d '[:space:]')" ]; then
+  echo "commit-msg: empty commit message." >&2
+  exit 1
+fi
+
+TYPES='feat|fix|docs|refactor|perf|test|build|ci|chore|style|revert'
+
+# A restated rule tells you what you got wrong. A worked example tells you
+# what to type instead, which is what you actually want at the moment the
+# hook fires. Both, since the rule is what makes the examples make sense.
+fail() {
+  {
+    echo "commit-msg: $1"
+    echo
+    echo "  subject: $SUBJECT"
+    echo
+    echo "  expected: type(scope): description"
+    echo "  types:    $(printf '%s' "$TYPES" | tr '|' ' ')"
+    echo
+    echo "  examples:"
+    echo "    feat(auth): add passkey sign-in"
+    echo "    fix(hooks): reject capitalised commit subjects"
+    echo "    docs: correct the status line in README"
+    echo "    feat(api)!: drop the v1 endpoint"
+    echo
+    echo "  See docs/commit-style.md. Bypass once: git commit --no-verify"
+  } >&2
+  exit 1
+}
+
+# Subjects git generates itself are left alone. fixup! and squash! matter as
+# much as the other two: blocking them breaks `git commit --fixup` and the
+# autosquash rebase that follows, which is a normal workflow rather than an
+# edge case.
+case "$SUBJECT" in
+  "Merge "*|"Revert \""*|"fixup!"*|"squash!"*) exit 0 ;;
+esac
+
+printf '%s' "$SUBJECT" | grep -Eq "^(${TYPES})(\([a-z0-9._/-]+\))?!?: .+" \
+  || fail "subject does not match Conventional Commits."
+
+LEN=${#SUBJECT}
+[ "$LEN" -le 72 ] || fail "subject is $LEN characters; the limit is 72."
+
+case "$SUBJECT" in
+  *.) fail "subject ends with a full stop." ;;
+esac
+
+DESC="${SUBJECT#*: }"
+case "$DESC" in
+  [A-Z]*) fail "description starts with a capital. Use imperative lower case." ;;
+esac
+
+# Past tense, third-person present, and gerund subjects are the three shapes
+# non-imperative drift actually takes ("added", "adds", and "adding" are all
+# not "add"). The list was originally past-tense/gerund only and missed the
+# third-person forms entirely, so "fix: adds a flag" passed silently; found
+# by diffing against an adopter's independently-extended fork of this same
+# hook, which had already caught it. See decisions.md #11.
+FIRST_WORD="${DESC%% *}"
+case "$FIRST_WORD" in
+  added|adds|fixed|fixes|updated|updates|removed|removes|changed|changes| \
+  created|creates|refactored|refactors| \
+  adding|fixing|updating|removing|changing|creating|refactoring)
+    fail "description is not imperative ('$FIRST_WORD'). Write 'add', not 'added'/'adds'/'adding'." ;;
+esac
+
+# '!' marks a breaking change for tooling; the footer is for the person
+# who has to deal with it. Require both.
+case "$SUBJECT" in
+  *'!:'*)
+    grep -q '^BREAKING CHANGE: ' "$MSG_FILE" \
+      || fail "'!' marks a breaking change but there is no 'BREAKING CHANGE: ' footer." ;;
+esac
+
+# A missing body is a nudge, never a block. Some changes really are one-liners,
+# and a nudge that fires on every one of them gets tuned out, which costs the
+# times it had something to say.
+BODY="$(printf '%s\n' "$CLEAN" | sed -n '3,$p' | tr -d '[:space:]')"
+case "$DESC" in
+  *typo*|*whitespace*|*lint*|*formatting*) BODY="exempt" ;;
+esac
+if [ -z "$BODY" ]; then
+  {
+    echo "commit-msg: no body."
+    echo "  The diff says what changed; the body says why, what it cost,"
+    echo "  and what you verified. Committing anyway."
+  } >&2
+fi
+
+exit 0

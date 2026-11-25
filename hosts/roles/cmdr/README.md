@@ -109,6 +109,20 @@ In the fleet repo, `scripts/cmdr.sh init` stores the client id and secret and a 
 | `/auth/login`, `/auth/callback`, `/auth/logout`, `/auth/done` | no | The sign-in flow. |
 | `/healthz` | no | Answers `ok`. |
 
+## Accessibility
+
+This describes what is in the code today, read from `style.css`, `theme.js` and `app.js`. None of it has been tested against conformIT's [accessibility floor](https://github.com/almadon/conformIT/blob/main/docs/accessibility.md).
+
+| Option | State |
+|---|---|
+| Colour scheme | Follows the system. A button in the header overrides it, remembered in the browser |
+| Reduce motion | Follows the system setting for the main animations. No switch in the page |
+| Keyboard | A visible focus outline is styled. Whether everything can be reached and used by keyboard is **VERIFY** |
+| Text size | No control. Browser zoom only |
+| High contrast | No option |
+
+**Not tested:** widths of 320, 390, 768 and 1280 px, the largest text size, 200% zoom, touch target sizes, whether colour is ever the only signal, and screen readers. The optional console in `console/` has not been assessed at all.
+
 ## What was tested
 
 When the sign-in flow was first written it was tested against a mock identity provider and a mock Loki: a wrong group, a tampered cookie, forged proxy headers, an open redirect and a path traversal were all refused. Those tests are not in the repository, and they have not been re-run since the page was rebuilt, so treat that as `VERIFY`. The page has run on the fleet since October 2026. The map, the domains view and the host drawer were added by later sessions and were checked by reading the code and by use, not by an automated test.
