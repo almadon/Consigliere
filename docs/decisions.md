@@ -206,24 +206,28 @@ Numbered, never reused. A reversed decision gets a new entry that supersedes the
 
 **Chosen.** `restic_mirror_source_host_keys` takes the source host's public keys. When it is set, the mirror's `known_hosts` is a managed file matched by the source's name (`HostKeyAlias`), and the script connects with `StrictHostKeyChecking=yes`, so only those keys count and a new tailnet address does not matter. A changed key stops the run and the failure message says what to check and where to update it. **Why.** One host's keys were regenerated and the mirror, which trusted the first key it saw and then refused any change, failed every night for three weeks without anyone knowing. The alert path that should have reported it was not installed either. **Cost.** A source that is rebuilt now needs its new key put in the fleet before the mirror works again, which is the point, but it is one more thing to remember. **Rejected.** `StrictHostKeyChecking=no` (trusts a changed key, which defeats the check); fetching the key from the source at run time (that is the same trust-on-first-use the pin replaces). **Left as it was.** With no keys set, the old accept-new behaviour stays, so existing fleets are unaffected until they opt in. **Revisit if** other roles that reach hosts over SSH want the same pin; the helper could then move into the platform layer.
 
-## 31. Proposed: fleet-notify delivers through Home Assistant Supernotify, with Pushover underneath
+## 31. fleet-notify delivers through Home Assistant Supernotify
 
-**Status: proposed. Nothing is wired yet.** The direction is the maintainer's, relayed by the projects coordinator; the points below marked VERIFY or "to decide" are open.
+**Status: direction decided, connection method open. Nothing is wired yet.**
 
-**Direction.** `fleet-notify` stays the one thing hosts and roles call, so no caller changes. Its backend moves from Apprise to Home Assistant's Supernotify integration. Because most of what Consigliere reports on is what Home Assistant runs on, two things go straight to Pushover instead: alerts that must always arrive (a failed backup, Home Assistant being down), and any alert Home Assistant did not accept. Pushover's emergency priority repeats until acknowledged; no equivalent was found in Supernotify (**VERIFY**).
+**Chosen.** `fleet-notify` stays the one thing hosts and roles call, so no caller changes. Its backend moves from Apprise to Home Assistant's Supernotify integration. **Why.** Novak already uses Supernotify to dispatch notifications, so people, phones and delivery rules are kept in one place.
 
-**Recommended: call Home Assistant directly, not through Novak's gateway.** The gateway is one more service, on infrastructure these alerts report on. Its `notify.py` already makes the call this needs, `POST /api/services/supernotify/notify` with `title`, `message`, a person entity as `target`, `priority` and `delivery_selection: explicit`; its comment records that this was checked against a live install. It was read here, not re-run.
+**Rejected: Pushover underneath.** The first draft sent must-arrive alerts, and anything Home Assistant refused, straight to Pushover. The maintainer removed it because Consigliere is meant for other fleets too, and not everyone has Pushover.
 
-**How hosts reach it: to decide.** Neither option is as narrow as we would like.
+**Cost.** Most of what Consigliere reports on is what Home Assistant runs on, and with no second path **an alert raised while Home Assistant is down or unreachable is not delivered.** The least that has to happen then is that the caller sees a failure: `fleet-notify` exits non-zero and the caller logs `ALERT NOT SENT`. Something outside Home Assistant, such as an uptime monitor watching it, is what would notice that it is down; Consigliere does not provide that.
+
+**Call Home Assistant directly, not through Novak's gateway.** The gateway is one more service, on infrastructure these alerts report on. Its `notify.py` already makes the call this needs, `POST /api/services/supernotify/notify` with `title`, `message`, a person entity as `target`, `priority` and `delivery_selection: explicit`; its comment records that this was checked against a live install. It was read here, not re-run.
+
+**How hosts reach it: open.** Neither option is as narrow as we would like.
 
 | Option | For | Against |
 |---|---|---|
-| REST service call with a token of a dedicated non-admin user | A rejected call returns an HTTP error, so the Pushover fallback can trigger | As far as we know Home Assistant tokens have no per-service scope, so a token read from any host could call other services (**VERIFY**) |
-| Webhook that runs one automation | No token on any host; the webhook can only do what the automation does | We believe Home Assistant answers 200 even for an unknown webhook or a failing automation (**VERIFY**), which would hide exactly the failures the fallback exists for |
-| Either, sent from one relay host that holds the credential | One place to protect and rotate | The relay is a single point of failure, so hosts still need the direct Pushover fallback |
+| REST service call with a token of a dedicated non-admin user | A rejected call returns an HTTP error, so the caller knows | As far as we know Home Assistant tokens have no per-service scope, so a token read from any host could call other services (**VERIFY**) |
+| Webhook that runs one automation | No token on any host; the webhook can only do what the automation does | We believe Home Assistant answers 200 even for an unknown webhook or a failing automation (**VERIFY**), so a lost alert would look sent. With no second path, that is the worst way to fail |
+| Either, sent from one relay host that holds the credential | One place to protect and rotate | One more thing that has to be up |
 
-A success from either one means Home Assistant took the request, not that a phone got it, which is why the must-arrive alerts do not depend on it.
+A success from either means Home Assistant took the request, not that a phone got it.
 
 **Also open.** Supernotify's version requirements (v2.14 is reported to need a recent Home Assistant and Python 3.13, **VERIFY**).
 
-**Cost.** Two delivery paths to test instead of one, and a Pushover credential still on the hosts. **Until this is settled** the current Apprise-based `fleet-notify` stays as it is, and nobody needs to set up the Apprise panel further. **Revisit if** Supernotify gains repeat-until-acknowledged, or Home Assistant gains scoped tokens.
+**Until it is wired** the current Apprise-based `fleet-notify` stays in the code. **Revisit if** a missed alert during a Home Assistant outage costs something; an optional second path that a fleet can point anywhere would be the thing to add.
