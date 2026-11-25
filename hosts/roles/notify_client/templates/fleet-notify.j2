@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Managed by Ansible (hosts/roles/notify_client).
+# fleet-notify "<title>" ["<body>"]     (body is read from stdin if omitted)
+# Sends to the fleet's notification relay, which hands it to Home Assistant. FLEET_NOTIFY_TAG sets the urgency (default: alert).
+# Exits non-zero, with the reason, when the alert was not accepted. There is no second delivery path.
+set -u
+title="${1:-notification}"
+body="${2:-}"
+[ -n "$body" ] || { [ -t 0 ] || body="$(cat)"; }
+[ -n "$body" ] || body="(no details)"
+cfg="${FLEET_NOTIFY_CONFIG:-/etc/fleet-notify.json}"
+endpoint="$(sed -n 's/.*"endpoint": *"\([^"]*\)".*/\1/p' "$cfg" 2>/dev/null)"
+key="$(sed -n 's/.*"key": *"\([^"]*\)".*/\1/p' "$cfg" 2>/dev/null)"
+[ -n "$endpoint" ] && [ -n "$key" ] || { echo "fleet-notify: $cfg is missing or incomplete" >&2; exit 1; }
+# The key goes in through a curl config read from a pipe, not on the command line (which any user can see in the process list).
+if ! out="$(curl -sS -m 25 --fail-with-body -K <(printf 'header = "X-Notify-Key: %s"\n' "$key") -X POST "$endpoint/notify" \
+  --data-urlencode "tag=${FLEET_NOTIFY_TAG:-alert}" --data-urlencode "host={{ inventory_hostname }}" \
+  --data-urlencode "title=[{{ notify_client_title_prefix }}] $title" --data-urlencode "body=$body" 2>&1)"; then
+  echo "fleet-notify: not delivered: $out" >&2
+  exit 1
+fi

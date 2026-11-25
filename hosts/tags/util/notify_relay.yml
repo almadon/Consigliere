@@ -1,0 +1,5 @@
+---
+description: "Notification relay: holds the Home Assistant token and passes the fleet's alerts to Supernotify (needs the notify.relay and notify.client secrets)"
+order: 60
+roles: [notify_relay]
+secrets: [notify.relay, notify.client]

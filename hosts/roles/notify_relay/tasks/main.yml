@@ -1,0 +1,80 @@
+---
+- name: Check the settings
+  ansible.builtin.assert:
+    that:
+      - notify_relay_ha_url is match('^https?://')
+      - notify_relay_targets | length > 0
+    fail_msg: >-
+      Set notify_relay_ha_url (Home Assistant's address) and notify_relay_targets (person entities) in config/vars/group/util_notify_relay.yml.
+    quiet: true
+
+- name: Load the Home Assistant token and the key hosts use (secrets notify.relay and notify.client)
+  ansible.builtin.include_role:
+    name: load_secrets
+  vars:
+    load_secrets_scopes: [notify.relay, notify.client]
+
+- name: Require real secrets
+  ansible.builtin.assert:
+    that:
+      - notify_relay_ha_token is defined
+      - "'CHANGEME' not in notify_relay_ha_token"
+      - notify_client_key is defined
+      - notify_client_key | length >= 24
+      - "'CHANGEME' not in notify_client_key"
+    fail_msg: >-
+      notify.relay needs notify_relay_ha_token, and notify.client needs notify_client_key of 24 characters or more.
+    quiet: true
+  no_log: true
+
+- name: Create the directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ notify_relay_dir }}"
+    - "{{ notify_relay_dir }}/app"
+
+- name: Check that the container name is free
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: guard_containers
+  vars:
+    docker_guard_containers: [notify-relay]
+    docker_guard_dir: "{{ notify_relay_dir }}"
+
+# Written on its own with no_log, so neither a diff nor the journal ever shows it. Single quotes keep compose from interpreting a "$".
+- name: Write the token and the key
+  ansible.builtin.copy:
+    content: |
+      RELAY_HA_TOKEN='{{ notify_relay_ha_token }}'
+      RELAY_KEY='{{ notify_client_key }}'
+    dest: "{{ notify_relay_dir }}/secrets.env"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  diff: false
+
+- name: Apply the relay's code and compose file safely
+  ansible.builtin.include_role:
+    name: safe_apply
+  vars:
+    safe_apply_name: notify-relay
+    safe_apply_files:
+      - {dest: "{{ notify_relay_dir }}/app/relay.py", content: "{{ lookup('ansible.builtin.file', 'relay.py', rstrip=false) }}", mode: "0644"}
+      - dest: "{{ notify_relay_dir }}/docker-compose.yml"
+        content: "{{ lookup('ansible.builtin.template', 'docker-compose.yml.j2') }}"
+        mode: "0644"
+    safe_apply_restart: {kind: compose, project_src: "{{ notify_relay_dir }}", name: notify-relay}
+    safe_apply_health: {url: "http://{{ notify_relay_bind_address }}:{{ notify_relay_port }}/healthz", statuses: [200]}
+  when: not ansible_check_mode
+
+# safe_apply acts only when files change, so a first start that failed would otherwise look fine on the next run.
+- name: Make sure the relay is running
+  community.docker.docker_compose_v2:
+    project_src: "{{ notify_relay_dir }}"
+    state: present
+    pull: missing
+  when: not ansible_check_mode
