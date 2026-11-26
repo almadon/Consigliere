@@ -42,7 +42,7 @@
 - name: Write the repository's source file
   ansible.builtin.copy:
     dest: "{{ platform_repo.apt.sources_file }}"
-    content: "{{ platform_repo.apt.source.content }}"
+    content: "# Managed by Ansible (hosts/roles/platform) -- edits here get overwritten on the next reconciliation run.\n{{ platform_repo.apt.source.content }}"
     owner: root
     group: root
     mode: "0644"

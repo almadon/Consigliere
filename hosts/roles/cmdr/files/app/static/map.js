@@ -1,3 +1,4 @@
+// Managed by Ansible (hosts/roles/cmdr) -- edits here get overwritten on the next reconciliation run.
 (() => {
   'use strict';
   // The fleet on a world map: one marker per place (hosts at the same coordinates share it), coloured by the worst status of the hosts there, with optional

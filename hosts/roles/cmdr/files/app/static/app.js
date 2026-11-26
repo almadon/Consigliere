@@ -1,3 +1,4 @@
+// Managed by Ansible (hosts/roles/cmdr) -- edits here get overwritten on the next reconciliation run.
 (() => {
   'use strict';
   const $ = (id) => document.getElementById(id);

@@ -1,3 +1,4 @@
+// Managed by Ansible (hosts/roles/cmdr) -- edits here get overwritten on the next reconciliation run.
 (() => {
   'use strict';
   // The identity provider refuses to be framed, so sign-in runs in a small window of its own. It sets the session cookie for this site; as soon

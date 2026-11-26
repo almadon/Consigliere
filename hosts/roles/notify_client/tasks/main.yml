@@ -33,7 +33,7 @@
 
 - name: Write the relay address and key (a secret)
   ansible.builtin.copy:
-    content: "{{ {'endpoint': notify_client_url | trim('/'), 'key': notify_client_key} | to_json }}\n"
+    content: "{{ {'_comment': 'Managed by Ansible (hosts/roles/notify_client) -- edits here get overwritten on the next reconciliation run.', 'endpoint': notify_client_url | trim('/'), 'key': notify_client_key} | to_json }}\n"
     dest: /etc/fleet-notify.json
     owner: root
     group: root

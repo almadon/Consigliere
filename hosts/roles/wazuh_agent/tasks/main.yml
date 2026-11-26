@@ -48,6 +48,7 @@
   ansible.builtin.copy:
     dest: /etc/apt/sources.list.d/wazuh.sources
     content: |
+      # Managed by Ansible (hosts/roles/wazuh_agent) -- edits here get overwritten on the next reconciliation run.
       Types: deb
       URIs: https://packages.wazuh.com/{{ wazuh_agent_apt_repo_version }}/apt/
       Suites: stable

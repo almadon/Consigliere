@@ -36,6 +36,10 @@ A role that sets something up and then leaves it to the app's own UI is a legiti
 | Pinned collections and downloads | This repo | `hosts/requirements-hosts.yml` installed under the work directory; releases installed by `artifact` at a pinned digest | A host runs what is written, not what is newest | `hosts/requirements-hosts.yml`, the role's artifact data | Falls back to the OS bundle if Galaxy is unreachable |
 | Proxmox, Unraid, hardware | The platform | Not touched beyond a documented profile | See [proxmox-host.md](proxmox-host.md), [platforms.md](platforms.md) | The platform | The platform |
 
+## How to tell on a host
+
+A file that opens with `Managed by Ansible (hosts/roles/<name>)` is rewritten by the reconciler: change it in git, not on the host. JSON has no comments, so those files say it in a `_comment` key. A file without the line is not automatically yours to edit: some cannot carry one (credential and key files, state records, Grafana dashboard JSON), some have only certain lines managed (for example `/etc/hosts` and the sshd settings the roles edit in place), and application stacks belong to Arcane. The full list of files deliberately left unmarked is in [test_managed_headers.py](../hosts/tests/test_managed_headers.py).
+
 ## Synced both ways
 
 Nothing is synced both ways. Everything marked "This repo" flows from git to the host, and a hand edit is overwritten on the next run. Everything marked

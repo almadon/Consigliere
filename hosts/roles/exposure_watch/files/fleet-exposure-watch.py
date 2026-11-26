@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Managed by Ansible (hosts/roles/exposure_watch) -- edits here get overwritten on the next reconciliation run.
 """Exposure watch: compare what the internet can reach on the fleet's public addresses with what is declared.
 
 For every target (a host's public IPs and the ports it is SUPPOSED to expose):

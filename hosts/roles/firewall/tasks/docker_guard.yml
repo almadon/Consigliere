@@ -82,6 +82,7 @@
         dest: /etc/systemd/system/docker.service.d/20-after-docker-guard.conf
         mode: "0644"
         content: |
+          # Managed by Ansible (hosts/roles/firewall) -- edits here get overwritten on the next reconciliation run.
           [Unit]
           After=consigliere-docker-guard.service
           Wants=consigliere-docker-guard.service
