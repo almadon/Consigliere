@@ -57,6 +57,7 @@
   ansible.builtin.copy:
     dest: /etc/systemd/system/docker.service.d/10-after-tailscale.conf
     content: |
+      # Managed by Ansible (hosts/roles/docker) -- edits here get overwritten on the next reconciliation run.
       [Unit]
       After=tailscaled.service
       Wants=tailscaled.service

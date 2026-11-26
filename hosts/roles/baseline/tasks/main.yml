@@ -90,6 +90,7 @@
       ansible.builtin.copy:
         dest: /etc/apt/apt.conf.d/20auto-upgrades
         content: |
+          // Managed by Ansible (hosts/roles/baseline) -- edits here get overwritten on the next reconciliation run.
           APT::Periodic::Update-Package-Lists "1";
           APT::Periodic::Unattended-Upgrade "1";
         owner: root
@@ -167,7 +168,7 @@
     - name: Write the trusted CA public keys
       ansible.builtin.copy:
         dest: /etc/ssh/trusted_user_ca_keys
-        content: "{{ baseline_ssh_user_ca_keys | join('\n') }}\n"
+        content: "# Managed by Ansible (hosts/roles/baseline) -- edits here get overwritten on the next reconciliation run.\n{{ baseline_ssh_user_ca_keys | join('\n') }}\n"
         owner: root
         group: root
         mode: "0644"
@@ -184,7 +185,7 @@
     - name: Say which certificate principals may log in as root
       ansible.builtin.copy:
         dest: /etc/ssh/auth_principals/root
-        content: "{{ baseline_ssh_ca_principals | join('\n') }}\n"
+        content: "# Managed by Ansible (hosts/roles/baseline) -- edits here get overwritten on the next reconciliation run.\n{{ baseline_ssh_ca_principals | join('\n') }}\n"
         owner: root
         group: root
         mode: "0644"

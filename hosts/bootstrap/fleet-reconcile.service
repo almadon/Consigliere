@@ -1,3 +1,5 @@
+# Installed by Consigliere (hosts/bootstrap/bootstrap.sh). The reconciler does not rewrite this file, and running bootstrap.sh again replaces it.
+# To change it on one host, use a drop-in: systemctl edit fleet-reconcile.service
 [Unit]
 Description=Fleet reconciliation run (framework + private fleet-config)
 Wants=network-online.target

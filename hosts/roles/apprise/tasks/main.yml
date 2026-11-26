@@ -21,7 +21,7 @@
 
 - name: Write the endpoint and key (a secret)
   ansible.builtin.copy:
-    content: "{{ {'endpoint': apprise_endpoint | trim('/'), 'key': apprise_endpoint_key} | to_json }}\n"
+    content: "{{ {'_comment': 'Managed by Ansible (hosts/roles/apprise) -- edits here get overwritten on the next reconciliation run.', 'endpoint': apprise_endpoint | trim('/'), 'key': apprise_endpoint_key} | to_json }}\n"
     dest: /etc/apprise-endpoint.json
     owner: root
     group: root
@@ -82,7 +82,7 @@
 
 - name: Write the Apprise config (contains tokens)
   ansible.builtin.copy:
-    content: "{{ {'version': 1, 'urls': apprise_notify_urls} | to_nice_yaml }}"
+    content: "# Managed by Ansible (hosts/roles/apprise) -- edits here get overwritten on the next reconciliation run.\n{{ {'version': 1, 'urls': apprise_notify_urls} | to_nice_yaml }}"
     dest: "{{ apprise_config_dir }}/apprise.yml"
     owner: root
     group: root

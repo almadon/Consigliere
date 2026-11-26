@@ -26,6 +26,7 @@ Pushes to `main` are what hosts apply. Treat every change as a deployment.
 - **Ownership.** [docs/ownership.md](docs/ownership.md) says what is managed and what is not. A new role adds a row there and opens its README with the contract block.
 - **Config changes to a running service** go through the `safe_apply` role (validate, keep a copy, apply, health-gate, restore), not a bare template plus restart.
 - **No secrets, no site values, no taxonomy** in this repo. They belong in the private fleet repo.
+- **A file written to a host says it is managed,** in its first lines. `hosts/tests/test_managed_headers.py` enforces it; an exception goes in that file with its reason.
 - **One home per setting.** Defaults in the role's `defaults/main.yml`; the fleet overrides them in `config/vars/`.
 
 ### Build and test

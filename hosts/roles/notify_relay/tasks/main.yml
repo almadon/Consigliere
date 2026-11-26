@@ -48,6 +48,7 @@
 - name: Write the token and the key
   ansible.builtin.copy:
     content: |
+      # Managed by Ansible (hosts/roles/notify_relay) -- edits here get overwritten on the next reconciliation run.
       RELAY_HA_TOKEN='{{ notify_relay_ha_token }}'
       RELAY_KEY='{{ notify_client_key }}'
     dest: "{{ notify_relay_dir }}/secrets.env"

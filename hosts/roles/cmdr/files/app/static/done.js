@@ -1,3 +1,4 @@
+// Managed by Ansible (hosts/roles/cmdr) -- edits here get overwritten on the next reconciliation run.
 (() => {
   'use strict';
   // Runs in the window that just finished signing in. Tell the waiting page (a frame in the console) at once, count down, then close.

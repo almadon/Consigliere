@@ -116,6 +116,7 @@ fi
 
 echo "==> Writing environment file for future reconciliation runs"
 cat > /etc/fleet-reconcile.env <<EOF
+# Written by Consigliere (hosts/bootstrap/bootstrap.sh). The reconciler does not rewrite this file, and running bootstrap.sh again replaces it.
 FRAMEWORK_REPO_URL=$FRAMEWORK_REPO_URL
 FRAMEWORK_REPO_BRANCH=$FRAMEWORK_REPO_BRANCH
 FLEET_CONFIG_REPO_URL=$FLEET_CONFIG_REPO_URL

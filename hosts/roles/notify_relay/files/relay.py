@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Managed by Ansible (hosts/roles/notify_relay) -- edits here get overwritten on the next reconciliation run.
 """The notification relay: takes an alert from a fleet host and hands it to Home Assistant's Supernotify (decision 31).
 
 It exists so that only one host holds a Home Assistant token. A host sends  POST /notify  (form fields title, body, tag, host) with the shared

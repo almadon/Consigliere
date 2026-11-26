@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Managed by Ansible (hosts/roles/cmdr) -- edits here get overwritten on the next reconciliation run.
 """cmdr: the fleet's control page. Metadata from the fleet repo, live status from Loki, launch buttons for the admin tools.
 
 Standard library only. Sign-in is OpenID Connect (authorization code + PKCE) against your identity provider, with a signed session

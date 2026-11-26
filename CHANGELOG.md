@@ -2,6 +2,10 @@
 
 What changed and why, including reverts. Dates are absolute.
 
+## 2026-11-26
+
+- **Managed files say so.** Files the framework writes to a host that lacked it now open with a "Managed by Ansible" line (JSON files carry a `_comment` key), and a test fails when a new one does not. Not marked, with reasons in the test: credential and key files, state records, dashboard JSON, and the Muximux config the app itself rewrites. Files where only a line is edited are left alone. The systemd units and env file that `bootstrap.sh` installs say who wrote them and that the reconciler does not rewrite them; existing hosts keep their current copies. The first reconcile after this rewrites the changed files once: cmdr restarts and the firewall guard re-applies its rules. Docker is not restarted.
+
 ## 2026-11-25
 
 - **Notification relay (decision 31).** New `util: [notify_relay]` and `feat: [notify]`: `fleet-notify` posts to one relay host, which holds the Home Assistant token and calls Supernotify. It exits non-zero when the alert is not accepted. Nothing uses it until a fleet adds the tags; `feat: [apprise]` is unchanged. Not yet run against a real Home Assistant.
